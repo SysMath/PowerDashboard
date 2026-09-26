@@ -190,9 +190,13 @@ pnpm audit --audit-level low
 ```
 
 Les overrides de version vivent dans `pnpm-workspace.yaml`, et non dans `package.json` :
-pnpm 11 ne lit plus le champ `pnpm` du fichier de paquet. Deux sont en place — `dompurify`,
-que Monaco embarque en version vulnérable, et `esbuild`, que drizzle-kit tire via un
-chargeur déprécié.
+pnpm 11 ne lit plus le champ `pnpm` du fichier de paquet. Deux sont en place : `esbuild`,
+que drizzle-kit tire via un chargeur déprécié, et `@types/node`, aligné sur la majeure du
+moteur (Node 24) jusque dans les pairs installés d'office.
+
+`trustPolicyExclude`, dans le même fichier, liste les rares versions acceptées malgré une
+publication moins garantie que la précédente (perte de la provenance) : chacune a été
+relue, et sa justification est écrite à côté.
 
 Le même fichier porte `allowBuilds`, la liste des paquets autorisés à exécuter un script
 d'installation. pnpm les bloque par défaut, et c'est justifié : un `postinstall` s'exécute

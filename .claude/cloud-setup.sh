@@ -19,7 +19,7 @@ fi
 
 # --- pnpm, à la version épinglée par package.json ---------------------------
 $SUDO corepack enable
-corepack prepare pnpm@11.20.0 --activate
+corepack prepare pnpm@11.27.1 --activate
 
 # --- PostgreSQL, pour les tests d'intégration --------------------------------
 # Sans base, ces tests se sautent proprement (HAS_DATABASE) : la session reste

@@ -17,10 +17,10 @@
     "@gamedashboard/ui": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@simplewebauthn/browser": "^14.0.0",
-    "lucide-react": "^1.46.0",
-    "monaco-editor": "^0.56.0",
-    "next": "^16.3.5",
-    "next-intl": "^4.14.5",
+    "lucide-react": "^1.48.0",
+    "monaco-editor": "^0.57.0",
+    "next": "^16.3.6",
+    "next-intl": "^4.14.7",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -28,17 +28,17 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.10.2",
+    "@axe-core/playwright": "^4.13.0",
     "@gamedashboard/config": "workspace:*",
-    "@playwright/test": "^1.56.1",
-    "@tailwindcss/postcss": "^4.1.0",
-    "@types/node": "^26.5.1",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24.13.6",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "lighthouse": "^13.5.0",
-    "tailwindcss": "^4.1.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.2"
   }
 }

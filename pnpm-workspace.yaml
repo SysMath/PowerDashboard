@@ -23,16 +23,16 @@ allowBuilds:
 # Versions imposées à tout l'arbre de dépendances.
 # pnpm 11 ne lit plus le champ « pnpm » de package.json : les overrides vivent ici.
 overrides:
-  # Monaco embarque un dompurify vulnérable, dont une XSS par suppression de
-  # hook IN_PLACE qui laisse un sous-arbre détaché exécutable. Monaco ne l'a pas
-  # encore relevé. À retirer quand monaco-editor le fera lui-même.
-  dompurify: ">=3.4.13"
-
   # drizzle-kit passe encore par @esbuild-kit/esm-loader, déprécié, qui épingle
   # un esbuild dont le serveur de développement accepte les requêtes de
   # n'importe quel site (GHSA-67mh-4wv8-2f99). Uniquement exploitable en
   # développement, mais la correction ne coûte rien.
   esbuild: ">=0.25.0"
+
+  # Types de Node alignés sur la majeure du moteur (Node 24, .nvmrc) dans tout
+  # l'arbre : sans cela, les pairs installés d'office (vite, vitest, Storybook)
+  # tirent la dernière majeure publiée et décrivent des API absentes de Node 24.
+  "@types/node": "^24.13.6"
 
 # Aucune dépendance transitive tirée d'une source hors du registre (dépôt git,
 # archive par URL) : seule une dépendance directe, écrite ici, peut le faire.
@@ -47,3 +47,10 @@ trustPolicyExclude:
   # juillet 2023, publié à la main sans la provenance des 7.x : faux positif
   # connu. Amené par @babel/core (Storybook, styled-jsx de Next).
   - semver@6.3.1
+
+  # Publiée en janvier 2025 par le même mainteneur que la 3.2.1 (jkoops), à la
+  # main, sans la provenance de la 3.2.1 : faux positif relu. L'écart entre les
+  # deux se borne à index.js (WeakRef sur les ressources suivies, piles
+  # recopiées avant affichage), aucun script d'installation, aucune dépendance
+  # ajoutée. Amené par vitest 5.0.2 (outil de diagnostic des tests seulement).
+  - why-is-node-running@3.2.2

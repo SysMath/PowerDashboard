@@ -41,6 +41,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { build } from "esbuild";
+import { EXTERNES_API } from "./externes-api.mjs";
 
 const VERSION = process.argv[2];
 const SORTIE = process.argv[3] ?? "dist";
@@ -117,23 +118,10 @@ try {
  * journaux, `code` des erreurs renvoyées).
  *
  * Restent dehors : le module natif d'argon2, copié à côté, et les paquets
- * facultatifs que Nest cherche sans les exiger (microservices, websockets,
- * Express, validation par classes) — absents ici comme dans node_modules.
+ * facultatifs que Nest cherche sans les exiger (`externes-api.mjs`).
  */
 async function compilerApi(dossier) {
-  const externes = [
-    "@node-rs/argon2",
-    "@nestjs/microservices",
-    "@nestjs/microservices/*",
-    "@nestjs/platform-express",
-    "@nestjs/websockets",
-    "@nestjs/websockets/*",
-    "class-transformer",
-    "class-transformer/*",
-    "class-validator",
-    "@fastify/static",
-    "@fastify/view",
-  ];
+  const externes = EXTERNES_API;
   await build({
     absWorkingDir: API,
     entryPoints: { main: "src/main.ts", migrer: "src/migrate.ts" },

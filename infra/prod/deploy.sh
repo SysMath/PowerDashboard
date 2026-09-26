@@ -138,7 +138,7 @@ export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 #
 # Il ne suffit pas d'appeler `corepack pnpm` : turbo relance `pnpm run build`
 # dans chaque paquet, et trouve alors le pnpm global de la machine (12.3.4),
-# qui refuse de tourner sur un projet épinglé en 11.20.0. On place donc en tête
+# qui refuse de tourner sur un projet épinglé en 11.27.1. On place donc en tête
 # de PATH un relais qui renvoie vers la version épinglée — pour nous comme pour
 # tout ce que nous lançons.
 install -d -m 755 "$ROOT/bin"

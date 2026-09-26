@@ -18,14 +18,14 @@
   },
   "dependencies": {
     "@gamedashboard/contracts": "workspace:*",
-    "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.0"
+    "drizzle-orm": "^0.45.3",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@gamedashboard/config": "workspace:*",
-    "@types/node": "^24.0.0",
-    "drizzle-kit": "^0.31.0",
+    "@types/node": "^24.13.6",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.2"
   }
 }

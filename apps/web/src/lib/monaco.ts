@@ -25,7 +25,7 @@ export type MonacoWorker = "editor" | "json" | "css" | "html" | "ts";
  * Monaco demande ses workers par `MonacoEnvironment.getWorker`, **tous** :
  * dès que la fonction existe, il ne crée plus rien lui-même, et une étiquette
  * sans réponse ferait tomber le service de langage. Les étiquettes sont
- * celles de Monaco 0.56 (le `workerManager.js` de chaque service de
+ * celles de Monaco 0.57 (le `workerManager.js` de chaque service de
  * langage) ; ce qui n'en est pas une retombe sur le worker de l'éditeur.
  */
 export function monacoWorkerFor(label: string): MonacoWorker {
