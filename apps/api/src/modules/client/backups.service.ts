@@ -1,3 +1,4 @@
+import { backupDeletionBlocked } from "@gamedashboard/contracts";
 import { backups, type Database, servers } from "@gamedashboard/db";
 import {
   BadRequestException,
@@ -6,7 +7,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 import { S3Service } from "../storage/s3.service";
 import { WingsClientService, WingsUnavailableError } from "../wings/wings-client.service";
@@ -221,6 +222,19 @@ export class BackupsService {
     if (backup.isLocked) {
       throw new ConflictException("Cette sauvegarde est verrouillée. Déverrouillez-la d'abord.");
     }
+    // Pendant une restauration, l'archive rendue ne doit pas disparaître : le
+    // compte rendu de fin de Wings trouverait un 404 et le serveur resterait
+    // bloqué (voir `backupDeletionBlocked`).
+    const [server] = await this.db
+      .select({ state: servers.state })
+      .from(servers)
+      .where(eq(servers.id, serverId))
+      .limit(1);
+    if (backupDeletionBlocked(server?.state)) {
+      throw new ConflictException(
+        "Une restauration est en cours sur ce serveur. Attendez qu'elle se termine pour supprimer une sauvegarde.",
+      );
+    }
 
     if (backup.disk === "s3") {
       // Une archive distante ne regarde pas le daemon : il ne supprime que ce
@@ -261,6 +275,14 @@ export class BackupsService {
    * Une sauvegarde encore en cours ou ratée est refusée : restaurer une archive
    * incomplète écraserait des données valides par des données tronquées, et
    * c'est irréversible.
+   *
+   * Le serveur passe à l'état `restoring` pendant l'opération (NC-44) : le
+   * panel refuse alors le démarrage, le gestionnaire de fichiers et le SFTP
+   * (`SftpAuthService`), au lieu de s'en remettre au seul drapeau de Wings.
+   * Trois issues le relâchent : le compte rendu de Wings
+   * (`POST /backups/:uuid/restore`, envoyé en fin de restauration, réussie ou
+   * non), un refus du daemon ici même, et le redémarrage du daemon
+   * (`resetTransientStates`).
    */
   async restore(serverId: string, backupId: string, truncate: boolean): Promise<void> {
     const backup = await this.mustFind(serverId, backupId);
@@ -275,7 +297,31 @@ export class BackupsService {
     // Une archive distante, Wings la télécharge lui-même par un lien signé :
     // il n'a pas les identifiants du compartiment.
     const downloadUrl = backup.disk === "s3" ? await this.remoteUrl(serverId, backupId) : undefined;
-    await this.wings.restoreBackup(serverId, backupId, truncate, downloadUrl);
+
+    // Pris seulement sur un serveur sans état : une installation, un transfert
+    // ou une suspension arrivés depuis le contrôle de la route gardent la main.
+    const [claimed] = await this.db
+      .update(servers)
+      .set({ state: "restoring", updatedAt: new Date().toISOString() })
+      .where(and(eq(servers.id, serverId), isNull(servers.state)))
+      .returning({ id: servers.id });
+    if (!claimed) {
+      throw new ConflictException(
+        "Ce serveur est occupé par une autre opération. Réessayez quand elle sera terminée.",
+      );
+    }
+
+    try {
+      await this.wings.restoreBackup(serverId, backupId, truncate, downloadUrl);
+    } catch (error) {
+      // Refusée par le daemon, la restauration n'a pas commencé : aucun
+      // compte rendu ne viendra relâcher l'état.
+      await this.db
+        .update(servers)
+        .set({ state: null, updatedAt: new Date().toISOString() })
+        .where(and(eq(servers.id, serverId), eq(servers.state, "restoring")));
+      throw error;
+    }
   }
 
   /**

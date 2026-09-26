@@ -345,8 +345,16 @@ describe("compte rendu de sauvegarde", () => {
     expect(complete).toHaveBeenCalledWith(NODE.id, "backup-1", {});
   });
 
-  it("accuse réception d'une restauration sans rien enregistrer", () => {
-    expect(controller().backupRestored()).toBeUndefined();
+  it("transmet la fin d'une restauration, au nom du node authentifié", async () => {
+    const restored = vi.fn(async () => {});
+    const c = controller({}, {}, { restored });
+
+    await c.backupRestored(request, "backup-1", { successful: true });
+    await c.backupRestored(request, "backup-1", undefined as never);
+
+    expect(restored).toHaveBeenNthCalledWith(1, NODE.id, "backup-1", true);
+    // Un corps absent ne vaut pas une réussite.
+    expect(restored).toHaveBeenNthCalledWith(2, NODE.id, "backup-1", false);
   });
 });
 

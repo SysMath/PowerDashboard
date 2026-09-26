@@ -97,6 +97,9 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
 
   "backup.create": { category: "backups", label: "Sauvegarde lancée" },
   "backup.restore": { category: "backups", label: "Sauvegarde restaurée" },
+  // Rapportés par le daemon en fin de restauration (NC-44).
+  "backup.restore_completed": { category: "backups", label: "Restauration terminée" },
+  "backup.restore_failed": { category: "backups", label: "Restauration échouée" },
   "backup.delete": { category: "backups", label: "Sauvegarde supprimée" },
   "backup.lock": { category: "backups", label: "Verrou de sauvegarde modifié" },
   /**

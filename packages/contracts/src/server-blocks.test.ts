@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  backupDeletionBlocked,
   reinstallBlocked,
   SERVER_BLOCKS,
   SERVER_MANAGED_STATES,
@@ -139,5 +140,22 @@ describe("réinstallation", () => {
     // et une réinstallation ne se reporte pas.
     expect(scheduleVerdict("install_failed")).toBe("skip");
     expect(reinstallBlocked("install_failed")).toBe(false);
+  });
+});
+
+/**
+ * Suppression d'une sauvegarde pendant une restauration (revue du lot
+ * « reliquats-asvs », R1) : effacer l'archive rendue laissait le serveur en
+ * `restoring` pour toujours. Ailleurs, supprimer reste permis pour libérer
+ * de la place.
+ */
+describe("suppression d'une sauvegarde", () => {
+  it("est refusée pendant une restauration, et seulement là", () => {
+    expect(backupDeletionBlocked("restoring")).toBe(true);
+    for (const state of SERVER_MANAGED_STATES) {
+      if (state === "restoring") continue;
+      expect(backupDeletionBlocked(state), `L'état « ${state} »`).toBe(false);
+    }
+    expect(backupDeletionBlocked(null)).toBe(false);
   });
 });

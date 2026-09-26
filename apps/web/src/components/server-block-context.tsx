@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  backupDeletionBlocked,
   nodeOutageBlock,
   reinstallBlocked,
   type ServerBlock,
@@ -93,6 +94,11 @@ export function useServerBlock(): ServerBlock | null {
  */
 export function useReinstallBlocked(): boolean {
   return reinstallBlocked(useContext(ServerBlockContext).state);
+}
+
+/** Vrai pendant une restauration : les sauvegardes ne se suppriment pas. */
+export function useBackupDeletionBlocked(): boolean {
+  return backupDeletionBlocked(useContext(ServerBlockContext).state);
 }
 
 /**
