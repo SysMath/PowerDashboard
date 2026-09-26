@@ -1,7 +1,15 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -1121,5 +1129,55 @@ describe("domaine de revendeur déclaré, pas encore vérifié", () => {
     // Nos propres blocs ne comptent pas : ce sont eux qu'on réécrit.
     expect(servi("a.revendeur.fr")).toBe(false);
     expect(servi("libre.revendeur.fr")).toBe(false);
+  });
+});
+
+/**
+ * L'API regroupée de l'archive autonome laisse dehors chaque pair facultatif
+ * de Nest absent de l'installation.
+ *
+ * esbuild ne sait pas qu'un pair est facultatif : un `import()` à la demande
+ * vers un paquet absent fait échouer tout le regroupement. NestJS 12.1.0 a
+ * ajouté `@fastify/multipart` aux pairs de l'adaptateur Fastify, et
+ * `autonome.mjs` échouait (« Could not resolve ») ; la CI ne construit pas
+ * cette archive, seule la release l'aurait vu, et l'hébergement cPanel
+ * n'aurait plus reçu de version.
+ */
+describe("archive autonome : externes de l'API", () => {
+  const API = join(RACINE, "apps", "api");
+
+  /**
+   * Un paquet visible depuis un dossier, comme Node le chercherait : dans les
+   * `node_modules` de chaque dossier parent. Par le système de fichiers et non
+   * par `require.resolve`, que le champ `exports` de Nest ferme à
+   * `package.json`.
+   */
+  const installe = (depuis: string, paquet: string): boolean => {
+    for (let dossier = depuis; ; dossier = dirname(dossier)) {
+      if (existsSync(join(dossier, "node_modules", paquet, "package.json"))) return true;
+      if (dirname(dossier) === dossier) return false;
+    }
+  };
+
+  it("nomme chaque pair facultatif de Nest qui n'est pas installé", async () => {
+    const { EXTERNES_API } = (await import(
+      join(RACINE, "infra", "release", "externes-api.mjs")
+    )) as { EXTERNES_API: string[] };
+    const manquants: string[] = [];
+
+    for (const paquet of ["@nestjs/core", "@nestjs/common", "@nestjs/platform-fastify"]) {
+      // Le vrai dossier du paquet : pnpm range ses pairs à côté de lui.
+      const dossier = realpathSync(join(API, "node_modules", paquet));
+      const manifeste = JSON.parse(readFileSync(join(dossier, "package.json"), "utf8")) as {
+        peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+      };
+      for (const [pair, meta] of Object.entries(manifeste.peerDependenciesMeta ?? {})) {
+        if (meta.optional && !installe(dossier, pair) && !EXTERNES_API.includes(pair)) {
+          manquants.push(`${pair} (${paquet})`);
+        }
+      }
+    }
+
+    expect(manquants).toEqual([]);
   });
 });

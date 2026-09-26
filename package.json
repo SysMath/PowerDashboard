@@ -1,7 +1,7 @@
 {
   "name": "gamedashboard",
   "private": true,
-  "packageManager": "pnpm@11.20.0",
+  "packageManager": "pnpm@11.27.1",
   "engines": {
     "node": ">=22"
   },
@@ -40,9 +40,9 @@
     "db:studio": "pnpm --filter @gamedashboard/db db:studio"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.1.0",
+    "@biomejs/biome": "^2.5.14",
     "esbuild": "^0.28.2",
-    "turbo": "^2.10.13",
+    "turbo": "^2.11.4",
     "typescript": "^7.0.2"
   }
 }
