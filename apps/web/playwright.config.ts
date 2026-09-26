@@ -34,6 +34,20 @@ const API_URL = `http://127.0.0.1:${API_PORT}`;
 const EXISTANT = process.env.E2E_BASE_URL;
 const BASE_URL = EXISTANT ?? `http://127.0.0.1:${WEB_PORT}`;
 
+/**
+ * Arrêt des deux serveurs par SIGTERM, et non par le SIGKILL immédiat que
+ * Playwright envoie par défaut au groupe de processus.
+ *
+ * Depuis pnpm 11.27.1, et seulement sans terminal de contrôle (CI, conteneur,
+ * service), `pnpm run` lance le script dans **son propre** groupe de
+ * processus ; dans un terminal, il le garde dans le sien, et le défaut ne se
+ * voit pas en local. Le SIGKILL du groupe tue alors pnpm, mais l'API et Next
+ * survivent, orphelins : la suite finissait ses tests puis restait pendue à
+ * l'arrêt, jusqu'au délai du job. Un SIGTERM, lui, est relayé par pnpm au
+ * script, qui s'arrête proprement.
+ */
+const ARRET = { signal: "SIGTERM", timeout: 10_000 } as const;
+
 export default defineConfig({
   testDir: "./e2e",
   /*
@@ -83,6 +97,7 @@ export default defineConfig({
           port: API_PORT,
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
+          gracefulShutdown: ARRET,
           env: {
             PORT: String(API_PORT),
             HOST: "127.0.0.1",
@@ -95,6 +110,7 @@ export default defineConfig({
           port: WEB_PORT,
           reuseExistingServer: !process.env.CI,
           timeout: 120_000,
+          gracefulShutdown: ARRET,
           env: { API_URL, PORT: String(WEB_PORT), NODE_ENV: "production" },
         },
       ],

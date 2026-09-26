@@ -11,12 +11,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "mysql2": "^3.16.0"
+    "mysql2": "^3.24.4"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
     "@gamedashboard/config": "workspace:*",
+    "@types/node": "^24.13.6",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.2"
   }
 }
