@@ -1,6 +1,7 @@
 import { encryptSecret, generateTotpSecret } from "@gamedashboard/auth";
 import {
   activityLogs,
+  authTokens,
   type Database,
   sessions as sessionsTable,
   userOauthAccounts,
@@ -8,7 +9,7 @@ import {
   userTotpCredentials,
 } from "@gamedashboard/db";
 import { Logger } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createThrowawayDatabase,
@@ -286,8 +287,7 @@ describe.skipIf(!HAS_DATABASE)("Connexion avec Google (intégration)", () => {
       .set({ emailVerifiedAt: new Date().toISOString() })
       .where(eq(users.id, id));
     expect((await retour()).statusCode).toBe(200);
-    const lien = await jetons.issue(id, "password_reset", null);
-    if (!lien) throw new Error("jeton non émis");
+    if (!(await jetons.issue(id, "password_reset", null))) throw new Error("jeton non émis");
 
     profilGoogle.email = "Alex.Nouvelle@gmail.com";
     const reply = await retour();
@@ -303,7 +303,15 @@ describe.skipIf(!HAS_DATABASE)("Connexion avec Google (intégration)", () => {
         previousEmail: { address: "alex@gmail.com", verified: true },
       }),
     );
-    expect(await jetons.consume(lien.token, "password_reset")).toBeNull();
+    // Le lien est lu en base plutôt que repassé par `consume()` : CodeQL prend
+    // le jeton aléatoire, haché en SHA-256, pour un mot de passe mal haché
+    // (js/insufficient-password-hash, faux positif déjà connu sur main).
+    const liens = await db
+      .select({ consumedAt: authTokens.consumedAt })
+      .from(authTokens)
+      .where(and(eq(authTokens.userId, id), eq(authTokens.purpose, "password_reset")));
+    expect(liens).toHaveLength(1);
+    expect(liens[0]?.consumedAt).not.toBeNull();
   });
 
   it("ne prévient personne quand l'adresse ne change que de casse", async () => {
