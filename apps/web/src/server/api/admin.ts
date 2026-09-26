@@ -211,9 +211,58 @@ export interface EggCatalogueEntry {
 }
 
 export const fetchEggCatalogue = () =>
-  unwrap<{ source: EggCatalogueSource; entries: EggCatalogueEntry[] }>(
-    "/api/v1/admin/egg-catalogue",
-  );
+  unwrap<{
+    source: EggCatalogueSource;
+    entries: EggCatalogueEntry[];
+    /** Date de lecture de l'arbre du dépôt chez GitHub. */
+    readAt: string;
+    /** Arbre vieilli, servi parce que GitHub n'a pas répondu. */
+    stale: boolean;
+  }>("/api/v1/admin/egg-catalogue");
+
+/** Le catalogue du dépôt, ou la raison pour laquelle il manque. */
+export interface EggCatalogueRead {
+  source: EggCatalogueSource | null;
+  entries: EggCatalogueEntry[];
+  /** Liste servie de mémoire, lue chez GitHub à `readAt`. */
+  staleSince: string | null;
+  /**
+   * Catalogue absent. `reason` : la phrase de l'API quand elle en donne une ;
+   * nulle quand l'API n'a pas répondu ou n'a rien dit d'utile — l'écran
+   * l'explique alors lui-même, sans l'adresse interne de l'API.
+   */
+  error: { reason: string | null } | null;
+}
+
+/**
+ * Le catalogue du dépôt, **sans faire tomber la page** quand il manque.
+ *
+ * Il se lit chez GitHub : limite d'appels anonymes atteinte (soixante par
+ * heure et par adresse, vite consommées sur un hébergement mutualisé), sortie
+ * filtrée, GitHub en panne. Un seul de ces refus remplaçait tout l'écran des
+ * eggs par « Une erreur est survenue » : plus moyen de modifier, activer ou
+ * coller un egg local, alors que rien de cela ne dépend du dépôt. Le refus
+ * devient ici un avertissement, et le reste de l'écran continue de servir.
+ *
+ * Seul un refus de l'API est absorbé. Ce qui n'en est pas un — le « page
+ * introuvable » qu'`unwrap` lève pour une session qui n'est plus du personnel —
+ * suit son cours.
+ */
+export async function readEggCatalogue(read = fetchEggCatalogue): Promise<EggCatalogueRead> {
+  try {
+    const { source, entries, readAt, stale } = await read();
+    return { source, entries, staleSince: stale ? readAt : null, error: null };
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error;
+    const parlante = error.kind === "http" && error.status !== 500;
+    return {
+      source: null,
+      entries: [],
+      staleSince: null,
+      error: { reason: parlante ? error.message : null },
+    };
+  }
+}
 
 export interface AdminOverview {
   servers: number;

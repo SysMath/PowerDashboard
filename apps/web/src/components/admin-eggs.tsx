@@ -19,7 +19,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useState, useTransition } from "react";
-import type { AdminEgg, EggCatalogueEntry, EggCatalogueSource } from "@/server/api/admin";
+import type {
+  AdminEgg,
+  EggCatalogueEntry,
+  EggCatalogueRead,
+  EggCatalogueSource,
+} from "@/server/api/admin";
 import { setEggEnabled } from "@/server/api/admin-actions";
 import { AdminEggExportButton } from "./admin-egg-export-button";
 import { AdminEggImport } from "./admin-egg-import";
@@ -28,10 +33,14 @@ export function AdminEggs({
   initial,
   source,
   entries,
+  catalogueError = null,
+  catalogueStaleSince = null,
 }: {
   initial: AdminEgg[];
   source: EggCatalogueSource | null;
   entries: EggCatalogueEntry[];
+  catalogueError?: EggCatalogueRead["error"];
+  catalogueStaleSince?: string | null;
 }) {
   const t = useTranslations("adminEggs");
   const tc = useTranslations("common");
@@ -157,7 +166,14 @@ export function AdminEggs({
   return (
     <PageTemplate
       header={<PageHeader icon={<Egg />} title={t("title")} subtitle={t("subtitle")} />}
-      toolbar={<AdminEggImport source={source} entries={entries} />}
+      toolbar={
+        <AdminEggImport
+          source={source}
+          entries={entries}
+          catalogueError={catalogueError}
+          catalogueStaleSince={catalogueStaleSince}
+        />
+      }
     >
       {error ? (
         <AlertBanner variant="danger" title={tc("actionRefused")} dismissible>

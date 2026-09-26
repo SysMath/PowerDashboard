@@ -1,8 +1,15 @@
 import { EggParseError, type ParsedEgg, parsePterodactylEgg } from "@gamedashboard/contracts";
 import { type Database, eggSources, eggs, eggVariables, nests } from "@gamedashboard/db";
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, isNull, notInArray } from "drizzle-orm";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { type EggTree, EggTreeCache } from "./egg-tree-cache";
 
 /**
  * Entrée du catalogue : import d'eggs Pterodactyl.
@@ -43,6 +50,39 @@ const MAX_EGG_BYTES = 512 * 1024;
 
 /** Durée de validité de l'arbre d'un dépôt gardé en mémoire. */
 const TREE_CACHE_TTL_MS = 15 * 60_000;
+
+/** Au-delà, un arbre vieilli ne sert plus, même GitHub injoignable. */
+const TREE_MAX_STALE_MS = 24 * 60 * 60_000;
+
+/** Après un échec passager, GitHub n'est pas retenté avant ce délai. */
+const TREE_FAILURE_HOLD_MS = 2 * 60_000;
+
+/**
+ * Échéance de la lecture d'un arbre, **nettement** sous les dix secondes au
+ * bout desquelles l'interface cesse d'attendre l'API (`API_TIMEOUT_MS` de
+ * `apps/web`) : au-delà, l'arbre vieilli servi en repli n'arriverait plus à
+ * personne.
+ */
+const TREE_TIMEOUT_MS = 5_000;
+/**
+ * Échéance de la branche par défaut d'un dépôt. Plus courte que celle de
+ * l'arbre : à la première ouverture d'un panel neuf, les deux lectures se
+ * suivent, et leur somme (8 s) doit rester sous les 10 s au bout desquelles
+ * Next cesse d'attendre l'API. Un échec retombe sur `main`.
+ */
+const BRANCH_TIMEOUT_MS = 3_000;
+/** Le dépôt officiel, posé comme source à la première ouverture. */
+const DEFAULT_SOURCE = {
+  name: "Pterodactyl game-eggs",
+  repo: { owner: "pterodactyl", name: "game-eggs" },
+};
+
+/**
+ * GitHub n'a pas pu répondre, pour une raison qui passera : limite d'appels,
+ * panne, réseau, échéance. Seule panne après laquelle l'arbre gardé en
+ * mémoire sert encore (`EggTreeCache`).
+ */
+export class GitHubUnavailableException extends ServiceUnavailableException {}
 
 /** Ce qu'un dépôt propose, tel que l'écran de recherche l'affiche. */
 export interface EggCatalogueEntry {
@@ -169,7 +209,9 @@ export class EggImportService {
    * requêtes. Le vrai nom, celui que l'egg déclare, remplace celui-ci au moment
    * de l'import.
    */
-  async catalogue(sourceId: string): Promise<EggCatalogueEntry[]> {
+  async catalogue(
+    sourceId: string,
+  ): Promise<{ entries: EggCatalogueEntry[]; readAt: string; stale: boolean }> {
     const [source] = await this.db.select().from(eggSources).where(eq(eggSources.id, sourceId));
     if (!source) throw new NotFoundException("Source inconnue.");
 
@@ -177,7 +219,7 @@ export class EggImportService {
     if (!repo)
       throw new BadRequestException("L'adresse de cette source n'est pas un dépôt GitHub.");
 
-    const paths = await this.treeOf(repo, source.branch);
+    const tree = await this.treeOf(repo, source.branch);
 
     // Ce qui est déjà importé depuis cette source, pour que l'écran puisse le
     // dire plutôt que de proposer un import qui ne ferait que réécrire.
@@ -188,7 +230,7 @@ export class EggImportService {
 
     const byRef = new Map(installed.map((row) => [row.ref, row]));
 
-    return paths.map((path) => {
+    const entries = tree.paths.map((path) => {
       const existing = byRef.get(path);
       return {
         path,
@@ -198,6 +240,7 @@ export class EggImportService {
         enabled: existing?.enabled ?? false,
       };
     });
+    return { entries, readAt: new Date(tree.at).toISOString(), stale: tree.stale };
   }
 
   /**
@@ -215,13 +258,16 @@ export class EggImportService {
     if (!repo)
       throw new BadRequestException("L'adresse de cette source n'est pas un dépôt GitHub.");
 
-    const paths = await this.treeOf(repo, source.branch);
+    const { paths } = await this.treeOf(repo, source.branch);
     if (!paths.includes(path)) {
       throw new BadRequestException("Ce fichier ne figure pas dans le dépôt.");
     }
 
+    // Même échéance que l'arbre : l'écran attend la réponse, et Next cesse
+    // d'attendre l'API au bout de 10 s.
     const raw = await fetchJson<unknown>(
       `https://raw.githubusercontent.com/${repo.owner}/${repo.name}/${source.branch}/${path}`,
+      TREE_TIMEOUT_MS,
     );
 
     let parsed: ParsedEgg;
@@ -248,62 +294,79 @@ export class EggImportService {
    * L'écran ne demande plus d'ajouter une source avant de chercher un egg :
    * c'était une étape de configuration pour un besoin qui n'en a pas. Elle est
    * posée à la première ouverture, et reste modifiable.
+   *
+   * **Une seule, même sous des ouvertures simultanées.** La première
+   * ouverture d'un panel neuf attend GitHub ; une seconde, ou la même que Next
+   * a abandonnée puis relancée, arrivait pendant ce temps et créait sa propre
+   * source : deux « Pterodactyl game-eggs ». La branche se lit hors verrou,
+   * puis un verrou transactionnel sérialise « relire, sinon créer ».
    */
   async defaultSource(): Promise<{ id: string; name: string; url: string; branch: string }> {
-    const [existing] = await this.db
-      .select()
-      .from(eggSources)
-      .orderBy(eggSources.createdAt)
-      .limit(1);
-    if (existing) {
-      return {
-        id: existing.id,
-        name: existing.name,
-        url: existing.url,
-        branch: existing.branch,
-      };
-    }
+    const existing = await this.firstSource(this.db);
+    if (existing) return existing;
 
-    const { id } = await this.addSource({
-      name: "Pterodactyl game-eggs",
-      url: "https://github.com/pterodactyl/game-eggs",
+    const branch = await defaultBranchOf(DEFAULT_SOURCE.repo);
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('egg_sources:defaut'))`);
+      const deja = await this.firstSource(tx);
+      if (deja) return deja;
+
+      const [created] = await tx
+        .insert(eggSources)
+        .values({
+          name: DEFAULT_SOURCE.name,
+          type: "git",
+          url: `https://github.com/${DEFAULT_SOURCE.repo.owner}/${DEFAULT_SOURCE.repo.name}`,
+          branch,
+          pathGlob: "**/*.json",
+        })
+        .returning();
+      if (!created) throw new Error("La source par défaut n'a pas pu être créée.");
+      return { id: created.id, name: created.name, url: created.url, branch: created.branch };
     });
+  }
 
-    const [created] = await this.db.select().from(eggSources).where(eq(eggSources.id, id));
-    if (!created) throw new Error("La source par défaut n'a pas pu être créée.");
-    return { id: created.id, name: created.name, url: created.url, branch: created.branch };
+  /** La plus ancienne source, s'il y en a une. */
+  private async firstSource(
+    db: Pick<Database, "select">,
+  ): Promise<{ id: string; name: string; url: string; branch: string } | null> {
+    const [first] = await db.select().from(eggSources).orderBy(eggSources.createdAt).limit(1);
+    return first ? { id: first.id, name: first.name, url: first.url, branch: first.branch } : null;
   }
 
   /**
-   * L'arbre du dépôt, gardé en mémoire un quart d'heure.
+   * L'arbre du dépôt, gardé en mémoire un quart d'heure (`EggTreeCache`).
    *
    * L'API de GitHub n'accorde que soixante appels par heure sans jeton. Chaque
    * frappe dans le champ de recherche ne doit pas en consommer un : la liste
    * est filtrée côté écran, et le dépôt n'est relu que lorsqu'elle a vieilli.
+   * GitHub injoignable, l'arbre vieilli sert encore, un jour au plus, et
+   * l'échec est retenu deux minutes.
    */
-  private async treeOf(repo: { owner: string; name: string }, branch: string): Promise<string[]> {
-    const key = `${repo.owner}/${repo.name}@${branch}`;
-    const cached = EggImportService.trees.get(key);
-    if (cached && Date.now() - cached.at < TREE_CACHE_TTL_MS) return cached.paths;
+  private treeOf(repo: { owner: string; name: string }, branch: string): Promise<EggTree> {
+    return EggImportService.trees.read(treeKey(repo, branch), async () => {
+      const tree = await fetchJson<{
+        tree?: { path: string; type: string; size?: number }[];
+      }>(
+        `https://api.github.com/repos/${repo.owner}/${repo.name}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+        TREE_TIMEOUT_MS,
+      );
 
-    const tree = await fetchJson<{
-      tree?: { path: string; type: string; size?: number }[];
-    }>(
-      `https://api.github.com/repos/${repo.owner}/${repo.name}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-    );
-
-    const paths = (tree.tree ?? [])
-      .filter((entry) => entry.type === "blob" && entry.path.endsWith(".json"))
-      .filter((entry) => (entry.size ?? 0) <= MAX_EGG_BYTES)
-      .map((entry) => entry.path)
-      .slice(0, MAX_FILES_PER_SYNC);
-
-    EggImportService.trees.set(key, { at: Date.now(), paths });
-    return paths;
+      return (tree.tree ?? [])
+        .filter((entry) => entry.type === "blob" && entry.path.endsWith(".json"))
+        .filter((entry) => (entry.size ?? 0) <= MAX_EGG_BYTES)
+        .map((entry) => entry.path)
+        .slice(0, MAX_FILES_PER_SYNC);
+    });
   }
 
   /** Partagé par toutes les instances : il n'y en a qu'une, et c'est un cache. */
-  private static readonly trees = new Map<string, { at: number; paths: string[] }>();
+  private static readonly trees = new EggTreeCache({
+    ttlMs: TREE_CACHE_TTL_MS,
+    maxStaleMs: TREE_MAX_STALE_MS,
+    failureHoldMs: TREE_FAILURE_HOLD_MS,
+    transient: (error) => error instanceof GitHubUnavailableException,
+  });
 
   /* --- Import d'un fichier ------------------------------------------------ */
 
@@ -367,12 +430,19 @@ export class EggImportService {
       tree?: { path: string; type: string; size?: number }[];
     }>(
       `https://api.github.com/repos/${repo.owner}/${repo.name}/git/trees/${encodeURIComponent(source.branch)}?recursive=1`,
+      TREE_TIMEOUT_MS,
     );
 
     const candidates = (tree.tree ?? [])
       .filter((entry) => entry.type === "blob" && entry.path.endsWith(".json"))
       .filter((entry) => (entry.size ?? 0) <= MAX_EGG_BYTES)
       .slice(0, MAX_FILES_PER_SYNC);
+
+    // L'arbre qu'on vient de lire devient celui de l'écran de recherche.
+    EggImportService.trees.store(
+      treeKey(repo, source.branch),
+      candidates.map((entry) => entry.path),
+    );
 
     if (candidates.length === 0) {
       throw new BadRequestException(
@@ -586,6 +656,11 @@ export class EggImportService {
   }
 }
 
+/** Clé d'un arbre en mémoire : un dépôt, une branche. */
+function treeKey(repo: { owner: string; name: string }, branch: string): string {
+  return `${repo.owner}/${repo.name}@${branch}`;
+}
+
 /** Découpe `https://github.com/owner/name` en ses deux morceaux. */
 function parseGitHubRepo(url: string): { owner: string; name: string } | null {
   const match = url
@@ -609,6 +684,7 @@ async function defaultBranchOf(repo: { owner: string; name: string }): Promise<s
   try {
     const info = await fetchJson<{ default_branch?: unknown }>(
       `https://api.github.com/repos/${repo.owner}/${repo.name}`,
+      BRANCH_TIMEOUT_MS,
     );
     return typeof info.default_branch === "string" && info.default_branch.trim() !== ""
       ? info.default_branch
@@ -634,24 +710,45 @@ function nestNameFromPath(path: string): string {
  * L'échéance est explicite : sans elle, un dépôt qui ne répond pas retiendrait
  * la requête d'administration jusqu'à ce que le navigateur abandonne, sans rien
  * afficher.
+ *
+ * Les pannes passagères (limite d'appels, 5xx, réseau, échéance) deviennent
+ * `GitHubUnavailableException`, avec une phrase qui nomme GitHub : un échec de
+ * transport remontait en « Internal server error », sans cause.
  */
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      // GitHub refuse les requêtes sans agent identifiable.
-      "user-agent": "gamedashboard-gamedashboard",
-    },
-    signal: AbortSignal.timeout(20_000),
-  });
+async function fetchJson<T>(url: string, timeoutMs = 20_000): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        accept: "application/json",
+        // GitHub refuse les requêtes sans agent identifiable.
+        "user-agent": "gamedashboard-gamedashboard",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (cause) {
+    // « fetch failed » dit tout et rien : la cause réelle est une échéance,
+    // ou un réseau qui ne mène pas à GitHub (DNS, sortie filtrée).
+    const timedOut =
+      cause instanceof DOMException &&
+      (cause.name === "TimeoutError" || cause.name === "AbortError");
+    throw new GitHubUnavailableException(
+      timedOut
+        ? `GitHub n'a pas répondu en moins de ${timeoutMs / 1000} s.`
+        : "GitHub est injoignable depuis le serveur du panel (réseau ou sortie filtrée).",
+    );
+  }
 
   if (response.status === 403 || response.status === 429) {
-    throw new BadRequestException(
+    throw new GitHubUnavailableException(
       "GitHub a refusé la requête : la limite d'appels anonymes est atteinte. Réessayez dans une heure.",
     );
   }
   if (response.status === 404) {
     throw new BadRequestException("Dépôt ou branche introuvable.");
+  }
+  if (response.status >= 500) {
+    throw new GitHubUnavailableException(`GitHub est en panne (réponse ${response.status}).`);
   }
   if (!response.ok) {
     throw new BadRequestException(`GitHub a répondu ${response.status}.`);
