@@ -1,5 +1,4 @@
-import { randomBytes } from "node:crypto";
-import { hashPassword } from "@gamedashboard/auth";
+import { hashPassword, provisionalPassword } from "@gamedashboard/auth";
 import {
   allocations,
   backups,
@@ -104,15 +103,21 @@ export class AdminActionsService {
      * Le tirer au sort garantit qu'il est unique à ce compte, et l'afficher une
      * seule fois rappelle qu'il est provisoire.
      *
-     * base64url : rien qu'un terminal, un courriel ou un copier-coller abîme.
+     * Il porte la même échéance que celui des scripts (ASVS 2.3.1) : vingt-
+     * quatre heures, après quoi la connexion et le SFTP le refusent ; avant,
+     * la première connexion mène à la page où l'on en choisit un autre. Sans
+     * échéance, le secret lu dans un courriel ou une messagerie restait le mot
+     * de passe durable du compte.
      */
-    const temporaryPassword = input.withPassword ? randomBytes(18).toString("base64url") : null;
+    const provisional = input.withPassword ? provisionalPassword() : null;
+    const temporaryPassword = provisional?.password ?? null;
 
     const [created] = await this.db
       .insert(users)
       .values({
         email,
         passwordHash: temporaryPassword ? await hashPassword(temporaryPassword) : null,
+        passwordExpiresAt: provisional?.expiresAt?.toISOString() ?? null,
         nameFirst,
         nameLast,
         role: input.role as "user" | "support" | "admin" | "reseller",

@@ -33,7 +33,11 @@ import {
   restoreBackup,
   setBackupLock,
 } from "@/server/api/backups";
-import { ServerBlockBanner, useServerBlock } from "./server-block-context";
+import {
+  ServerBlockBanner,
+  useBackupDeletionBlocked,
+  useServerBlock,
+} from "./server-block-context";
 
 /**
  * Sauvegardes d'un serveur.
@@ -64,6 +68,7 @@ export function BackupsWorkspace({ serverId, initial }: { serverId: string; init
    * de portée.
    */
   const bloc = useServerBlock();
+  const deletionBlocked = useBackupDeletionBlocked();
 
   const run = useCallback(
     (action: () => Promise<{ error: string | null }>) =>
@@ -170,7 +175,7 @@ export function BackupsWorkspace({ serverId, initial }: { serverId: string; init
               <DropdownItem
                 icon={<Trash2 />}
                 destructive
-                disabled={busy || backup.isLocked}
+                disabled={busy || backup.isLocked || deletionBlocked}
                 onSelect={() => setToDelete(backup)}
               >
                 {tc("delete")}
@@ -180,7 +185,7 @@ export function BackupsWorkspace({ serverId, initial }: { serverId: string; init
         },
       },
     ],
-    [serverId, pending, bloc, run, t, tc],
+    [serverId, pending, bloc, deletionBlocked, run, t, tc],
   );
 
   const full = initial.used >= initial.limit;

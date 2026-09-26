@@ -98,7 +98,7 @@ describe.skipIf(!HAS_DATABASE)("suivi du moteur installé (intégration)", () =>
   const packs = { newerVersion: vi.fn(), search: vi.fn(async () => []) };
   const sources = {
     resolve: vi.fn(async () => ({
-      url: "https://fill.papermc.io/paper.jar",
+      url: "https://fill-data.papermc.io/v1/objects/abc/paper.jar",
       fileName: "paper.jar",
     })),
     labelOf: vi.fn(() => "Paper"),

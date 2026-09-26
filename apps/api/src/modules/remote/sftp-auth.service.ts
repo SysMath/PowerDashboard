@@ -1,4 +1,4 @@
-import { parseSshPublicKey, verifyPassword } from "@gamedashboard/auth";
+import { parseSshPublicKey, passwordStanding, verifyPassword } from "@gamedashboard/auth";
 import {
   ROLE_PRESETS,
   type ServerPermission,
@@ -76,13 +76,10 @@ const MAX_TRACKED = 50_000;
  * `transferring` y manquait : pendant qu'un node archive les fichiers pour un
  * autre, une écriture SFTP se perd, ou arrive à moitié de l'autre côté.
  *
- * `restoring`, lui, n'est jamais posé par le panel : la restauration n'a pas
- * d'état de ce côté-ci, et le compte rendu de Wings
- * (`POST /backups/:uuid/restore`) n'en relâche aucun. Le poser sans cela
- * bloquerait le serveur jusqu'au prochain redémarrage du daemon. Wings, lui,
- * refuse toute opération SFTP pendant qu'il restaure (son propre drapeau,
- * `IsInProtectedState`). L'état reste ici pour le jour où le panel le
- * tiendrait.
+ * `restoring` est posé par `BackupsService.restore` et relâché par le compte
+ * rendu de Wings (`POST /backups/:uuid/restore`) : le panel refuse le SFTP
+ * pendant une restauration, sans s'en remettre au seul drapeau du daemon
+ * (`IsInProtectedState`).
  */
 const CLOSED_STATES = new Set([
   "installing",
@@ -174,6 +171,7 @@ export class SftpAuthService {
         id: users.id,
         email: users.email,
         passwordHash: users.passwordHash,
+        passwordExpiresAt: users.passwordExpiresAt,
         suspendedAt: users.suspendedAt,
       })
       .from(users)
@@ -229,7 +227,7 @@ export class SftpAuthService {
    * `keyId` ne sert qu'à noter l'usage de la clé.
    */
   private async verify(
-    account: { id: string; passwordHash: string | null },
+    account: { id: string; passwordHash: string | null; passwordExpiresAt?: string | null },
     request: SftpAuthRequest,
   ): Promise<{ keyId: string | null } | null> {
     if (request.type === "password") {
@@ -242,6 +240,13 @@ export class SftpAuthService {
        * machine de son porteur.
        */
       if (!account.passwordHash) return null;
+      /*
+       * Un mot de passe provisoire échu ne vaut plus rien, ici non plus
+       * (ASVS 2.3.1) : la connexion au panel le refuse, et le SFTP l'acceptait
+       * encore, ce qui en faisait le mot de passe durable du compte. Les clés
+       * SSH, choisies par leur porteur, ne sont pas concernées.
+       */
+      if (passwordStanding(account.passwordExpiresAt ?? null) === "expired") return null;
       // Le mot de passe suffit, double authentification ou non : le protocole
       // n'a aucune étape pour un code. Écart assumé et documenté (ADR 0001).
       return (await verifyPassword(account.passwordHash, request.password))
