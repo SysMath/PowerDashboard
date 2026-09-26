@@ -3,18 +3,15 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../lib/cn";
+import { THEME_STORAGE_KEY as KEY } from "../lib/theme-init";
 
 export type Theme = "light" | "dark" | "system";
-const KEY = "gd-theme";
 
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
   if (theme === "system") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", theme);
 }
-
-/** Script inline à placer dans <head> pour éviter le flash de thème. */
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("${KEY}");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})();`;
 
 export function ThemeToggle({
   labels,

@@ -47,3 +47,4 @@ export * from "./lib/ansi";
 export { cn } from "./lib/cn";
 export * from "./lib/console-text";
 export * from "./lib/format";
+export * from "./lib/theme-init";
