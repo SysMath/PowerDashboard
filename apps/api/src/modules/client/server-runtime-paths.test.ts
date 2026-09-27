@@ -84,6 +84,25 @@ describe("chemins relayés au daemon", () => {
     expect(tokens.fileDownloadGrant).not.toHaveBeenCalled();
   });
 
+  it("refuse un chemin donné deux fois en paramètre, au lieu d'une erreur 500", async () => {
+    // `?file=a&file=b` arrive en tableau : `refusePath` tombait en TypeError.
+    const { controleur, wings, tokens } = monter();
+    const double = ["/a", "/b"];
+
+    for (const appel of [
+      () => controleur.files(requete, SERVEUR, double),
+      () => controleur.fileContents(requete, SERVEUR, double),
+      () => controleur.writeFile(requete, SERVEUR, double, { content: "x" }),
+      () => controleur.downloadFile(requete, SERVEUR, double),
+    ]) {
+      await expect(appel()).rejects.toBeInstanceOf(BadRequestException);
+    }
+    expect(wings.listDirectory).not.toHaveBeenCalled();
+    expect(wings.readFile).not.toHaveBeenCalled();
+    expect(wings.writeFile).not.toHaveBeenCalled();
+    expect(tokens.fileDownloadGrant).not.toHaveBeenCalled();
+  });
+
   it("refuse un octet nul", async () => {
     const { controleur, wings } = monter();
     await expect(controleur.fileContents(requete, SERVEUR, NUL)).rejects.toBeInstanceOf(

@@ -29,7 +29,12 @@ import { DATABASE } from "../../common/database.provider";
 import { NotificationsService } from "../notifications/notifications.service";
 import { queryA2s, queryCfx } from "./game-query.transport";
 import type { GameStatus } from "./game-status";
-import { buildStatusRequest, type MinecraftStatus, readStatusResponse } from "./minecraft-ping";
+import {
+  buildStatusRequest,
+  type MinecraftStatus,
+  readStatusResponse,
+  STATUS_FRAME_MAX_BYTES,
+} from "./minecraft-ping";
 import { probePlan } from "./probe-plan";
 
 /**
@@ -425,7 +430,11 @@ export function probeHost(row: { ip: string; ipAlias: string | null; fqdn: strin
  * qui n'est pas un serveur Minecraft. Aucun de ces cas n'est distingué, parce
  * qu'aucun ne change ce qu'il faut en dire : les joueurs n'entrent pas.
  */
-export function ping(host: string, port: number): Promise<MinecraftStatus | null> {
+export function ping(
+  host: string,
+  port: number,
+  timeoutMs = TIMEOUT_MS,
+): Promise<MinecraftStatus | null> {
   return new Promise((resolve) => {
     const socket = new Socket();
     let chunks = Buffer.alloc(0);
@@ -434,18 +443,23 @@ export function ping(host: string, port: number): Promise<MinecraftStatus | null
     const finish = (status: MinecraftStatus | null): void => {
       if (settled) return;
       settled = true;
+      clearTimeout(echeance);
       socket.destroy();
       resolve(status);
     };
 
-    socket.setTimeout(TIMEOUT_MS);
-    socket.on("timeout", () => finish(null));
+    // Échéance fixe, comme pour A2S et FiveM, et non `socket.setTimeout` : ce
+    // dernier ne mesure que l'inactivité et repart à chaque octet reçu. Un
+    // serveur qui en envoyait un toutes les deux secondes tenait la sonde sans
+    // fin, et avec elle tout le lot — donc la surveillance du parc entier.
+    const echeance = setTimeout(() => finish(null), timeoutMs);
     socket.on("error", () => finish(null));
     // Fin de flux sans réponse exploitable : le serveur a raccroché.
     socket.on("close", () => finish(null));
 
     socket.on("data", (chunk) => {
       chunks = Buffer.concat([chunks, chunk]);
+      if (chunks.length > STATUS_FRAME_MAX_BYTES) return finish(null);
       const status = readStatusResponse(chunks);
       // `null` signifie « trame encore incomplète » : on attend la suite
       // jusqu'au délai, plutôt que de conclure sur un début de JSON.
