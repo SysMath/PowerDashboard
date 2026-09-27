@@ -63,7 +63,7 @@ export class CloudflareProvider implements DnsProvider {
       const record = row as { id?: unknown; type?: unknown; comment?: unknown };
       const note = typeof record.comment === "string" ? record.comment : null;
       return typeof record.id === "string" && typeof record.type === "string"
-        ? [{ id: record.id, type: record.type, note }]
+        ? [{ id: record.id, type: record.type, name, note }]
         : [];
     });
   }

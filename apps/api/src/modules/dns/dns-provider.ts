@@ -44,6 +44,8 @@ export interface DnsConnection {
 export interface NamedRecord {
   id: string;
   type: string;
+  /** Le nom demandé : le fournisseur n'en rend pas d'autre. */
+  name: string;
   note: string | null;
 }
 

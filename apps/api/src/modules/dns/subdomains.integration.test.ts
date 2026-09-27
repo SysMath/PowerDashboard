@@ -806,6 +806,43 @@ describe.skipIf(!HAS_DATABASE)("SubdomainsService (intégration)", () => {
       { type: "CNAME", name: "mixte.jeux.exemple.fr", cible: "node.test" },
     ]);
   });
+  it("ne retire, d'un nom abandonné, que ce que le panel a pu y poser pour ce serveur", async () => {
+    // Revue V4-F1 et V4-F2 : le retrait prenait tout enregistrement portant la
+    // note, TXT compris ; et rien ne vérifiait qu'il s'agissait bien de la
+    // note de ce serveur-là.
+    service = servicePerdant();
+    const serverId = await serveur();
+    const autre = await serveur();
+    await expect(service.claim(serverId, "melange")).resolves.toMatchObject({ status: "error" });
+    const texte = sim.poser({
+      type: "TXT",
+      name: "melange.jeux.exemple.fr",
+      content: "copie de la note",
+      comment: `GameDashboard, serveur ${serverId}`,
+    });
+    const voisin = sim.poser({
+      type: "SRV",
+      name: "_minecraft._tcp.melange.jeux.exemple.fr",
+      data: { priority: 0, weight: 5, port: 25_565, target: "mc.ailleurs.fr" },
+      comment: `GameDashboard, serveur ${autre}`,
+    });
+
+    plusTard();
+    await service.release(serverId);
+    expect([...sim.enregistrements.keys()].sort()).toEqual([texte, voisin].sort());
+  });
+
+  it("ne prend pas pour sien un TXT qui porte sa note", async () => {
+    const serverId = await serveur();
+    const texte = sim.poser({
+      type: "TXT",
+      name: "note.jeux.exemple.fr",
+      content: "copie de la note",
+      comment: `GameDashboard, serveur ${serverId}`,
+    });
+    await expect(service.claim(serverId, "note")).rejects.toBeInstanceOf(ConflictException);
+    expect([...sim.enregistrements.keys()]).toEqual([texte]);
+  });
 });
 
 if (!HAS_DATABASE) console.warn(NO_DATABASE_REASON);

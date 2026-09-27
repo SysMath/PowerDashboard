@@ -62,7 +62,10 @@ transporte que du HTTP), durent 60 secondes, et portent la note
 `GameDashboard, serveur <uuid>`. Cette note sert aussi au panel : un
 enregistrement de même nom et de même type qui la porte est **repris** plutôt
 que refusé (création dont la réponse s'est perdue, zone recréée avec copie de
-ses enregistrements). Ne pas la poser à la main sur autre chose.
+ses enregistrements). Seuls comptent les types que le panel publie à ce nom
+(`A`, `AAAA`, `CNAME` au nom, `SRV` sous `_minecraft._tcp`) : la même note
+recopiée sur un `TXT` ne rend pas celui-ci au panel, qui le tient pour
+étranger. Ne pas la poser à la main sur autre chose.
 
 ## Ce qui les tient à jour
 

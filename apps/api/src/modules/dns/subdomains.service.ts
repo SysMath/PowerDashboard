@@ -45,7 +45,7 @@ import { isPrivateAddress } from "../../common/public-url";
 import { decryptRowSecret } from "../../common/row-secrets";
 import { probeHost } from "../scheduler/game-probe.service";
 import { probePlan } from "../scheduler/probe-plan";
-import { type DnsConnection, type DnsProvider, DnsRefusal } from "./dns-provider";
+import { type DnsConnection, type DnsProvider, DnsRefusal, type NamedRecord } from "./dns-provider";
 
 /** Jeton d'injection du registre des fournisseurs, substitué par les tests. */
 export const DNS_PROVIDERS = Symbol("DNS_PROVIDERS");
@@ -236,7 +236,7 @@ export class SubdomainsService implements OnModuleInit, OnModuleDestroy {
       )
         .flat()
         // Posé par le panel pour ce serveur, dont la réponse s'est perdue : il sera repris.
-        .filter((record) => record.note !== noteFor(serverId));
+        .filter((record) => !isOwnRecord(record, serverId));
     } catch (error) {
       this.logger.warn(`Zone DNS injoignable : ${this.describe(error, setup)}.`);
       throw new ServiceUnavailableException(
@@ -608,10 +608,10 @@ export class SubdomainsService implements OnModuleInit, OnModuleDestroy {
       // Créé par le panel pour ce serveur, mais la réponse s'est perdue (délai
       // dépassé, coupure) : il est repris, sinon le nom restait bloqué pour
       // toujours sur un enregistrement que personne ne connaissait.
-      if (named.some((existing) => existing.note !== note)) {
+      if (named.some((existing) => !isOwnRecord(existing, row.serverId))) {
         throw new SubdomainProblem(SUBDOMAIN_ERRORS.conflict);
       }
-      const mine = named.filter((existing) => existing.note === note);
+      const mine = named;
       const lost = mine.find((existing) => existing.type === record.type);
       // Les siens d'un autre type (un A perdu, puis l'adresse devenue un nom
       // d'hôte) bloqueraient la création : retirés, comme ceux de `blocking`.
@@ -683,12 +683,11 @@ export class SubdomainsService implements OnModuleInit, OnModuleDestroy {
     row: SubdomainRow,
   ): Promise<void> {
     if (!row.abandonedBy) return;
-    const note = noteFor(row.abandonedBy);
     const connection = { zoneId: row.zoneId, apiToken: setup.connection.apiToken };
     try {
       for (const name of publishableNames(row.fqdn)) {
         for (const record of await provider.recordsNamed(connection, name)) {
-          if (record.note === note) await provider.remove(connection, record.id);
+          if (isOwnRecord(record, row.abandonedBy)) await provider.remove(connection, record.id);
         }
       }
     } catch (error) {
@@ -835,6 +834,19 @@ function forgetOlder(moments: Map<string, number>, now: number): void {
  */
 function noteFor(serverId: string | null): string {
   return `GameDashboard, serveur ${serverId}`;
+}
+
+/**
+ * Un enregistrement que le panel a pu créer pour ce serveur : sa note, et un
+ * type que le panel publie à ce nom (A, AAAA ou CNAME au nom, SRV sous
+ * `_minecraft._tcp`). Une note recopiée sur autre chose — un TXT, un MX — ne
+ * suffit pas : ce n'est pas le panel qui l'a posé, il ne le reprend ni ne le
+ * retire.
+ */
+function isOwnRecord(record: NamedRecord, serverId: string | null): boolean {
+  if (record.note !== noteFor(serverId)) return false;
+  const srvName = record.name.startsWith(`${MINECRAFT_SRV_PREFIX}.`);
+  return srvName ? record.type === "SRV" : ["A", "AAAA", "CNAME"].includes(record.type);
 }
 
 /** Les noms que le panel peut publier pour un nom complet : le nom, et son SRV. */
