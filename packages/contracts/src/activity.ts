@@ -330,6 +330,10 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
     category: "settings",
     label: "Limites du serveur changées par la facturation",
   },
+  "application.server_owner_changed": {
+    category: "account",
+    label: "Titulaire d'un serveur changé par la facturation",
+  },
   "application.server_deleted": {
     category: "settings",
     label: "Serveur supprimé par la facturation",

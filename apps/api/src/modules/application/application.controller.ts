@@ -1,5 +1,6 @@
 import {
   ApplicationServerCreate,
+  ApplicationServerOwner,
   ApplicationUserCreate,
   ApplicationUserUpdate,
   ServerLimitsPatch,
@@ -25,8 +26,10 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { z } from "zod";
+import { isUuid } from "../../common/uuid";
 import { ActivityService } from "../activity/activity.service";
 import { AdminActionsService } from "../admin/admin-actions.service";
+import { AdminServerService } from "../admin/admin-server.service";
 import { BillingSsoService } from "../auth/billing-sso.service";
 import { ServerResizeService } from "../client/server-resize.service";
 import { BrandingService } from "../reseller/branding.service";
@@ -111,6 +114,9 @@ export class ApplicationController {
     // La même porte que l'espace revendeur et l'administration : un quota qui
     // se ferait contourner par l'une des trois ne bornerait rien.
     @Inject(ServerResizeService) private readonly resize: ServerResizeService,
+    // Le changement de titulaire de l'administration, et non une copie : le
+    // consentement du revendeur et la révocation des consoles y vivent.
+    @Inject(AdminServerService) private readonly adminServers: AdminServerService,
   ) {}
 
   /**
@@ -192,7 +198,9 @@ export class ApplicationController {
     @Param("userId") userId: string,
     @Body() body: unknown,
   ) {
-    await this.scope.requireUser(request.application.resellerId, userId);
+    // Entièrement à lui, et pas seulement lisible : réécrire l'identifiant
+    // externe d'un client partagé coupait la facturation du confrère.
+    await this.scope.requireOwnedUser(request.application.resellerId, userId);
     const user = await this.app.updateUser(userId, parse(UpdateUser, body));
     await this.trace(request, "application.user_updated", null, { userId });
     return { data: user };
@@ -208,7 +216,7 @@ export class ApplicationController {
   @Delete("users/:userId")
   @RequireScopes("users.delete")
   async deleteUser(@Req() request: ApplicationRequest, @Param("userId") userId: string) {
-    await this.scope.requireUser(request.application.resellerId, userId);
+    await this.scope.requireOwnedUser(request.application.resellerId, userId);
 
     const owned = await this.app.ownedServers(userId);
     if (owned > 0) {
@@ -304,6 +312,18 @@ export class ApplicationController {
       idempotencyKey,
       input,
       async () => {
+        /*
+         * Donner un serveur fait entrer le compte dans le périmètre de la
+         * clé : sans ce contrôle, une clé de revendeur annexait le client
+         * d'un confrère ou un administrateur, puis lisait et réécrivait sa
+         * fiche.
+         *
+         * **Dans** le travail idempotent, et non avant : une boutique qui a
+         * perdu la réponse et rejoue doit retrouver son serveur, même si le
+         * compte a changé entre-temps (invité ailleurs, suspendu). Contrôlé
+         * avant, le rejeu rendait 404 pour un serveur bel et bien créé.
+         */
+        await this.scope.requireRecipient(request.application.resellerId, input.ownerId);
         const server = await this.relay(() =>
           this.app.createServer(input, request.application.resellerId),
         );
@@ -383,6 +403,42 @@ export class ApplicationController {
     return { data: limites };
   }
 
+  /**
+   * Change le titulaire d'un serveur : le service a changé de client chez le
+   * facturier, le serveur suit.
+   *
+   * Sans cette route, le module de facturation créait bien le compte du
+   * nouveau client mais devait rendre un échec et laisser le geste à la main
+   * — pendant quoi l'ancien titulaire gardait la console d'un serveur qu'il
+   * ne payait plus.
+   *
+   * Tout le métier est celui de l'administration (`AdminServerService.setOwner`) :
+   * le revendeur hébergeur et les sous-utilisateurs restent, un revendeur qui
+   * refuse le provisionnement ne se voit rien imposer, les consoles de
+   * l'ancien titulaire sont fermées. S'y ajoute le périmètre de la clé, des
+   * deux côtés : le serveur doit être chez elle, et le destinataire aussi — ou
+   * n'avoir encore aucun serveur, cas du client tout juste créé.
+   *
+   * Pas d'`Idempotency-Key` : rejouer le même transfert ne fait rien de plus
+   * que le premier.
+   */
+  @Post("servers/:serverId/owner")
+  @RequireScopes("servers.owner")
+  async setServerOwner(
+    @Req() request: ApplicationRequest,
+    @Param("serverId") serverId: string,
+    @Body() body: unknown,
+  ) {
+    const { ownerId } = parse(ApplicationServerOwner, body);
+
+    await this.scope.requireServer(request.application.resellerId, serverId);
+    await this.scope.requireRecipient(request.application.resellerId, ownerId);
+    await this.adminServers.setOwner(serverId, ownerId);
+    await this.trace(request, "application.server_owner_changed", serverId, { ownerId });
+
+    return { data: { serverId, ownerId } };
+  }
+
   @Delete("servers/:serverId")
   @RequireScopes("servers.delete")
   async deleteServer(@Req() request: ApplicationRequest, @Param("serverId") serverId: string) {
@@ -398,6 +454,7 @@ export class ApplicationController {
   @RequireScopes("resellers.read")
   @PlatformOnly("les enveloppes de revente")
   async quota(@Param("userId") userId: string) {
+    if (!isUuid(userId)) throw new NotFoundException("Compte introuvable.");
     return { data: await this.quotas.report(userId) };
   }
 
@@ -416,6 +473,7 @@ export class ApplicationController {
     @Param("userId") userId: string,
     @Body() body: unknown,
   ) {
+    if (!isUuid(userId)) throw new NotFoundException("Compte introuvable.");
     const quota = parse(Quota, body);
     await this.quotas.setQuota(userId, quota);
     await this.trace(request, "application.reseller_quota_set", null, { userId, ...quota });
@@ -545,6 +603,9 @@ export class ApplicationController {
   }
 }
 
+/** Les messages de zod dans la langue du panel. */
+const MESSAGES_ZOD = z.locales.fr();
+
 /**
  * Valide un corps, et ne rend que le premier manquement.
  *
@@ -552,7 +613,15 @@ export class ApplicationController {
  * savoir où passe la journée à deviner.
  */
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
-  const result = schema.safeParse(body);
+  // Sans corps, zod répondait dans sa langue (« Invalid input: expected
+  // object ») : le message part tel quel vers le facturier.
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    throw new BadRequestException("Corps de requête manquant : un objet JSON est attendu.");
+  }
+  // Les messages de zod en français : ils partent tels quels vers le
+  // facturier (« Invalid input: expected string… » pour un champ absent).
+  // Un message écrit dans le schéma garde la priorité.
+  const result = schema.safeParse(body, { error: MESSAGES_ZOD.localeError });
   if (result.success) return result.data;
 
   const issue = result.error.issues[0];

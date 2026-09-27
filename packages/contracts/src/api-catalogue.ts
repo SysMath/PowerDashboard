@@ -564,7 +564,10 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
     method: "POST",
     path: "/servers",
     summary:
-      "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte Idempotency-Key.",
+      "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte " +
+      "Idempotency-Key. Une clé de revendeur ne le donne qu'à un compte client non suspendu, " +
+      "entièrement chez elle ou encore sans serveur ; sans serveur, il ne doit être invité sur " +
+      "aucun serveur d'ailleurs.",
     scope: "servers.create",
     group: "Serveurs",
   },
@@ -574,6 +577,18 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
     summary:
       "Changer les limites d'un serveur (mémoire, disque, CPU, swap, allocations, sauvegardes, bases). Seuls les champs envoyés changent.",
     scope: "servers.resize",
+    group: "Serveurs",
+  },
+  {
+    method: "POST",
+    path: "/servers/{server}/owner",
+    summary:
+      "Changer le titulaire d'un serveur (corps : ownerId). Les sous-utilisateurs et le revendeur " +
+      "hébergeur restent ; les consoles ouvertes de l'ancien titulaire sont fermées. Une clé de " +
+      "revendeur ne peut le donner qu'à un compte client non suspendu, entièrement chez elle ou " +
+      "encore sans serveur ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs. " +
+      "Son propre client suspendu est refusé en 403, avec la raison ; tout autre refus rend 404.",
+    scope: "servers.owner",
     group: "Serveurs",
   },
   {

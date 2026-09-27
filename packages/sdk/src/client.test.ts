@@ -165,6 +165,7 @@ describe("GameDashboardClient", () => {
     await c.suspendServer(id, "impayé");
     await c.unsuspendServer(id);
     await c.resizeServer(id, { memoryMb: 4096 });
+    await c.setServerOwner(id, "0b0c1a4e-3c57-4c2e-9d36-3f1f5e9f0a11");
     await c.terminateServer(id);
     await c.ssoLink({ externalId: "client-42" });
     await c.openapi();

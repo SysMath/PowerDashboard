@@ -246,9 +246,13 @@ function reponsesDe(route: ApiRoute): OpenApiOperation["responses"] {
     },
     "401": { description: "Aucune authentification recevable." },
     "403": {
+      // Deux causes, que le message du corps distingue : la clé (portée,
+      // route réservée à la plateforme) ou l'état de la ressource visée (un
+      // compte suspendu, par exemple).
       description: route.scope
-        ? `Authentifié, mais sans la portée « ${route.scope} ».`
-        : "Authentifié, mais sans le droit sur cette ressource.",
+        ? `Authentifié, mais sans la portée « ${route.scope} », ou refusé pour la ressource visée : la cause est dans le corps.`
+        : "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/Problem" } } },
     },
   };
 }

@@ -12,8 +12,8 @@
  * Ce qu'il faut savoir du contrat, côté panel :
  *
  * - une **clé applicative** (`gd_app_…`) porte des portées déclarées une par
- *   une ; rien n'est déduit d'autre chose. Ce module en demande cinq, pas
- *   davantage ;
+ *   une ; rien n'est déduit d'autre chose. Le module n'en demande que ce
+ *   qu'il emploie ;
  * - les créations acceptent une **clé d'idempotence** : rejouer la même
  *   requête après un délai réseau ne crée pas un second serveur ;
  * - le client est désigné par **son identifiant chez vous** (`externalId`),
@@ -129,6 +129,25 @@ class GameDashboardClient
         );
     }
 
+    /**
+     * Donne le serveur à un autre compte du panel : le service a changé de
+     * client chez vous.
+     *
+     * `$ownerId` est l'identifiant **du panel**, celui que rendent
+     * `createUser` et les recherches. Le panel ferme au passage les consoles
+     * ouvertes de l'ancien titulaire ; les sous-utilisateurs restent. Demande
+     * la portée `servers.owner`, qu'une clé plus ancienne n'a pas : le refus
+     * la nomme.
+     */
+    public function setServerOwner(string $serverId, string $ownerId): array
+    {
+        return $this->request(
+            'POST',
+            '/api/v1/application/servers/' . rawurlencode($serverId) . '/owner',
+            ['ownerId' => $ownerId]
+        );
+    }
+
     public function deleteServer(string $serverId): array
     {
         return $this->request('DELETE', '/api/v1/application/servers/' . rawurlencode($serverId));
@@ -219,10 +238,16 @@ class GameDashboardClient
             $decoded = [];
         }
 
-        if ($status === 401 || $status === 403) {
+        if ($status === 401 || ($status === 403 && self::refusDeLaCle($decoded))) {
             throw new GameDashboardError(
                 'Le panel a refusé la clé applicative : ' . self::message($decoded, 'vérifiez la clé et ses portées.')
             );
+        }
+        if ($status === 403) {
+            // Un refus qui tient au compte ou au serveur visé (compte
+            // suspendu, personnel…), pas à la clé : le présenter comme un
+            // refus de la clé enverrait vérifier une clé qui fonctionne.
+            throw new GameDashboardError('Le panel a refusé : ' . self::message($decoded, 'action refusée.'));
         }
         if ($status === 404) {
             throw new GameDashboardNotFound(self::message($decoded, 'Ressource introuvable sur le panel.'));
@@ -232,6 +257,21 @@ class GameDashboardClient
         }
 
         return $decoded;
+    }
+
+    /**
+     * Le 403 vient-il de la clé elle-même ? Portée manquante, clé bornée à un
+     * revendeur pour une route de la plateforme, ou clé d'un autre node : ce
+     * sont les refus du garde de l'API applicative, et eux seuls se corrigent
+     * dans la configuration de la clé.
+     */
+    private static function refusDeLaCle(array $decoded): bool
+    {
+        $message = self::message($decoded, '');
+        return $message === ''
+            || str_starts_with($message, 'Portée manquante')
+            || str_starts_with($message, 'Cette clé')
+            || str_starts_with($message, 'Cette route ne déclare aucune portée');
     }
 
     private static function message(array $decoded, string $fallback): string

@@ -169,6 +169,18 @@ export class GameDashboardClient {
   }
 
   /**
+   * Changer le titulaire : le service a changé de client chez le facturier.
+   * `ownerId` est l'identifiant du compte **dans le panel** — celui que rend
+   * `POST /users` ou `GET /users?externalId=`. Rejouer l'appel ne fait rien de
+   * plus.
+   */
+  setServerOwner(serverId: string, ownerId: string): Promise<unknown> {
+    return this.call("POST", `/api/v1/application/servers/${encodeURIComponent(serverId)}/owner`, {
+      ownerId,
+    });
+  }
+
+  /**
    * Lien de connexion d'un client, derrière le bouton « Gérer mon serveur » du
    * facturier. Le désigner par son identifiant **chez vous** (`externalId`)
    * évite de tenir une table de correspondance. Le lien vaut deux minutes et

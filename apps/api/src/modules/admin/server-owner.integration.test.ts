@@ -93,4 +93,13 @@ describe.skipIf(!HAS_DATABASE)("AdminServerService.setOwner (intégration)", () 
 
     await expect(service.setOwner(serverId, nouveau)).resolves.toBeUndefined();
   });
+
+  it("refuse un identifiant illisible sans le confier à la base, qui rendait une erreur 500", async () => {
+    await expect(service.setOwner(serverId, "nimporte-quoi")).rejects.toThrow(
+      "Compte destinataire inconnu.",
+    );
+    await expect(service.setOwner("nimporte-quoi", nouveau)).rejects.toThrow(
+      "Serveur introuvable.",
+    );
+  });
 });
