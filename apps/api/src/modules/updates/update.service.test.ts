@@ -72,7 +72,7 @@ beforeEach(() => {
   vi.stubEnv("GAMEDASHBOARD_VERSION", "v1.0.0");
   vi.stubEnv("GAMEDASHBOARD_DEPOT", "org/panel");
   vi.stubEnv("GAMEDASHBOARD_GITHUB_API", baseGithub);
-  vi.stubEnv("GAMEDASHBOARD_TELECHARGEMENTS", `${baseGithub}/`);
+  vi.stubEnv("GAMEDASHBOARD_TELECHARGEMENTS", baseGithub);
   vi.stubEnv("GAMEDASHBOARD_ESSAI", "");
   vi.stubEnv("PANEL_ORIGIN", basePublique);
   etatPublic = "ok";
@@ -118,7 +118,7 @@ async function publier(version: string, { casse = false } = {}) {
   const contenu = readFileSync(fichier);
   const empreinte = createHash("sha256").update(contenu).digest("hex");
 
-  const chemin = `/releases/download/${version}/${archiveName(version)}`;
+  const chemin = `/org/panel/releases/download/${version}/${archiveName(version)}`;
   github.reponses.set(chemin, { status: 200, body: contenu });
   github.reponses.set(`${chemin}.sha256`, {
     status: 200,
@@ -186,6 +186,46 @@ describe("UpdateService", () => {
     // Mise de côté : jamais retéléchargée.
     await s.check();
     expect(telechargements()).toBe(1);
+  });
+
+  /*
+   * Les hébergements installés depuis la v1.0.1 portent l'ancien nom du dépôt
+   * (depot=PowerNexus/PowerDashboard) : GitHub redirige, mais les fichiers de
+   * la release portent le nom actuel, et chaque archive était refusée
+   * (« Adresse de téléchargement refusée »), à chaque vérification.
+   */
+  it("installe depuis un dépôt renommé, sous son nom actuel lu chez GitHub", async () => {
+    vi.stubEnv("GAMEDASHBOARD_DEPOT", "ancien/panel");
+    await publier("v1.1.0");
+    github.reponses.set("/repos/ancien/panel/releases/latest", {
+      status: 301,
+      headers: { location: `${baseGithub}/repositories/42/releases/latest` },
+      body: "",
+    });
+    const publiee = github.reponses.get("/repos/org/panel/releases/latest");
+    if (publiee) github.reponses.set("/repositories/42/releases/latest", publiee);
+    github.reponses.set("/repositories/42", {
+      status: 200,
+      body: JSON.stringify({ id: 42, full_name: "org/panel" }),
+    });
+
+    await service().check();
+    const etat = readState(racine);
+    expect(etat.dernierResultat).toBeUndefined();
+    expect(etat).toMatchObject({ enService: "v1.1.0", bascule: { version: "v1.1.0" } });
+    expect(telechargements()).toBe(1);
+  });
+
+  it("ne cherche rien sans dépôt connu, et le dit à l'administration", async () => {
+    for (const depot of ["", "PowerDashboard"]) {
+      vi.stubEnv("GAMEDASHBOARD_DEPOT", depot);
+      await service().check();
+      expect(github.requetes).toEqual([]);
+      expect(readState(racine).dernierResultat).toMatchObject({
+        etat: "erreur",
+        message: expect.stringContaining("Dépôt des releases inconnu"),
+      });
+    }
   });
 
   it("ne touche à rien quand la dernière release n'est pas plus récente", async () => {

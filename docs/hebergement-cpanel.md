@@ -182,6 +182,21 @@ installation sont consignés au journal d'audit.
 Les **préversions** (`v1.2.0-rc.1`) ne sont jamais installées : GitHub ne les
 rend pas comme « dernière release ».
 
+### Le dépôt suivi
+
+Le dépôt dont les releases sont lues est celui qui a publié la version en
+service : ligne `depot=` de `versions/<v>/RELEASE`, écrite à la construction
+de l'archive. Une ligne `GAMEDASHBOARD_DEPOT=propriétaire/dépôt` dans
+`env/api.env` l'emporte, puis relancer l'application de l'API.
+
+Un dépôt **renommé ou transféré** reste suivi : GitHub redirige l'ancien nom,
+et l'API lit le nom actuel par l'identifiant du dépôt avant de n'accepter que
+les fichiers publiés sous ce nom. Les versions antérieures à ce suivi (v1.0.1
+et avant) ne le savent pas : sur elles, la carte affiche « Adresse de
+téléchargement refusée » à chaque vérification (ou ne voit plus aucune
+release, si l'ancien nom ne mène plus nulle part), et il faut poser une fois
+la ligne ci-dessus avec le nom actuel.
+
 **Les migrations ne se défont pas.** Revenir à la version précédente
 redémarre l'ancien code sur le schéma déjà migré : sans danger tant que les
 migrations ne font qu'ajouter, ce qui est la règle du projet.

@@ -40,8 +40,7 @@ import {
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
-import { build } from "esbuild";
-import { EXTERNES_API } from "./externes-api.mjs";
+import { regrouperApi } from "./externes-api.mjs";
 
 const VERSION = process.argv[2];
 const SORTIE = process.argv[3] ?? "dist";
@@ -51,6 +50,22 @@ const API = join(RACINE, "apps", "api");
 
 if (!/^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(VERSION ?? "")) {
   arreter("Usage : autonome.mjs <version, ex. v1.2.0> [dossier de sortie]");
+}
+
+/*
+ * Le dépôt dont les hébergements tireront la version suivante, écrit dans
+ * RELEASE. Aucun nom par défaut : un nom écrit ici vieillirait avec le dépôt
+ * (renommé, transféré), et chaque hébergement installé depuis cette archive
+ * refuserait ensuite les releases publiées sous le nom actuel. GitHub
+ * Actions le pose ; infra/ci/linux.sh le transmet au conteneur.
+ */
+const DEPOT = process.env.GITHUB_REPOSITORY ?? "";
+// Même motif que REPOSITORY_PATTERN (apps/api/src/modules/updates/github-releases.ts).
+const DEPOT_VALABLE = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/(?!\.\.?$)[A-Za-z0-9._-]+$/;
+if (!DEPOT_VALABLE.test(DEPOT)) {
+  arreter(
+    "GITHUB_REPOSITORY doit nommer le dépôt des releases (propriétaire/dépôt) : il est écrit dans RELEASE, et les hébergements y cherchent leurs mises à jour.",
+  );
 }
 
 /*
@@ -121,46 +136,7 @@ try {
  * facultatifs que Nest cherche sans les exiger (`externes-api.mjs`).
  */
 async function compilerApi(dossier) {
-  const externes = EXTERNES_API;
-  await build({
-    absWorkingDir: API,
-    entryPoints: { main: "src/main.ts", migrer: "src/migrate.ts" },
-    outdir: dossier,
-    outExtension: { ".js": ".cjs" },
-    bundle: true,
-    platform: "node",
-    target: "node24",
-    format: "cjs",
-    tsconfig: join(API, "tsconfig.json"),
-    keepNames: true,
-    legalComments: "linked",
-    external: externes,
-    logLevel: "warning",
-    // `new Reply(…)` sur un espace de noms : c'est le code de Nest lui-même
-    // (@nestjs/platform-fastify, en ESM), qui se comporte de même sous tsx.
-    logOverride: { "call-import-namespace": "silent" },
-  });
-
-  // La création d'un administrateur attend au premier niveau : elle se
-  // compile en ESM, avec un `require` pour les dépendances en CommonJS.
-  await build({
-    absWorkingDir: API,
-    entryPoints: { "creer-admin": "scripts/create-admin.mts" },
-    outdir: dossier,
-    outExtension: { ".js": ".mjs" },
-    bundle: true,
-    platform: "node",
-    target: "node24",
-    format: "esm",
-    banner: {
-      js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
-    },
-    tsconfig: join(API, "tsconfig.json"),
-    keepNames: true,
-    legalComments: "linked",
-    external: externes,
-    logLevel: "warning",
-  });
+  await regrouperApi(API, dossier);
 
   cpSync(join(RACINE, "packages", "db", "migrations"), join(dossier, "migrations"), {
     recursive: true,
@@ -241,7 +217,7 @@ function ecrireRelease(version) {
     `node=${process.version}`,
     `build_id=${buildId}`,
     // Le dépôt dont la version suivante sera tirée (src/modules/updates).
-    `depot=${process.env.GITHUB_REPOSITORY ?? "PowerNexus/PowerDashboard"}`,
+    `depot=${DEPOT}`,
   ];
   writeFileSync(join(version, "RELEASE"), `${lignes.join("\n")}\n`);
 }
