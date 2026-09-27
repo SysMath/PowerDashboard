@@ -425,6 +425,10 @@
     "billingTestFailed": "Liaison refusée",
     "billingTestKnown": "Le facturier a répondu, et connaît votre adresse : vos clients verront leurs services sur l'accueil.",
     "billingTestUnknown": "Le facturier a répondu. Votre adresse n'y est pas connue, ce qui est normal pour un compte du personnel : vos clients verront leurs services sur l'accueil.",
+    "dnsTest": "Tester la zone",
+    "dnsTestOk": "Zone joignable",
+    "dnsTestFailed": "Zone refusée",
+    "dnsTestZone": "Le jeton lit la zone « {zone} », et le domaine des serveurs en fait partie : vos clients peuvent choisir leur sous-domaine.",
     "features": "Fonctionnalités",
     "featuresHint": "Activation progressive des modules. Prend effet immédiatement.",
     "featureOn": "Actif",
@@ -1310,7 +1314,21 @@
     "annotateTitle": "Annoter ce port",
     "notePlaceholder": "Port du plugin Dynmap",
     "releaseTitle": "Libérer ce port ?",
-    "releaseBody": "Le port redeviendra disponible pour un autre serveur du node, et vous ne le récupérerez pas forcément."
+    "releaseBody": "Le port redeviendra disponible pour un autre serveur du node, et vous ne le récupérerez pas forcément.",
+    "subdomainTitle": "Sous-domaine",
+    "subdomainHint": "Une adresse à donner à vos joueurs, sous {domain}. Elle suit le port principal et les déplacements du serveur.",
+    "subdomainPlaceholder": "monserveur",
+    "subdomainChange": "Changer",
+    "subdomainRemove": "Retirer le sous-domaine",
+    "subdomainRemoveTitle": "Retirer ce sous-domaine ?",
+    "subdomainRemoveBody": "L'adresse cessera de répondre, et un autre client pourra la prendre.",
+    "subdomainSrv": "Les joueurs de Minecraft n'ont pas à saisir de port : le jeu le trouve seul.",
+    "subdomainWithPort": "Les joueurs saisissent l'adresse avec son port, comme affiché.",
+    "subdomainStatus": {
+      "active": "Publié",
+      "pending": "En cours",
+      "error": "Échec"
+    }
   },
   "nodeStatus": {
     "online": "En ligne",

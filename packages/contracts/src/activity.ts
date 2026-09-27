@@ -117,6 +117,8 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "allocation.primary": { category: "network", label: "Port principal changé" },
   "allocation.notes": { category: "network", label: "Port annoté" },
   "allocation.release": { category: "network", label: "Port libéré" },
+  "subdomain.set": { category: "network", label: "Sous-domaine choisi" },
+  "subdomain.remove": { category: "network", label: "Sous-domaine retiré" },
 
   "subuser.invite": { category: "access", label: "Sous-utilisateur invité" },
   "subuser.invite_sent": { category: "access", label: "Invitation envoyée par courriel" },
@@ -373,6 +375,7 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   },
   "admin.smtp_tested": { category: "settings", label: "Envoi de courrier éprouvé" },
   "admin.billing_tested": { category: "settings", label: "Liaison avec la facturation éprouvée" },
+  "admin.dns_tested": { category: "settings", label: "Zone DNS des sous-domaines éprouvée" },
   "admin.audit_exported": { category: "access", label: "Journal de la plateforme exporté" },
   "admin.subuser_presets_saved": {
     category: "access",

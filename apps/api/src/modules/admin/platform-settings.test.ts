@@ -1,6 +1,7 @@
 import type { Database } from "@gamedashboard/db";
 import { BadRequestException } from "@nestjs/common";
 import { beforeEach, describe, expect, it } from "vitest";
+import { decryptRowSecret } from "../../common/row-secrets";
 import { PlatformSettingsService } from "./platform-settings.service";
 
 /**
@@ -71,6 +72,37 @@ describe("écriture des réglages", () => {
     await svc.save({ "instatus.pageUrl": "https://93.184.216.34" });
     await svc.save({ "instatus.pageUrl": "" });
     expect(written.map((row) => row.value)).toEqual(["https://93.184.216.34", ""]);
+  });
+
+  it("ramène le domaine des sous-domaines à sa forme canonique, et refuse ce qui n'en est pas un", async () => {
+    // Il finit dans chaque nom publié : « Jeux.Exemple.fr. » produirait des
+    // noms que la comparaison avec la zone ne reconnaîtrait plus.
+    const { svc, written } = service();
+    await svc.save({ "dns.domain": " Jeux.Exemple.FR. " });
+    await svc.save({ "dns.domain": "" });
+    await expect(svc.save({ "dns.domain": "https://jeux.exemple.fr" })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(written.map((row) => row.value)).toEqual(["jeux.exemple.fr", ""]);
+  });
+
+  it("refuse un jeton DNS qui n'a pas la forme d'un jeton", async () => {
+    // Revue N5 : un jeton collé avec un en-tête ou un saut de ligne partait
+    // tel quel dans les requêtes, et pouvait revenir dans un message d'erreur.
+    const { svc, written } = service();
+    for (const jeton of [
+      "Bearer abcdefghijklmnopqrstuvwxyz",
+      "court",
+      "abc\ndefghijklmnopqrstuvwxyz",
+    ]) {
+      await expect(svc.save({ "dns.apiToken": jeton })).rejects.toBeInstanceOf(BadRequestException);
+    }
+    process.env.APP_SECRET_KEY ??= "cle-de-test-suffisamment-longue-pour-vitest";
+    await svc.save({ "dns.apiToken": "  Ab_cD-0123456789efghijKLMNOP  " });
+    expect(written).toHaveLength(1);
+    expect(decryptRowSecret("settings.value", "dns.apiToken", String(written[0]?.value))).toBe(
+      "Ab_cD-0123456789efghijKLMNOP",
+    );
   });
 
   it("ignore un secret reçu vide plutôt que d'effacer", async () => {

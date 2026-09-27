@@ -40,8 +40,13 @@ export interface SettingDescriptor {
    *   jamais une destination interne (boucle locale, réseau privé, service
    *   de métadonnées). L'API le vérifie en résolvant le nom
    *   (`assertPublicDestination`, rapport ASVS NC-56).
+   * - `domain` : nom de domaine, ramené en minuscules et sans point final
+   *   (`normalizeDnsDomain`). Il finit dans les enregistrements DNS publiés.
+   * - `token` : jeton d'API d'un seul tenant (`A-Z a-z 0-9 _ -`), pour un
+   *   secret. Un saut de ligne collé avec lui finissait dans un en-tête HTTP
+   *   invalide, dont le message d'erreur recopiait le jeton en clair.
    */
-  format?: "url" | "hex" | "outbound" | "email";
+  format?: "url" | "hex" | "outbound" | "email" | "domain" | "token";
   /**
    * L'adresse peut aussi s'obtenir **par envoi de fichier** : l'écran propose
    * un bouton qui range l'image (PNG, JPEG, WebP ou ICO) et remplit le champ
@@ -519,6 +524,64 @@ export const PLATFORM_SETTINGS: readonly SettingGroup[] = [
         description:
           "Donne accès à l'ensemble des clients de la facturation : à réserver à un compte d'API en lecture. " +
           "ClientXCMS : un jeton limité aux capacités « customers:index », « customers:show » et « services:index ».",
+      },
+    ],
+  },
+  {
+    key: "dns",
+    label: "Sous-domaines des serveurs",
+    description:
+      "Chaque client peut donner à son serveur une adresse du type « monserveur.jeux.exemple.fr ». " +
+      "Le panel la publie dans votre zone DNS et la tient à jour quand le port ou la machine du serveur change ; " +
+      "elle disparaît avec le serveur. Minecraft Java reçoit aussi un enregistrement SRV : ses joueurs n'ont pas à saisir de port.",
+    settings: [
+      {
+        key: "dns.provider",
+        kind: "choice",
+        label: "Fournisseur DNS",
+        fallback: "none",
+        choices: [
+          {
+            value: "none",
+            label: "Aucun",
+            description: "Les clients ne peuvent pas choisir de sous-domaine.",
+          },
+          { value: "cloudflare", label: "Cloudflare" },
+        ],
+      },
+      {
+        key: "dns.domain",
+        kind: "text",
+        label: "Domaine des serveurs",
+        description:
+          "Les sous-domaines se créent sous ce nom. Il doit appartenir à la zone ci-dessous : la zone elle-même, ou l'un de ses sous-domaines.",
+        placeholder: "jeux.exemple.fr",
+        format: "domain",
+      },
+      {
+        key: "dns.zoneId",
+        kind: "text",
+        label: "Identifiant de zone",
+        description:
+          "Cloudflare : « Zone ID », dans la colonne de droite de la page d'accueil du domaine.",
+        placeholder: "023e105f4ecef8ad9ca31a8372d0c353",
+      },
+      {
+        key: "dns.apiToken",
+        kind: "secret",
+        format: "token",
+        label: "Jeton d'API",
+        description:
+          "Cloudflare : un jeton limité à cette seule zone, avec les droits « Zone › DNS › Modifier » et « Zone › Zone › Lire ». " +
+          "Jamais la clé globale du compte.",
+      },
+      {
+        key: "dns.reservedLabels",
+        kind: "text",
+        label: "Noms réservés",
+        description:
+          "Refusés aux clients, en plus de ceux du panel (www, mail, panel, api, status, support…). Séparés par des virgules.",
+        placeholder: "boutique, discord, forum",
       },
     ],
   },

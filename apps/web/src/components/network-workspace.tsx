@@ -21,7 +21,7 @@ import {
 import { Network, Pencil, Plus, Star, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { type ReactNode, useCallback, useMemo, useState, useTransition } from "react";
 import {
   type Allocation,
   type AllocationList,
@@ -42,9 +42,12 @@ import { ServerBlockBanner, useServerBlock } from "./server-block-context";
 export function NetworkWorkspace({
   serverId,
   initial,
+  subdomain,
 }: {
   serverId: string;
   initial: AllocationList;
+  /** La carte du sous-domaine, au-dessus des ports. */
+  subdomain?: ReactNode;
 }) {
   const t = useTranslations("network");
   const tc = useTranslations("common");
@@ -201,6 +204,8 @@ export function NetworkWorkspace({
           {t("exhaustedBody")}
         </AlertBanner>
       ) : null}
+
+      {subdomain}
 
       <DataTable
         columns={columns}

@@ -3,6 +3,7 @@ import { Logger } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
+import { sousDomainesInertes } from "../../test/sous-domaines";
 import {
   createThrowawayDatabase,
   HAS_DATABASE,
@@ -30,6 +31,7 @@ describe.skipIf(!HAS_DATABASE)("ServerTransferService (intégration)", () => {
   let throwaway: ThrowawayDatabase;
   let db: Database;
   let service: ServerTransferService;
+  const sousDomaines = sousDomainesInertes();
   let notified: string[];
 
   let serverId: string;
@@ -61,6 +63,7 @@ describe.skipIf(!HAS_DATABASE)("ServerTransferService (intégration)", () => {
       tokens,
       notifications,
       new WebhookEmitterService(db),
+      sousDomaines,
     );
   }, 60_000);
 
@@ -141,11 +144,14 @@ describe.skipIf(!HAS_DATABASE)("ServerTransferService (intégration)", () => {
     await age(TRANSFER_STALE_MS + 60_000);
     await service.expireStale();
 
+    sousDomaines.refresh.mockClear();
     await service.complete(serverId);
 
     const { server, transfer } = await state();
     expect(server).toMatchObject({ nodeId: fromNodeId, state: null });
     expect(transfer?.state).toBe("failed");
+    // Le serveur n'a pas bougé : son sous-domaine non plus.
+    expect(sousDomaines.refresh).not.toHaveBeenCalled();
   });
 
   it("ne défait pas un transfert conclu entre la lecture et le retour en arrière", async () => {
@@ -175,6 +181,12 @@ describe.skipIf(!HAS_DATABASE)("ServerTransferService (intégration)", () => {
     expect(server).toMatchObject({ nodeId: toNodeId, state: null, allocationId: arrivalId });
     // Le port d'arrivée est la seule adresse du serveur : il ne doit pas être rendu.
     expect(arrival?.serverId).toBe(serverId);
+  });
+
+  it("fait suivre le sous-domaine au serveur transféré", async () => {
+    sousDomaines.refresh.mockClear();
+    await service.complete(serverId);
+    expect(sousDomaines.refresh).toHaveBeenCalledWith(serverId);
   });
 });
 

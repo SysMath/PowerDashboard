@@ -425,6 +425,10 @@
     "billingTestFailed": "Connection refused",
     "billingTestKnown": "The billing system answered and knows your address: your clients will see their services on the home page.",
     "billingTestUnknown": "The billing system answered. Your address is not known there, which is expected for a staff account: your clients will see their services on the home page.",
+    "dnsTest": "Test the zone",
+    "dnsTestOk": "Zone reachable",
+    "dnsTestFailed": "Zone refused",
+    "dnsTestZone": "The token reads the zone “{zone}”, and the server domain belongs to it: your clients can pick their subdomain.",
     "features": "Features",
     "featuresHint": "Gradual module rollout. Takes effect immediately.",
     "featureOn": "On",
@@ -1310,7 +1314,21 @@
     "annotateTitle": "Annotate this port",
     "notePlaceholder": "Dynmap plugin port",
     "releaseTitle": "Release this port?",
-    "releaseBody": "The port returns to the node's pool, and you may not get it back."
+    "releaseBody": "The port returns to the node's pool, and you may not get it back.",
+    "subdomainTitle": "Subdomain",
+    "subdomainHint": "An address to give your players, under {domain}. It follows the primary port and the server's moves.",
+    "subdomainPlaceholder": "myserver",
+    "subdomainChange": "Change",
+    "subdomainRemove": "Remove the subdomain",
+    "subdomainRemoveTitle": "Remove this subdomain?",
+    "subdomainRemoveBody": "The address will stop answering, and another client may take it.",
+    "subdomainSrv": "Minecraft players do not need to type a port: the game finds it.",
+    "subdomainWithPort": "Players type the address with its port, as shown.",
+    "subdomainStatus": {
+      "active": "Published",
+      "pending": "In progress",
+      "error": "Failed"
+    }
   },
   "nodeStatus": {
     "online": "Online",

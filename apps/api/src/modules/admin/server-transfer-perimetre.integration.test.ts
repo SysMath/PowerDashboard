@@ -10,6 +10,7 @@ import { ConflictException, Logger } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
+import { sousDomainesInertes } from "../../test/sous-domaines";
 import {
   createThrowawayDatabase,
   HAS_DATABASE,
@@ -62,6 +63,7 @@ describe.skipIf(!HAS_DATABASE)("ServerTransferService : périmètre des revendeu
       } as unknown as WingsTokenService,
       { notifyServerOwner: async () => undefined } as unknown as NotificationsService,
       new WebhookEmitterService(db),
+      sousDomainesInertes(),
     );
   }, 60_000);
 

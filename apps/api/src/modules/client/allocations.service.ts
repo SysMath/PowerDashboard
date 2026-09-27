@@ -2,6 +2,7 @@ import { allocations, type Database, servers } from "@gamedashboard/db";
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { SubdomainsService } from "../dns/subdomains.service";
 import { WingsClientService } from "../wings/wings-client.service";
 
 export interface ClientAllocation {
@@ -25,6 +26,7 @@ export class AllocationsService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(WingsClientService) private readonly wings: WingsClientService,
+    @Inject(SubdomainsService) private readonly subdomains: SubdomainsService,
   ) {}
 
   async list(serverId: string): Promise<ClientAllocation[]> {
@@ -152,6 +154,8 @@ export class AllocationsService {
       .where(eq(servers.id, serverId));
 
     await this.sync(serverId);
+    // Le sous-domaine vise le port principal : il le suit.
+    void this.subdomains.refresh(serverId);
   }
 
   async setNotes(serverId: string, allocationId: string, notes: string | null): Promise<void> {

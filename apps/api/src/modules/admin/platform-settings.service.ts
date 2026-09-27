@@ -3,6 +3,7 @@ import {
   featureFlagDefault,
   isSafeBrandUrl,
   isValidReplyTo,
+  normalizeDnsDomain,
   normalizeHex,
   PLATFORM_SETTINGS,
   ROLE_PRESETS_SETTING_KEY,
@@ -387,9 +388,15 @@ export class PlatformSettingsService {
 
       if (descriptor.kind === "secret") {
         if (typeof raw !== "string" || raw === "") continue;
+        if (descriptor.format === "token" && !/^[A-Za-z0-9_-]{20,255}$/.test(raw.trim())) {
+          throw new BadRequestException(
+            `« ${descriptor.label} » doit être un jeton d'un seul tenant : lettres, chiffres, « _ » et « - ».`,
+          );
+        }
         // La clé du réglage tient lieu d'identifiant de ligne : c'est elle
         // que la table rend unique, et elle ne change jamais.
-        await upsert(db, key, encryptRowSecret("settings.value", key, raw), true);
+        const secret = descriptor.format === "token" ? raw.trim() : raw;
+        await upsert(db, key, encryptRowSecret("settings.value", key, secret), true);
         saved.push(key);
         continue;
       }
@@ -432,7 +439,7 @@ export class PlatformSettingsService {
        * même fonction : la plateforme n'a pas à être moins protégée qu'un
        * revendeur.
        */
-      const text = typeof raw === "string" ? raw.trim() : String(raw ?? "");
+      let text = typeof raw === "string" ? raw.trim() : String(raw ?? "");
       if (descriptor.format === "url" && !isSafeBrandUrl(text)) {
         throw new BadRequestException(
           `« ${descriptor.label} » doit commencer par « https:// » ou par « / » (chemin interne).`,
@@ -447,6 +454,15 @@ export class PlatformSettingsService {
         throw new BadRequestException(
           `« ${descriptor.label} » doit être une seule adresse e-mail, comme support@exemple.fr.`,
         );
+      }
+      if (descriptor.format === "domain" && text !== "") {
+        const domain = normalizeDnsDomain(text);
+        if (domain === null) {
+          throw new BadRequestException(
+            `« ${descriptor.label} » doit être un nom de domaine, comme jeux.exemple.fr.`,
+          );
+        }
+        text = domain;
       }
       if (descriptor.format === "outbound" && text !== "") {
         await assertOutboundSetting(text, descriptor.label);
