@@ -12,7 +12,7 @@ import {
 } from "@nestjs/common";
 import { battre } from "../../common/background-tick";
 import { ActivityService } from "../activity/activity.service";
-import { fetchLatestRelease, type PublishedRelease } from "./github-releases";
+import { fetchLatestRelease, type PublishedRelease, REPOSITORY_PATTERN } from "./github-releases";
 import { cleanupVersions, downloadRelease, extractRelease, rehearse } from "./update-installer";
 import {
   compareReleaseVersions,
@@ -207,7 +207,24 @@ export class UpdateService implements OnApplicationBootstrap, OnModuleDestroy {
     // Une bascule attend la confirmation de la nouvelle version.
     if (state.bascule && !state.bascule.confirmee) return;
 
-    const derniere = await fetchLatestRelease(this.repository(), {
+    const depot = this.repository();
+    if (!depot) {
+      // Pas de repli sur un nom écrit en dur : ce serait celui d'un autre
+      // dépôt, ou d'un nom qui ne mène plus nulle part.
+      updateState(root, (s) => {
+        s.derniereVerification = new Date().toISOString();
+        s.dernierResultat = {
+          etat: "erreur",
+          version: this.version ?? "",
+          message:
+            "Dépôt des releases inconnu : GAMEDASHBOARD_DEPOT n'est pas posé, ou n'a pas la forme propriétaire/dépôt (ligne depot= du fichier RELEASE, ou env/api.env).",
+          date: new Date().toISOString(),
+        };
+      });
+      return;
+    }
+
+    const derniere = await fetchLatestRelease(depot, {
       etag: state.etagRelease,
       apiBase: process.env.GAMEDASHBOARD_GITHUB_API,
       userAgent: `GameDashboard/${this.version}`,
@@ -225,10 +242,16 @@ export class UpdateService implements OnApplicationBootstrap, OnModuleDestroy {
     if (!release || compareReleaseVersions(release.version, enService) <= 0) return;
     if (apres.refusees?.includes(release.version)) return;
 
-    await this.install(root, release);
+    const publieSous = release.repository ?? depot;
+    if (publieSous !== depot) {
+      this.logger.warn(
+        `Le dépôt ${depot} s'appelle désormais ${publieSous} : la release y est lue.`,
+      );
+    }
+    await this.install(root, release, publieSous);
   }
 
-  private async install(root: string, release: PublishedRelease): Promise<void> {
+  private async install(root: string, release: PublishedRelease, depot: string): Promise<void> {
     const etape = (nom: NonNullable<UpdateState["operation"]>["etape"]) =>
       updateState(root, (state) => {
         state.operation = {
@@ -244,7 +267,7 @@ export class UpdateService implements OnApplicationBootstrap, OnModuleDestroy {
       const archive = await downloadRelease(
         release,
         join(root, "telechargements"),
-        this.repository(),
+        depot,
         process.env.GAMEDASHBOARD_TELECHARGEMENTS,
       );
       etape("extraction");
@@ -385,9 +408,13 @@ export class UpdateService implements OnApplicationBootstrap, OnModuleDestroy {
     };
   }
 
-  /** Le dépôt des releases : celui dont la version en service a été construite. */
-  private repository(): string {
-    return process.env.GAMEDASHBOARD_DEPOT ?? "PowerNexus/PowerDashboard";
+  /**
+   * Le dépôt des releases : celui dont la version en service a été construite
+   * (ligne `depot=` de son RELEASE, que `env/api.env` peut remplacer).
+   */
+  private repository(): string | null {
+    const depot = process.env.GAMEDASHBOARD_DEPOT?.trim();
+    return depot && REPOSITORY_PATTERN.test(depot) ? depot : null;
   }
 
   private async trace({
