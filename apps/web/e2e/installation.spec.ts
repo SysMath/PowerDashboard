@@ -63,6 +63,40 @@ test.describe("application installable", () => {
     }
   });
 
+  test("le script de thème est du JavaScript, lu avant la peinture sans erreur", async ({
+    request,
+    page,
+  }) => {
+    // Servi depuis un module client, il rendait le texte d'une référence
+    // client, que le navigateur refusait sur chaque page (« Function
+    // statements require a function name ») : le thème choisi ne tenait pas.
+    const reponse = await request.get("/gd-theme.js");
+    expect(reponse.status()).toBe(200);
+    const script = await reponse.text();
+    expect(script).toContain("localStorage.getItem");
+    expect(() => new Function(script)).not.toThrow();
+
+    const erreurs: string[] = [];
+    page.on("pageerror", (erreur) => erreurs.push(erreur.message));
+    await page.addInitScript(() => {
+      localStorage.setItem("gd-theme", "dark");
+      // Relevé à la fin de l'analyse du document, avant toute hydratation :
+      // seul le script de <head> a pu poser le thème à ce moment.
+      document.addEventListener(
+        "DOMContentLoaded",
+        () => {
+          document.documentElement.dataset.themeAuChargement =
+            document.documentElement.dataset.theme ?? "aucun";
+        },
+        { once: true },
+      );
+    });
+    await page.goto("/login");
+    await expect(page.locator("html")).toHaveAttribute("data-theme-au-chargement", "dark");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    expect(erreurs).toEqual([]);
+  });
+
   test("l'agent de service est servi et ne met aucune page en cache", async ({ request }) => {
     const reponse = await request.get("/sw.js");
     expect(reponse.status()).toBe(200);
