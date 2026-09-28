@@ -588,6 +588,23 @@ describe("actions GitHub des workflows", () => {
     );
   });
 
+  /*
+   * `linux.sh ouvrir` copie le dépôt, .git/config compris, dans le conteneur
+   * du job, où tourne le code des dépendances : le jeton du workflow ne doit
+   * pas y être écrit par actions/checkout.
+   */
+  it("ne laissent pas le jeton dans le dépôt copié", () => {
+    const extractions = workflows.flatMap((texte) =>
+      [...texte.matchAll(/^( +)- uses: actions\/checkout@.*\n((?:\1 {2}.*\n)*)/gm)].map(
+        (m) => m[2] as string,
+      ),
+    );
+    expect(extractions.length).toBe(6);
+    for (const options of extractions) {
+      expect(options).toMatch(/^ +with:\n(?: +\S.*\n)*? +persist-credentials: false$/m);
+    }
+  });
+
   it("ne tombent pas pour un quota d'artefacts atteint", () => {
     const envois = workflows.flatMap((texte) =>
       [...texte.matchAll(/^( +)- name: .+\n(?:\1 {2}.*\n)*/gm)]
