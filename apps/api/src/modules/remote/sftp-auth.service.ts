@@ -225,9 +225,12 @@ export class SftpAuthService {
    *
    * Les deux chemins rendent la même chose et coûtent le même refus. Le
    * `keyId` ne sert qu'à noter l'usage de la clé.
+   *
+   * `passwordExpiresAt` est obligatoire : le typage garde ainsi la colonne
+   * dans la lecture du compte, dont l'oubli passait sinon sans bruit.
    */
   private async verify(
-    account: { id: string; passwordHash: string | null; passwordExpiresAt?: string | null },
+    account: { id: string; passwordHash: string | null; passwordExpiresAt: string | null },
     request: SftpAuthRequest,
   ): Promise<{ keyId: string | null } | null> {
     if (request.type === "password") {
@@ -246,7 +249,7 @@ export class SftpAuthService {
        * encore, ce qui en faisait le mot de passe durable du compte. Les clés
        * SSH, choisies par leur porteur, ne sont pas concernées.
        */
-      if (passwordStanding(account.passwordExpiresAt ?? null) === "expired") return null;
+      if (passwordStanding(account.passwordExpiresAt) === "expired") return null;
       // Le mot de passe suffit, double authentification ou non : le protocole
       // n'a aucune étape pour un code. Écart assumé et documenté (ADR 0001).
       return (await verifyPassword(account.passwordHash, request.password))

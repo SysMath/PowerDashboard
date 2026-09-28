@@ -188,14 +188,16 @@ export const CLIENT_ROUTES: ApiRoute[] = [
   {
     method: "POST",
     path: "/servers/{server}/backups/{backup}/restore",
-    summary: "Restaurer une sauvegarde sur le serveur.",
+    summary:
+      "Restaurer une sauvegarde sur le serveur. Le serveur reste fermé (démarrage, fichiers, SFTP) jusqu'au compte rendu du daemon ; refusé (409) sur un serveur déjà occupé ou pour une sauvegarde en cours ou ratée.",
     scope: "backups.restore",
     group: "Sauvegardes",
   },
   {
     method: "DELETE",
     path: "/servers/{server}/backups/{backup}",
-    summary: "Supprimer une sauvegarde non verrouillée.",
+    summary:
+      "Supprimer une sauvegarde non verrouillée. Refusé (409) pendant une restauration sur ce serveur, quelle que soit l'archive.",
     scope: "backups.delete",
     group: "Sauvegardes",
   },
@@ -254,7 +256,7 @@ export const CLIENT_ROUTES: ApiRoute[] = [
     method: "POST",
     path: "/servers/{server}/engine/install",
     summary:
-      "Installer une plateforme ou un modpack, ou mettre à jour le pack en place (même optionId, autre versionId) : { optionId, versionId, backupFirst? }. Répond 202 aussitôt : l'installation se poursuit en tâche de fond, son état et son compte rendu (fichiers posés, manquants, gardés, chargeur posé) se lisent sur GET engine (meta.install). Un pack Forge ou NeoForge fait poser son chargeur par une réinstallation de l'egg Minecraft Java (variables LOADER, LOADER_VERSION, MINECRAFT_VERSION réglées d'après le manifeste, versions vérifiées sur le dépôt officiel) ; son échec est dit dans le compte rendu, le suivi des fichiers du pack reste. Refus immédiats : version, chargeur ou archive refusés, installation déjà en cours (409). Arrête le serveur ; backupFirst (portée backups.create) prend une sauvegarde ordinaire et l'attend avant toute écriture, et son échec redémarre le serveur s'il tournait. Exige aussi files.delete et power.stop.",
+      "Installer une plateforme ou un modpack, ou mettre à jour le pack en place (même optionId, autre versionId) : { optionId, versionId, backupFirst? }. Répond 202 aussitôt : l'installation se poursuit en tâche de fond, son état et son compte rendu (fichiers posés, manquants, gardés, chargeur posé) se lisent sur GET engine (meta.install). Un pack Forge ou NeoForge fait poser son chargeur par une réinstallation de l'egg Minecraft Java (variables LOADER, LOADER_VERSION, MINECRAFT_VERSION réglées d'après le manifeste, versions vérifiées sur le dépôt officiel) ; son échec est dit dans le compte rendu, le suivi des fichiers du pack reste. Refus immédiats : version, chargeur ou archive refusés, installation déjà en cours ou serveur occupé (409) ; version de plateforme retirée par l'éditeur (404), éditeur muet ou réponse inattendue (502), avant tout arrêt du serveur. Arrête le serveur ; backupFirst (portée backups.create) prend une sauvegarde ordinaire et l'attend avant toute écriture, et son échec redémarre le serveur s'il tournait. Exige aussi files.delete et power.stop.",
     scope: "files.write",
     group: "Moteur",
   },

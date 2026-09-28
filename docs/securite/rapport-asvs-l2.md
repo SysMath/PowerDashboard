@@ -141,6 +141,7 @@ par cookie refusée depuis une autre origine (`Origin`, `Sec-Fetch-Site`,
 | `efdeafa` | Nettoyage des bases de test : il coupait aussi l'autovacuum, superutilisateur, et le fichier échouait au nettoyage, tous ses tests verts | `throwaway-database.integration.test.ts` |
 | lot `reliquats-asvs` | Le mot de passe provisoire d'un compte créé depuis l'administration (`AdminActionsService.createUser`) n'avait pas d'échéance, contrairement à ceux de `create-admin` et `reset-password` (NC-33) : 24 h, après quoi la connexion **et le SFTP** le refusent (le SFTP ne lisait pas l'échéance, scripts compris) ; avant, la première connexion mène à la page de changement, sans l'imposer route par route. Les comptes créés avant ce lot ne sont pas touchés (§0.5) | `admin-create-user.test.ts`, `sftp-auth.test.ts` |
 | lot `reliquats-asvs` | `SsoService.refresh` remplaçait l'adresse du compte par celle du fournisseur sans prévenir le titulaire (ASVS 2.5.5) : avis à l'ancienne adresse (cloche, et courriel si elle était confirmée), liens de réinitialisation et de vérification déjà partis éteints, comme pour un changement fait par l'administration | `google-sign-in.integration.test.ts` |
+| lot `reliquats-asvs-suivi` | Même famille que la prise conditionnelle de l'installation (NC-47) : `ForgeInstallService` reposait `installing` sans condition avant et après l'installeur du chargeur, écrasant une suspension, une restauration ou un transfert décidés pendant l'attente. Il ne le pose plus que sur un serveur libre, déjà en installation ou dont l'installeur vient d'échouer, et ne relance pas l'installeur sur un serveur pris | `forge-install.integration.test.ts` |
 | `0239c39` | Le « piège connu » de la consigne (`security-alert` › panne de courrier) n'était pas Argon2 : le test libérait l'envoi avant son départ et attendait pour toujours. La connexion, elle, répondait en 78 ms | le test lui-même, trois exécutions vertes |
 
 ### 0.5 Ce qui reste, et pourquoi
@@ -163,6 +164,17 @@ par cookie refusée depuis une autre origine (`Origin`, `Sec-Fetch-Site`,
   `ENGINE_DOWNLOAD_HOSTS` (`engine-sources.ts`) le suive ; le changement du
   mot de passe provisoire est proposé à la première connexion, pas imposé
   (l'échéance de 24 h tient ASVS 2.3.1).
+- **Restauration sans nouvelles** (lot `reliquats-asvs-suivi`) : au bout de six
+  heures, le panel lève `restoring` et le consigne au journal du serveur
+  (`backup.restore_expired`). Deux écarts, bornés par ce délai et acceptés :
+  - après la levée, le gestionnaire de fichiers rouvre alors que Wings écrit
+    peut-être encore (Wings ne bloque que le démarrage et le SFTP) ; et le
+    panel ne retient pas quelle archive est rendue, si bien que le compte
+    rendu tardif d'une première restauration lève l'état d'une seconde ;
+  - la suppression d'une sauvegarde lit l'état du serveur puis efface, sans
+    verrou : une restauration de la **même** archive acceptée entre les deux
+    attend le balayage de six heures. Verrouiller la ligne du serveur pendant
+    l'appel au daemon ou au compartiment coûterait davantage.
 - **Comptes créés par l'administration avant ce lot** : leur mot de passe tiré
   au sort n'a pas d'échéance. Pour les repérer (lecture seule), puis leur
   envoyer un lien de réinitialisation depuis l'administration :

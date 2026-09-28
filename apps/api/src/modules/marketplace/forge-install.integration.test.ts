@@ -6,7 +6,7 @@ import {
   servers,
   serverVariables,
 } from "@gamedashboard/db";
-import { Logger } from "@nestjs/common";
+import { ConflictException, Logger } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { FauxWings } from "../../test/faux-wings";
@@ -364,5 +364,64 @@ describe.skipIf(!HAS_DATABASE)("pose de Forge et NeoForge avec un modpack (inté
     await remote.markInstalled(nodeId, serverId, { successful: true, reinstall: true });
     expect(await service.current(serverId)).toBeNull();
     expect(await db.select().from(serverEngines)).toEqual([]);
+  });
+
+  /*
+   * Relecture (R10, F3, F6) : les prises d'état jouées contre une vraie base.
+   * La base simulée des tests unitaires ignorait les conditions SQL.
+   */
+  describe("prise de l'état « installation »", () => {
+    it("refuse un serveur en restauration, sans rien toucher (409)", async () => {
+      await db.update(servers).set({ state: "restoring" }).where(eq(servers.id, serverId));
+
+      await expect(service.install(serverId, "curseforge-pack:42", "100")).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(await state()).toBe("restoring");
+      expect(daemon.events).toEqual([]);
+      expect(await variables()).toEqual({ LOADER: "forge", LOADER_VERSION: "latest" });
+    });
+
+    it("ne lève pas une suspension arrivée après l'installeur du chargeur", async () => {
+      daemon.onReinstall = async (server) => {
+        await remote.markInstalled(nodeId, server, { successful: true, reinstall: true });
+        await db.update(servers).set({ state: "suspended" }).where(eq(servers.id, server));
+      };
+
+      await service.install(serverId, "curseforge-pack:42", "100");
+
+      expect(await state()).toBe("suspended");
+    });
+
+    // Relecture (L1-a) : une suspension pendant l'installeur était annoncée
+    // comme un redémarrage du daemon.
+    it("dit la vraie cause quand le serveur est pris pendant l'installeur", async () => {
+      daemon.onReinstall = async (server) => {
+        await db.update(servers).set({ state: "suspended" }).where(eq(servers.id, server));
+      };
+
+      const report = await service.install(serverId, "curseforge-pack:42", "100");
+
+      expect(report.notice).toMatch(/pris par une autre opération/);
+      expect(report.notice).not.toMatch(/redémarré/);
+      expect(await variables()).toEqual({ LOADER: "forge", LOADER_VERSION: "latest" });
+      expect(await state()).toBe("suspended");
+    });
+
+    it("ne relance pas l'installeur sur un serveur pris entre-temps", async () => {
+      // Une restauration posée pendant la lecture du dépôt de Forge, après la
+      // prise de l'installation du pack : elle garde la main.
+      fetchText.mockImplementationOnce(async () => {
+        await db.update(servers).set({ state: "restoring" }).where(eq(servers.id, serverId));
+        return FORGE_INDEX;
+      });
+
+      const report = await service.install(serverId, "curseforge-pack:42", "100");
+
+      expect(daemon.events).not.toContain("reinstall");
+      expect(report.notice).toMatch(/pris par une autre opération/);
+      expect(await variables()).toEqual({ LOADER: "forge", LOADER_VERSION: "latest" });
+      expect(await state()).toBe("restoring");
+    });
   });
 });

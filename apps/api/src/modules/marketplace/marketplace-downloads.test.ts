@@ -352,6 +352,20 @@ describe("plateforme : jar rendu par l'éditeur", () => {
       /plus proposée/,
     ],
     ["réponse illisible", new SyntaxError("JSON invalide"), BadGatewayException, /inattendue/],
+    [
+      "coupure réseau",
+      new TypeError("fetch failed", { cause: new Error("ECONNRESET") }),
+      BadGatewayException,
+      /ne répond pas/,
+    ],
+    // Relecture (F5) : un JSON d'une forme inattendue lève aussi un TypeError ;
+    // ce n'est pas un silence de l'éditeur.
+    [
+      "réponse d'une forme inattendue",
+      new TypeError("builds.find is not a function"),
+      BadGatewayException,
+      /inattendue/,
+    ],
   ])("%s : refus explicite, sans arrêter le serveur", async (_cas, erreur, type, message) => {
     const { svc, daemon, sources } = moteur({ url: "", fileName: "" });
     sources.resolve.mockRejectedValueOnce(erreur);
@@ -368,10 +382,19 @@ describe("plateforme : jar rendu par l'éditeur", () => {
     const url = "https://fill-data.papermc.io/v1/objects/8de7/paper-1.21.1-60.jar";
     const { svc, sources } = moteur({ url, fileName: "paper-1.21.1-60.jar" });
 
-    await svc.install(SERVER, "paper:paper", "1.21.1");
-    const signal = (sources.resolve.mock.calls[0] as unknown[])[2];
-    expect(signal).toBeInstanceOf(AbortSignal);
-    expect((signal as AbortSignal).aborted).toBe(false);
+    const echeance = vi.spyOn(AbortSignal, "timeout");
+    try {
+      await svc.install(SERVER, "paper:paper", "1.21.1");
+      // Relecture (F3) : l'échéance elle-même, pas seulement la présence d'un
+      // signal. Une seule, posée une fois, et sous les 10 s de l'interface.
+      expect(echeance).toHaveBeenCalledTimes(1);
+      const [delai] = echeance.mock.calls[0] as [number];
+      expect(delai).toBeLessThan(10_000);
+      const signal = (sources.resolve.mock.calls[0] as unknown[])[2];
+      expect(signal).toBe(echeance.mock.results[0]?.value);
+    } finally {
+      echeance.mockRestore();
+    }
   });
 
   // Revue du lot (R10) : l'état « installation » écrasait une restauration ou
@@ -438,5 +461,57 @@ describe("Vanilla : adresse de version du manifeste", () => {
       /inattendue/,
     );
     expect(appels).not.toContain(METADONNEES);
+  });
+});
+
+/*
+ * Relecture (F3) : l'échéance unique de la résolution doit atteindre chaque
+ * requête faite chez l'éditeur, pas seulement la première.
+ */
+describe("résolution : échéance partagée par toutes les requêtes", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("transmet l'échéance aux deux requêtes de Fabric", async () => {
+    const signaux: (AbortSignal | undefined)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (adresse: string | URL, init?: RequestInit) => {
+        signaux.push(init?.signal ?? undefined);
+        return String(adresse).endsWith("/versions/installer")
+          ? Response.json([{ version: "1.0.1", stable: true }])
+          : Response.json([{ loader: { version: "0.16.10" }, intermediary: { stable: true } }]);
+      }),
+    );
+    const echeance = new AbortController();
+
+    const jar = await new EngineSourcesService().resolve(
+      "fabric:fabric",
+      "1.21.1",
+      echeance.signal,
+    );
+
+    expect(jar?.fileName).toBe("fabric-server-1.21.1-0.16.10.jar");
+    expect(signaux).toHaveLength(2);
+    for (const signal of signaux) expect(signal?.aborted).toBe(false);
+    echeance.abort();
+    // Le signal de chaque requête suit l'échéance commune.
+    for (const signal of signaux) expect(signal?.aborted).toBe(true);
+  });
+
+  it("n'interroge pas l'éditeur une fois l'échéance passée", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_adresse: string | URL, init?: RequestInit) => {
+        init?.signal?.throwIfAborted();
+        return Response.json([]);
+      }),
+    );
+    const echue = AbortSignal.abort(new DOMException("délai dépassé", "TimeoutError"));
+
+    await expect(
+      new EngineSourcesService().resolve("fabric:fabric", "1.21.1", echue),
+    ).rejects.toMatchObject({ name: "TimeoutError" });
   });
 });

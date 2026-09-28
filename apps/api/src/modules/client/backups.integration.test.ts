@@ -239,10 +239,14 @@ describe.skipIf(!HAS_DATABASE)("BackupsService (intégration)", () => {
       await vieillir(RESTORE_STALE_MS + 60_000);
       expect(await rapport().expireStaleRestores()).toBe(1);
       expect(await etat()).toBeNull();
+      // Relecture (F1) : la levée se lit au journal du serveur.
+      expect(await issues()).toEqual(["backup.restore_expired"]);
 
-      // Le compte rendu arrivé après coup ne change plus rien.
+      // Le compte rendu arrivé après coup ne change plus rien, ni à l'état ni
+      // au journal.
       await rapport().restored(nodeId, id, true);
       expect(await etat()).toBeNull();
+      expect(await issues()).toEqual(["backup.restore_expired"]);
     });
 
     it("ne lève pas une suspension décidée pendant la restauration", async () => {
