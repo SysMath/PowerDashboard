@@ -9,12 +9,13 @@ import {
   EmptyState,
   FormField,
   Input,
+  RelativeTime,
 } from "@gamedashboard/ui";
 import { Check, DownloadCloud, Plus, RefreshCw, Search, SearchX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useDeferredValue, useMemo, useState, useTransition } from "react";
-import type { EggCatalogueEntry, EggCatalogueSource } from "@/server/api/admin";
+import type { EggCatalogueEntry, EggCatalogueRead, EggCatalogueSource } from "@/server/api/admin";
 import { importEgg, importEggFromCatalogue, syncEggSource } from "@/server/api/admin-actions";
 
 /**
@@ -41,9 +42,15 @@ const MAX_RESULTS = 40;
 export function AdminEggImport({
   source,
   entries,
+  catalogueError = null,
+  catalogueStaleSince = null,
 }: {
   source: EggCatalogueSource | null;
   entries: EggCatalogueEntry[];
+  /** Le dépôt n'a pas pu être lu : recherche et synchronisation attendent. */
+  catalogueError?: EggCatalogueRead["error"];
+  /** Liste gardée en mémoire, GitHub ne répondant plus : date de sa lecture. */
+  catalogueStaleSince?: string | null;
 }) {
   const t = useTranslations("adminEggs");
   const tc = useTranslations("common");
@@ -167,6 +174,18 @@ export function AdminEggImport({
         </Button>
       </div>
 
+      {catalogueError ? (
+        <AlertBanner variant="warning" title={t("catalogueUnavailable")}>
+          {catalogueError.reason ?? t("catalogueNoAnswer")} {t("catalogueUnavailableHint")}
+        </AlertBanner>
+      ) : null}
+      {catalogueStaleSince ? (
+        <AlertBanner variant="warning" title={t("catalogueStale")}>
+          {t.rich("catalogueStaleHint", {
+            time: () => <RelativeTime value={catalogueStaleSince} />,
+          })}
+        </AlertBanner>
+      ) : null}
       {error ? (
         <AlertBanner variant="danger" title={tc("actionRefused")} dismissible>
           {error}

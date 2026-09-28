@@ -1674,7 +1674,7 @@ export class AdminController {
   @Get("egg-catalogue")
   async eggCatalogue() {
     const source = await this.eggImport.defaultSource();
-    return { data: { source, entries: await this.eggImport.catalogue(source.id) } };
+    return { data: { source, ...(await this.eggImport.catalogue(source.id)) } };
   }
 
   @Post("egg-catalogue/import")
