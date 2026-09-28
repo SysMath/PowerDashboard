@@ -6,12 +6,11 @@
 # Écrit un fichier SARIF par langage (`javascript.sarif`, `actions.sarif`),
 # que le workflow téléverse ensuite vers GitHub depuis le runner.
 #
-# Pourquoi pas la « configuration par défaut » de GitHub : elle réclame un
-# runner hébergé (`ubuntu-latest`), que le dépôt n'obtient plus ; ses deux
-# exécutions du 22/09/2026 ont échoué en deux secondes, sans journal. Et
-# `github/codeql-action/init` tournerait directement sur le runner Windows,
-# alors que tout job du projet travaille dans un conteneur Linux
-# (docs/runner-auto-heberge.md). Le CLI tourne donc ici, et seul le
+# Pourquoi pas la « configuration par défaut » de GitHub : elle ne tourne que
+# sur les runners de GitHub, jamais sur l'auto-hébergé. Et
+# `github/codeql-action/init` tournerait directement sur le runner (Windows
+# pour l'auto-hébergé), alors que tout job du projet travaille dans un
+# conteneur Linux, le même sur chaque runner (docs/runner-auto-heberge.md). Le CLI tourne donc ici, et seul le
 # téléversement (un appel d'API) reste sur le runner, où est le jeton.
 set -euo pipefail
 

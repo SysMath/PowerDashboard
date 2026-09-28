@@ -7,7 +7,7 @@
 # Deux façons de tourner :
 # - sur la machine (poste, runner Linux) : le panel démarre ici, et ZAP le
 #   joint par le réseau de l'hôte ;
-# - dans la CI (runner Windows) : le panel démarre dans le conteneur Linux du
+# - dans la CI (tout runner) : le panel démarre dans le conteneur Linux du
 #   job (`ZAP_CONTENEUR`, voir infra/ci/linux.sh), qui porte déjà la base et
 #   la clé, et ZAP partage son réseau.
 #
