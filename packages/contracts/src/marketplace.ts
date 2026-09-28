@@ -307,6 +307,9 @@ export function chooseRelease(
  */
 export function gameVersionFromPing(announced: string | null | undefined): string {
   if (typeof announced !== "string") return "";
-  const found = /(\d+\.\d+(?:\.\d+)?)/.exec(announced);
+  // `(?<!\d)` : une suite de chiffres n'est essayée qu'à partir de son début.
+  // Sans lui, « 000…0 » était relu depuis chaque position — quadratique, et
+  // le texte vient du serveur de jeu, que le client contrôle.
+  const found = /(?<!\d)(\d+\.\d+(?:\.\d+)?)/.exec(announced);
   return found?.[1] ?? "";
 }

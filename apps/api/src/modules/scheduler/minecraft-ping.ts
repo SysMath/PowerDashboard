@@ -15,7 +15,7 @@
  */
 
 import { isPlayerName } from "@gamedashboard/contracts";
-import { type GameStatus, PLAYER_SAMPLE_MAX } from "./game-status";
+import { cleanStatusText, type GameStatus, PLAYER_SAMPLE_MAX } from "./game-status";
 
 /*
  * Il vit dans l'API et non dans `@gamedashboard/contracts` : `Buffer` est propre à
@@ -116,6 +116,17 @@ export type MinecraftStatus = GameStatus;
 
 export { PLAYER_SAMPLE_MAX };
 
+/**
+ * Taille maximale d'une réponse d'état.
+ *
+ * Le protocole borne le JSON à 32 767 caractères, soit moins de 100 Kio même
+ * tout en caractères de trois octets : au-delà, ce n'est plus un serveur
+ * Minecraft qui répond. Sans plafond, le serveur de jeu — que le client
+ * contrôle — pouvait faire accumuler au panel autant d'octets qu'il en
+ * envoyait pendant le délai de la sonde.
+ */
+export const STATUS_FRAME_MAX_BYTES = 256 * 1024;
+
 /** Identifiant nul que les serveurs donnent aux lignes décoratives de l'échantillon. */
 const DECORATIVE_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -189,7 +200,10 @@ export function parseStatusJson(raw: string): MinecraftStatus | null {
   return {
     playersOnline: typeof players.online === "number" ? players.online : null,
     playersMax: typeof players.max === "number" ? players.max : null,
-    version: typeof version.name === "string" ? version.name : null,
+    // Borné et nettoyé comme la version d'A2S et de FiveM : lue telle quelle,
+    // une version de plusieurs centaines de kilo-octets partait en base, et
+    // chaque lecture du catalogue d'extensions la repassait par une regex.
+    version: cleanStatusText(version.name),
     sample: readSample(players.sample),
   };
 }
