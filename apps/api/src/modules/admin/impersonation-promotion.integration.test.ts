@@ -4,6 +4,7 @@ import { type Database, settings, users } from "@gamedashboard/db";
 import { type CanActivate, type ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sousDomainesInertes } from "../../test/sous-domaines";
 import {
   createThrowawayDatabase,
   HAS_DATABASE,
@@ -131,6 +132,7 @@ describe.skipIf(!HAS_DATABASE)("session empruntée d'un compte promu (intégrati
       { emit: async () => undefined } as unknown as WebhookEmitterService,
       new WingsTokenService(db),
       {} as S3Service,
+      sousDomainesInertes(),
     );
     await actions.setUserRole(confrere, client, "admin");
 

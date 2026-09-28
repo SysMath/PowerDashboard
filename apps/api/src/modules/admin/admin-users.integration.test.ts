@@ -14,6 +14,7 @@ import { ConflictException, ForbiddenException, ServiceUnavailableException } fr
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedLocation, seedNode, seedServer } from "../../test/fixtures";
+import { sousDomainesInertes } from "../../test/sous-domaines";
 import {
   createThrowawayDatabase,
   HAS_DATABASE,
@@ -342,6 +343,7 @@ describe.skipIf(!HAS_DATABASE)("suspension et modification d'un compte (intégra
       { emit: async () => undefined } as unknown as WebhookEmitterService,
       new WingsTokenService(db),
       {} as S3Service,
+      sousDomainesInertes(),
     );
     await expect(actions.impersonationTarget(admin.id, client.id)).rejects.toThrow(/suspendu/);
   });
@@ -359,6 +361,7 @@ describe.skipIf(!HAS_DATABASE)("suspension et modification d'un compte (intégra
       { emit: async () => undefined } as unknown as WebhookEmitterService,
       new WingsTokenService(db),
       {} as S3Service,
+      sousDomainesInertes(),
     );
     await expect(actions.impersonationTarget(admin.id, reseller.id)).rejects.toBeInstanceOf(
       ForbiddenException,

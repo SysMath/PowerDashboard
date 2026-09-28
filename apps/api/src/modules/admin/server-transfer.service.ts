@@ -17,6 +17,7 @@ import {
 } from "@nestjs/common";
 import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { SubdomainsService } from "../dns/subdomains.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { WebhookEmitterService } from "../webhooks/webhook-emitter.service";
 import { WingsClientService } from "../wings/wings-client.service";
@@ -78,6 +79,7 @@ export class ServerTransferService {
     @Inject(WingsTokenService) private readonly tokens: WingsTokenService,
     @Inject(NotificationsService) private readonly notifications: NotificationsService,
     @Inject(WebhookEmitterService) private readonly webhooks: WebhookEmitterService,
+    @Inject(SubdomainsService) private readonly subdomains: SubdomainsService,
   ) {}
 
   /**
@@ -342,6 +344,9 @@ export class ServerTransferService {
       this.logger.warn(`Transfert confirmé pour ${serverId}, mais il venait d'être clos.`);
       return;
     }
+
+    // L'adresse a changé : le sous-domaine la suit, sans retenir la bascule.
+    void this.subdomains.refresh(serverId);
 
     /*
      * La copie de départ est retirée, et **après** la bascule.

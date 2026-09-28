@@ -1,3 +1,4 @@
+import type { DesiredRecord } from "@gamedashboard/contracts";
 import { relations } from "drizzle-orm";
 import {
   bigint,
@@ -17,6 +18,14 @@ import { eggs, eggVariables } from "./catalogue";
 import { serverState, transferState } from "./enums";
 import { users } from "./identity";
 import { allocations, nodes } from "./infrastructure";
+
+/**
+ * Un enregistrement publié : ce qu'on voulait, l'identifiant que le fournisseur
+ * lui a donné, et la zone où il vit. La zone est portée par l'enregistrement,
+ * et non par la ligne seule : pendant un changement de zone, la ligne tient à
+ * la fois ceux de l'ancienne, à retirer, et ceux de la nouvelle.
+ */
+export type PublishedDnsRecord = DesiredRecord & { id: string; zoneId: string };
 
 /** §6.4 — Serveurs. */
 
@@ -249,6 +258,54 @@ export const serverHealth = pgTable(
     queryPayload: jsonb("query_payload"),
   },
   (table) => [index("server_health_server_at_idx").on(table.serverId, table.at)],
+);
+
+/**
+ * Sous-domaine d'un serveur, publié chez le fournisseur DNS (PLAN §10.3).
+ *
+ * La ligne garde **ce qui a été publié** (`records`, avec les identifiants du
+ * fournisseur) et non seulement ce qu'on voulait publier : c'est ce qui permet
+ * de retirer exactement ces enregistrements quand l'adresse change ou que le
+ * serveur disparaît, sans toucher au reste de la zone.
+ *
+ * `set null` à la suppression du serveur, et non `cascade` : la ligne survit
+ * au serveur le temps que le balayage retire ses enregistrements, puis
+ * s'efface. En cascade, une zone injoignable au moment de la suppression
+ * laissait des noms pointer pour toujours vers une adresse qu'un autre client
+ * recevra. Un libellé que le client abandonne suit le même chemin.
+ *
+ * Le nom complet est unique : tant que les enregistrements d'un nom abandonné
+ * ne sont pas retirés, personne d'autre ne peut le prendre.
+ */
+export const serverSubdomains = pgTable(
+  "server_subdomains",
+  {
+    id: id(),
+    serverId: uuid("server_id").references(() => servers.id, { onDelete: "set null" }),
+    /**
+     * Le serveur qui a abandonné ce nom (changement de libellé, retrait), le
+     * temps que ses enregistrements partent. Sans clé étrangère : c'est une
+     * trace, qui sert à refuser un nouveau changement tant que l'ancien nom
+     * n'est pas retiré.
+     */
+    abandonedBy: uuid("abandoned_by"),
+    label: varchar("label", { length: 63 }).notNull(),
+    /** `label.<domaine des serveurs>`, en minuscules. */
+    fqdn: varchar("fqdn", { length: 255 }).notNull(),
+    /** Fournisseur et zone **au moment de la publication** : les réglages peuvent changer depuis. */
+    provider: varchar("provider", { length: 20 }).notNull(),
+    zoneId: varchar("zone_id", { length: 64 }).notNull(),
+    records: jsonb("records").$type<PublishedDnsRecord[]>().notNull().default([]),
+    /** `pending`, `active` ou `error`. */
+    status: varchar("status", { length: 8 }).notNull().default("pending"),
+    error: varchar("error", { length: 500 }),
+    syncedAt: moment("synced_at"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("server_subdomain_fqdn_unique").on(table.fqdn),
+    uniqueIndex("server_subdomain_server_unique").on(table.serverId),
+  ],
 );
 
 export const serversRelations = relations(servers, ({ one, many }) => ({

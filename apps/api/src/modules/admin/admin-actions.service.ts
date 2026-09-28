@@ -19,6 +19,7 @@ import {
 import { and, count, eq, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 import { SessionRepository } from "../auth/session.repository";
+import { SubdomainsService } from "../dns/subdomains.service";
 import { S3Service } from "../storage/s3.service";
 import { WebhookEmitterService } from "../webhooks/webhook-emitter.service";
 import { WingsClientService, WingsUnavailableError } from "../wings/wings-client.service";
@@ -37,6 +38,7 @@ export class AdminActionsService {
     @Inject(WebhookEmitterService) private readonly webhooks: WebhookEmitterService,
     @Inject(WingsTokenService) private readonly tokens: WingsTokenService,
     @Inject(S3Service) private readonly s3: S3Service,
+    @Inject(SubdomainsService) private readonly subdomains: SubdomainsService,
   ) {}
 
   /* --- Utilisateurs -------------------------------------------------------- */
@@ -419,7 +421,15 @@ export class AdminActionsService {
       await this.s3.discard(await this.s3.keyFor(serverId, sauvegarde.id), sauvegarde.uploadId);
     }
 
-    await this.db.delete(servers).where(eq(servers.id, serverId));
+    await this.db.transaction(async (tx) => {
+      // Le nom retient qui l'a publié : la clé étrangère (`set null`) efface
+      // le serveur, et le retrait doit encore reconnaître ses enregistrements.
+      await this.subdomains.departing(tx, serverId);
+      await tx.delete(servers).where(eq(servers.id, serverId));
+    });
+    // Le sous-domaine a perdu son serveur : ses enregistrements partent tout
+    // de suite, ou au balayage suivant si la zone ne répond pas.
+    void this.subdomains.sweepSoon();
 
     // Le propriétaire est relevé **avant** la suppression : après, la ligne
     // n'existe plus, et le rappel ne dirait pas à qui appartenait le serveur —

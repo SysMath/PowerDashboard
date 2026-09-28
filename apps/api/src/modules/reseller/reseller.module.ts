@@ -8,6 +8,7 @@ import { ResellerScopeService } from "../application/reseller-scope.service";
 import { AuthModule } from "../auth/auth.module";
 import { CatalogueService } from "../client/catalogue.service";
 import { ServerResizeService } from "../client/server-resize.service";
+import { DnsModule } from "../dns/dns.module";
 import { StorageModule } from "../storage/storage.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { WingsModule } from "../wings/wings.module";
@@ -38,7 +39,15 @@ import { ResellerShareService } from "./reseller-share.service";
    * `StorageModule` de même, qui ne dépend que de la base et des réglages :
    * supprimer un serveur efface ses archives du compartiment.
    */
-  imports: [AuthModule, ActivityModule, WebhooksModule, WingsModule, StorageModule],
+  imports: [
+    AuthModule,
+    ActivityModule,
+    WebhooksModule,
+    WingsModule,
+    StorageModule,
+    // Supprimer un serveur retire son sous-domaine.
+    DnsModule,
+  ],
   controllers: [ResellerController, BrandingController],
   providers: [
     ResellerService,
