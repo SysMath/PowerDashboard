@@ -15,10 +15,49 @@ variables → Actions → Variables). Sa valeur est du JSON :
 |---|---|
 | *(absente)* | `"self-hosted"` : le premier runner auto-hébergé libre |
 | `["self-hosted","windows"]` | seulement les runners Windows |
-| `"ubuntu-latest"` | retour aux runners hébergés par GitHub |
+| `"ubuntu-latest"` | les runners hébergés par GitHub (voir plus bas) |
 
 Les trois cibles marchent sans autre changement : le runner ne fait que
 piloter Docker depuis bash.
+
+Une exécution lancée à la main (onglet **Actions**, workflow voulu, **Run
+workflow**) choisit aussi son runner, sans toucher à la variable : entrée
+`runner`, `CI_RUNNER` (la variable, par défaut), `ubuntu-latest` ou
+`self-hosted`. Une release lancée ainsi fait tourner ses vérifications sur le
+même runner que sa publication.
+
+## Runners de GitHub (`ubuntu-latest`)
+
+Le dépôt est public : les runners standard de GitHub y sont gratuits. Ils
+servent de relève quand la machine du runner auto-hébergé est éteinte, les
+jobs restant sinon « Queued » jusqu'à ce que GitHub les annule, au bout de
+24 heures.
+
+- **Relancer la CI d'une PR** : Actions › CI › Run workflow, choisir la
+  branche de la PR et `ubuntu-latest`. Le résultat s'attache au commit, donc
+  à la PR. L'exécution de la PR restée en attente sur le runner
+  auto-hébergé n'est pas annulée pour autant ; sur `main`, en revanche,
+  l'exécution manuelle remplace celle du push (même groupe de concurrence).
+- **Tout basculer** : variable `CI_RUNNER` à `"ubuntu-latest"`, puis la
+  retirer au retour de la machine.
+
+Rien ne change dans les jobs : sur Ubuntu, ils ouvrent le même conteneur
+Linux (`infra/ci/linux.sh`, image épinglée), avec la même base et les mêmes
+outils ; seule l'étape « Bash de Git et Docker », propre à Windows, est
+sautée. Le verdict est donc le même d'une cible à l'autre. Seule réserve,
+les captures de référence : rendues par le Chromium du conteneur, elles
+peuvent tout de même différer d'un pixel d'un processeur à l'autre. Les
+prendre (`captures.yml`) sur le runner qui fait tourner la CI.
+
+Ce qui diffère :
+
+- les caches (volumes `gd-ci-*`) ne survivent pas au job : chaque exécution
+  retélécharge le store pnpm, Chromium et, pour CodeQL, son archive ;
+- la machine a 4 cœurs et 16 Go de mémoire ;
+- les PR venues d'un fork restent refusées, par la même condition.
+
+Si les jobs hébergés ne démarrent pas et que GitHub invoque la facturation,
+c'est un réglage du compte GitHub (Settings › Billing), pas du dépôt.
 
 ## Comment un job tourne
 
@@ -99,7 +138,7 @@ mkdir C:\actions-runner; cd C:\actions-runner
 Invoke-WebRequest -Uri <archive donnée par la page> -OutFile runner.zip
 (Get-FileHash runner.zip -Algorithm SHA256).Hash   # comparer à la page
 Expand-Archive runner.zip -DestinationPath .
-./config.cmd --url https://github.com/PowerNexus/PowerDashboard --token <JETON> --unattended --runasservice
+./config.cmd --url https://github.com/SysMath/PowerDashboard --token <JETON> --unattended --runasservice
 ```
 
 Le service doit tourner sous un compte qui a accès à Docker Desktop, c'est-à-dire
@@ -205,8 +244,8 @@ Si elle en manque encore, donner davantage de mémoire à WSL (voir « Mémoire
 de Docker Desktop »).
 
 La « configuration par défaut » de GitHub (**Settings → Code security →
-CodeQL analysis → Default setup**) ne sert pas ici : elle réclame un runner
-hébergé. Elle doit rester **désactivée**, sinon GitHub refuse les résultats
+CodeQL analysis → Default setup**) ne sert pas ici : elle ne tourne que sur
+les runners de GitHub, et ferait double emploi avec `codeql.yml`. Elle doit rester **désactivée**, sinon GitHub refuse les résultats
 de `codeql.yml` (« CodeQL analyses from advanced configurations cannot be
 processed when the default setup is enabled »).
 

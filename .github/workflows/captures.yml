@@ -17,6 +17,14 @@ name: Captures de référence
 
 on:
   workflow_dispatch:
+    inputs:
+      # Le même que celui de la CI : le conteneur est le même partout, mais
+      # un autre processeur peut décaler l'anticrénelage d'un pixel.
+      runner:
+        description: "Runner : celui de la variable CI_RUNNER, ceux de GitHub, ou l'auto-hébergé"
+        type: choice
+        options: [CI_RUNNER, ubuntu-latest, self-hosted]
+        default: CI_RUNNER
 
 concurrency:
   group: captures-${{ github.ref }}
@@ -25,8 +33,8 @@ concurrency:
 permissions:
   contents: read
 
-# Comme la CI : Git Bash sur le runner Windows, commandes dans un conteneur
-# Linux (infra/ci/linux.sh), le même que celui des parcours : les captures
+# Comme la CI : bash sur le runner (Git Bash sous Windows), commandes dans un
+# conteneur Linux (infra/ci/linux.sh), le même que celui des parcours : les captures
 # prises ici sont celles que la CI comparera.
 defaults:
   run:
@@ -40,7 +48,7 @@ env:
 jobs:
   captures:
     name: Prendre et commiter les captures
-    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"self-hosted"') }}
+    runs-on: ${{ fromJSON(inputs.runner && inputs.runner != 'CI_RUNNER' && toJSON(inputs.runner) || vars.CI_RUNNER || '"self-hosted"') }}
     timeout-minutes: 30
     permissions:
       # Pousser le commit des captures sur la branche choisie.

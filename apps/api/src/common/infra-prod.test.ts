@@ -508,13 +508,15 @@ describe("actions GitHub des workflows", () => {
     }
   });
 
-  it("prennent n'importe quel runner auto-hébergé, sauf choix contraire dans CI_RUNNER", () => {
+  it("prennent n'importe quel runner auto-hébergé, sauf choix contraire dans CI_RUNNER ou à la main", () => {
     const cibles = workflows.flatMap((texte) =>
       [...texte.matchAll(/^\s*runs-on:\s*(.+)$/gm)].map((m) => m[1]),
     );
     expect(cibles.length).toBe(6);
     for (const cible of cibles) {
-      expect(cible).toBe(`\${{ fromJSON(vars.CI_RUNNER || '"self-hosted"') }}`);
+      expect(cible).toBe(
+        `\${{ fromJSON(inputs.runner && inputs.runner != 'CI_RUNNER' && toJSON(inputs.runner) || vars.CI_RUNNER || '"self-hosted"') }}`,
+      );
     }
     // Git Bash, et non PowerShell, le shell par défaut de Windows.
     for (const texte of workflows) {
@@ -547,6 +549,11 @@ describe("actions GitHub des workflows", () => {
       expect(bloc.slice(chemin)).toMatch(
         /^ {8}shell: powershell .*-ExecutionPolicy Bypass .*\{0\}/m,
       );
+      // Seulement sous Windows : ubuntu-latest n'a pas `powershell`, et le
+      // job y serait tombé dès sa première étape.
+      expect(bloc.slice(chemin)).toMatch(
+        /^- name: Bash de Git et Docker\n {8}if: runner\.os == 'Windows'\n/,
+      );
       expect(bloc).toContain("$env:GITHUB_PATH");
       expect(bloc).toContain("run: git config --global core.autocrlf false");
       expect(bloc).toMatch(/run: bash infra\/ci\/linux\.sh ouvrir/);
@@ -556,6 +563,29 @@ describe("actions GitHub des workflows", () => {
       expect(bloc).not.toMatch(/^ {4}(services|container):/m);
       expect(bloc).not.toContain("actions/setup-node@");
     }
+  });
+
+  /*
+   * La machine du runner auto-hébergé éteinte, une exécution lancée à la main
+   * doit pouvoir tourner sur les runners de GitHub, et une release vérifier
+   * son code là où elle le publiera.
+   */
+  it("se lancent à la main sur le runner choisi", () => {
+    const [ci, release, captures, codeql] = workflows as [string, string, string, string];
+    for (const texte of [ci, release, captures, codeql]) {
+      const debut = texte.indexOf("  workflow_dispatch:\n");
+      expect(debut).toBeGreaterThan(0);
+      const bloc = texte.slice(debut, texte.indexOf("\n\n", debut));
+      expect(bloc).toMatch(
+        / {6}runner:\n(?: {8}.*\n)*? {8}type: choice\n {8}options: \[CI_RUNNER, ubuntu-latest, self-hosted\]\n {8}default: CI_RUNNER/,
+      );
+    }
+    expect(ci).toMatch(
+      / {2}workflow_call:\n {4}inputs:\n {6}runner:\n {8}type: string\n {8}default: CI_RUNNER\n/,
+    );
+    expect(release).toMatch(
+      /uses: \.\/\.github\/workflows\/ci\.yml\n(?: {4}#.*\n)* {4}with:\n {6}runner: \$\{\{ inputs\.runner \|\| 'CI_RUNNER' \}\}\n/,
+    );
   });
 
   it("ne tombent pas pour un quota d'artefacts atteint", () => {
@@ -939,7 +969,8 @@ describe("workflow des captures de référence", () => {
       captures.indexOf("\non:"),
       captures.indexOf("\nconcurrency:"),
     );
-    expect(declencheurs.trim()).toBe("on:\n  workflow_dispatch:");
+    // Un seul déclencheur ; ses entrées (le runner) sont indentées plus loin.
+    expect(declencheurs.match(/^ {2}\S.*$/gm)).toEqual(["  workflow_dispatch:"]);
   });
 
   it("reprend toutes les captures de la suite visuelle, et les pousse sur la branche lancée", () => {

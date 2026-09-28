@@ -9,12 +9,14 @@
 #   bash infra/ci/linux.sh rapatrier <chemin>…   recopie des fichiers vers le runner
 #   bash infra/ci/linux.sh fermer                retire tout ce que le job a créé
 #
-# Pourquoi : le runner est une machine Windows avec Docker. GitHub Actions n'y
-# lance ni `services:` ni action conteneur (« Container operations are only
-# supported on Linux runners »), et tout le projet — scripts bash, binaires
-# natifs, captures de référence, archive de l'hébergement — suppose Linux. Les
-# commandes tournent donc dans un conteneur Linux ; le runner ne fait que le
-# piloter, depuis Git Bash.
+# Pourquoi : le runner auto-hébergé est une machine Windows avec Docker.
+# GitHub Actions n'y lance ni `services:` ni action conteneur (« Container
+# operations are only supported on Linux runners »), et tout le projet —
+# scripts bash, binaires natifs, captures de référence, archive de
+# l'hébergement — suppose Linux. Les commandes tournent donc dans un conteneur
+# Linux ; le runner ne fait que le piloter, depuis Git Bash. Sur un runner
+# Linux (ubuntu-latest de GitHub), le même conteneur sert tel quel : même
+# image, même verdict.
 #
 # Le dépôt est **copié** dans un volume, jamais monté depuis le disque de
 # Windows : un montage NTFS rend `pnpm install` très lent, et ce qu'un

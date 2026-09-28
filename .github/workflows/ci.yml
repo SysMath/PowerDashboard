@@ -7,6 +7,21 @@ on:
   # Appelé par release.yml : aucune version ne se publie sans avoir passé
   # exactement les mêmes vérifications qu'une PR.
   workflow_call:
+    inputs:
+      runner:
+        type: string
+        default: CI_RUNNER
+  # À la main (onglet Actions › CI › Run workflow, sur la branche d'une PR) :
+  # le résultat s'attache au commit, donc à la PR. Sert surtout quand la
+  # machine du runner auto-hébergé est éteinte : « ubuntu-latest » fait
+  # tourner la même CI sur les runners de GitHub.
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner : celui de la variable CI_RUNNER, ceux de GitHub, ou l'auto-hébergé"
+        type: choice
+        options: [CI_RUNNER, ubuntu-latest, self-hosted]
+        default: CI_RUNNER
 
 # Une seule exécution par branche : un nouveau push annule la précédente.
 concurrency:
@@ -25,12 +40,15 @@ permissions:
 # Les jobs prennent n'importe quel runner auto-hébergé, Windows ou Linux,
 # pourvu qu'il ait Docker (docs/runner-auto-heberge.md). La variable de dépôt
 # CI_RUNNER, en JSON, choisit une autre cible sans toucher aux workflows :
-# '"ubuntu-latest"' pour revenir aux runners de GitHub.
+# '"ubuntu-latest"' pour les runners de GitHub. Une exécution lancée à la main
+# choisit la sienne (entrée `runner`), qui l'emporte sur la variable.
 #
-# Chaque job lance ses commandes dans un conteneur Linux (infra/ci/linux.sh) :
-# GitHub Actions ne lance ni `services:` ni action conteneur sur un runner
-# Windows, et le projet suppose Linux partout. Le runner ne fait que piloter,
-# depuis Git Bash — d'où `shell: bash`, qui ne doit pas trouver le bash de WSL.
+# Chaque job lance ses commandes dans un conteneur Linux (infra/ci/linux.sh),
+# sur Windows comme sur Ubuntu : GitHub Actions ne lance ni `services:` ni
+# action conteneur sur un runner Windows, le projet suppose Linux partout, et
+# le même conteneur partout donne le même verdict. Le runner ne fait que
+# piloter Docker depuis bash (Git Bash sous Windows, qui ne doit pas trouver
+# le bash de WSL).
 
 defaults:
   run:
@@ -48,7 +66,7 @@ jobs:
     # Jamais le code d'une PR venue d'un fork sur nos machines : voir
     # docs/runner-auto-heberge.md.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"self-hosted"') }}
+    runs-on: ${{ fromJSON(inputs.runner && inputs.runner != 'CI_RUNNER' && toJSON(inputs.runner) || vars.CI_RUNNER || '"self-hosted"') }}
     # Plus large qu'avant : l'installation et les tests passent par Docker.
     timeout-minutes: 30
 
@@ -147,7 +165,7 @@ jobs:
     # Jamais le code d'une PR venue d'un fork sur nos machines : voir
     # docs/runner-auto-heberge.md.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"self-hosted"') }}
+    runs-on: ${{ fromJSON(inputs.runner && inputs.runner != 'CI_RUNNER' && toJSON(inputs.runner) || vars.CI_RUNNER || '"self-hosted"') }}
     timeout-minutes: 20
 
     steps:
@@ -233,7 +251,7 @@ jobs:
     # Jamais le code d'une PR venue d'un fork sur nos machines : voir
     # docs/runner-auto-heberge.md.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"self-hosted"') }}
+    runs-on: ${{ fromJSON(inputs.runner && inputs.runner != 'CI_RUNNER' && toJSON(inputs.runner) || vars.CI_RUNNER || '"self-hosted"') }}
     # Cinq minutes de plus pour le scan ZAP, dont le premier passage télécharge
     # l'image (1,5 Go) sur la machine du runner.
     timeout-minutes: 30

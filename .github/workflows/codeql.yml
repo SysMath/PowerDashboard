@@ -3,12 +3,13 @@ name: CodeQL
 # Analyse statique du TypeScript et des workflows, publiée dans l'onglet
 # Security › Code scanning du dépôt.
 #
-# Remplace la « configuration par défaut » de GitHub, qui réclame un runner
-# hébergé : elle n'a jamais tourné ici (runners hébergés suspendus). Elle doit
-# être **désactivée** dans Settings › Code security › CodeQL analysis, sinon
-# GitHub refuse les résultats de ce workflow. L'analyse tourne dans le
-# conteneur Linux du job (infra/ci/codeql.sh) ; le runner ne fait que
-# téléverser les fichiers SARIF.
+# Remplace la « configuration par défaut » de GitHub, qui ne tourne que sur
+# les runners de GitHub. Elle doit rester **désactivée** dans Settings › Code
+# security › CodeQL analysis, sinon GitHub refuse les résultats de ce
+# workflow. L'analyse tourne dans le conteneur Linux du job
+# (infra/ci/codeql.sh), sur le runner auto-hébergé comme sur ubuntu-latest
+# (variable CI_RUNNER, ou entrée `runner` d'une exécution lancée à la main) ;
+# le runner ne fait que téléverser les fichiers SARIF.
 
 on:
   push:
@@ -18,7 +19,14 @@ on:
   # dans du code qui ne bouge plus doit finir par se voir.
   schedule:
     - cron: "17 4 * * 1"
+  # À la main, au besoin sur les runners de GitHub (voir ci.yml).
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner : celui de la variable CI_RUNNER, ceux de GitHub, ou l'auto-hébergé"
+        type: choice
+        options: [CI_RUNNER, ubuntu-latest, self-hosted]
+        default: CI_RUNNER
 
 # Par événement aussi : l'analyse de la semaine et un push sur main ne
 # s'annulent pas l'une l'autre.
@@ -39,7 +47,7 @@ jobs:
     # Jamais le code d'une PR venue d'un fork sur nos machines : voir
     # docs/runner-auto-heberge.md.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"self-hosted"') }}
+    runs-on: ${{ fromJSON(inputs.runner && inputs.runner != 'CI_RUNNER' && toJSON(inputs.runner) || vars.CI_RUNNER || '"self-hosted"') }}
     # Le premier passage télécharge le CLI (700 Mo) ; ensuite, deux minutes
     # et demie (l'archive est revérifiée et extraite à chaque job).
     timeout-minutes: 30
