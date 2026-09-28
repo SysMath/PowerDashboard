@@ -25,16 +25,18 @@ const TAILLE_MAXIMALE = 500 * 1024 * 1024;
  * L'empreinte ne prouve pas l'origine — elle vient de la même release —
  * mais elle écarte un téléchargement tronqué, et HTTPS vers le seul dépôt
  * configuré fait le reste. L'adresse est vérifiée avant tout : rien d'autre
- * que les fichiers de release de ce dépôt ne se télécharge ici.
+ * que les fichiers de release de ce dépôt ne se télécharge ici. `repository`
+ * est son nom actuel quand GitHub l'a vu renommé (`fetchLatestRelease`).
+ * `site` ne change que pour les tests.
  */
 export async function downloadRelease(
   release: PublishedRelease,
   directory: string,
   repository: string,
-  allowedPrefix = `https://github.com/${repository}/releases/download/`,
+  site = "https://github.com",
 ): Promise<string> {
   for (const url of [release.archiveUrl, release.checksumUrl]) {
-    if (!url.startsWith(allowedPrefix)) {
+    if (!isReleaseFile(url, repository, site)) {
       throw new Error(`Adresse de téléchargement refusée : ${url}`);
     }
   }
@@ -73,6 +75,33 @@ export async function downloadRelease(
     throw new Error("L'archive ne correspond pas à son empreinte.");
   }
   return fichier;
+}
+
+/**
+ * Vrai si `url` désigne un fichier de release de `repository`, et rien d'autre.
+ *
+ * L'adresse est analysée, pas comparée en texte :
+ * - elle doit être déjà sous sa forme normale (`href` identique) : un `../`,
+ *   un `%2e%2e` ou une barre inverse se résoudraient ailleurs que le préfixe
+ *   lu, vers un autre dépôt ;
+ * - même origine que `site` : ni autre hôte, ni autre port, ni identifiants ;
+ * - chemin `/<propriétaire>/<dépôt>/releases/download/…`, **sans tenir compte
+ *   de la casse**, comme GitHub : `GAMEDASHBOARD_DEPOT` se tape à la main ;
+ * - aucune barre encodée (`%2f`, `%5c`), qu'un serveur décoderait.
+ */
+export function isReleaseFile(url: string, repository: string, site: string): boolean {
+  let adresse: URL;
+  try {
+    adresse = new URL(url);
+  } catch {
+    return false;
+  }
+  if (adresse.href !== url || adresse.origin !== new URL(site).origin) return false;
+  if (adresse.username || adresse.password || adresse.search || adresse.hash) return false;
+  if (/%2f|%5c/i.test(adresse.pathname)) return false;
+  const prefixe = `/${repository}/releases/download/`.toLowerCase();
+  const chemin = adresse.pathname.toLowerCase();
+  return chemin.startsWith(prefixe) && chemin.length > prefixe.length;
 }
 
 /**

@@ -93,10 +93,10 @@ par cookie refusée depuis une autre origine (`Origin`, `Sec-Fetch-Site`,
 | NC-41 | Corrigée | `fea08a9` | `server-owner.integration.test.ts` | |
 | NC-42 | Corrigée | `2d3d5ee` | `server-activity.integration.test.ts` | |
 | NC-43 | Corrigée | `d612e12` | `wings-token.test.ts`, `logout-consoles.test.ts` | Par session plutôt que par compte, pour ne pas couper les autres appareils |
-| NC-44 | Corrigée, en partie | `66e38a1` | `sftp-auth.test.ts` | État `restoring` non posé : rien ne le relâcherait (Wings refuse déjà le SFTP pendant une restauration). Mot de passe seul d'un compte 2FA documenté (ADR 0001) |
+| NC-44 | Corrigée | `66e38a1`, lot `reliquats-asvs` | `sftp-auth.test.ts`, `backups.integration.test.ts`, `remote.controller.test.ts`, `server-blocks.test.ts` | `restoring` posé par la restauration (seulement sur un serveur sans état), levé par le compte rendu de Wings (`SendRestorationStatus`, envoyé réussie ou non, issue consignée au journal du serveur), par un refus du daemon, par son redémarrage, ou au bout de six heures sans nouvelles (`RESTORE_STALE_MS`) ; une suspension décidée entre-temps n'est pas levée. Pendant la restauration, supprimer une sauvegarde est refusé (sinon le compte rendu trouvait un 404, que Wings ne rejoue pas). Mot de passe seul d'un compte 2FA documenté (ADR 0001) |
 | NC-45 | Corrigée, écart | `d2d0c05` | `remote-activity.integration.test.ts` | Le revendeur et le personnel du serveur sont aussi des auteurs admis |
 | NC-46 | Corrigée | `7d0874e` | `server-runtime-paths.test.ts`, `files.test.ts` | Seul le `..` qui sort du volume est refusé (le renommage vers un dossier parent reste possible) |
-| NC-47 | Corrigée, en partie | `9669849` | `marketplace-downloads.test.ts` | Le jar de plateforme (API PaperMC, Mojang) n'est pas filtré : liste d'hôtes à établir |
+| NC-47 | Corrigée | `9669849`, lot `reliquats-asvs` | `marketplace-downloads.test.ts` | Jar de plateforme : hôtes relevés sur les réponses réelles (`fill-data.papermc.io`, `api.purpurmc.org`, `meta.fabricmc.net`, `piston-data.mojang.com`, `launcher.mojang.com`), sans identifiants ni port, nom de fichier simple ; refus avant l'arrêt du serveur (`isTrustedEngineDownload`). L'adresse de version du manifeste de Mojang, suivie par le panel, est bornée à `piston-meta`/`launchermeta.mojang.com` |
 | NC-48 | Corrigée | `67a2853` | `server-daemon-errors.test.ts`, `application-daemon-errors.test.ts` | |
 | NC-49 | Corrigée | `54c476c`, `c4d8c6f` | `infra-prod.test.ts` | 503 et non 429 (Wings ne rejoue que les 5xx) ; la production locale n'avait **aucune** limitation, elle a désormais celles du modèle |
 | NC-50 | Corrigée | `c7aa452` | `infra-prod.test.ts`, `response-headers.test.ts` | Pas de `preload` ni d'agrafage OCSP : Let's Encrypt n'en publie plus |
@@ -126,7 +126,7 @@ par cookie refusée depuis une autre origine (`Origin`, `Sec-Fetch-Site`,
 | D-5 | Confirmé, corrigé : `AdminGuard` refuse toute session empruntée | `7b83b49`, `impersonation-promotion.integration.test.ts` |
 | D-6 | Tranché : le défi d'une cérémonie est à usage unique et consommé en base (NC-30, NC-32) ; un compteur à zéro est celui des clés synchronisées, admis par WebAuthn | `login-challenge.integration.test.ts` |
 | D-7 | Confirmé, corrigé : index unique `(user_id, provider)` (migration 0043) | `dd18811`, `sso-resolve.integration.test.ts` |
-| D-8 | Sans objet pour le panel : aucune adresse de fournisseur n'atteint `pullFile` hors de la liste d'hôtes (NC-47) ; le comportement de Wings seul reste à voir sur Codiax | `marketplace-downloads.test.ts` |
+| D-8 | Sans objet pour le panel : aucune adresse de fournisseur n'atteint `pullFile` hors des listes d'hôtes (NC-47), jar de plateforme compris ; le comportement de Wings seul reste à voir sur Codiax | `marketplace-downloads.test.ts` |
 | D-9 | Conforme : `private, no-cache, no-store` sur les pages, authentifiées ou non | Sonde sur l'application compilée |
 | D-10 | Confirmé, corrigé : un transfert ne sort plus un serveur du périmètre de son revendeur | `97b1074`, `server-transfer-perimetre.integration.test.ts` |
 
@@ -139,6 +139,8 @@ par cookie refusée depuis une autre origine (`Origin`, `Sec-Fetch-Site`,
 | `9835769` | Quota de ports compté hors transaction : cinq demandes simultanées passaient toutes (même défaut que NC-08) | `allocations.integration.test.ts` |
 | `8be4083` | Rétention : décompte lu sous `rowCount`, que postgres-js n'expose pas — l'écran annonçait toujours « 0 ligne », et une seule tranche par heure | `retention.integration.test.ts` |
 | `efdeafa` | Nettoyage des bases de test : il coupait aussi l'autovacuum, superutilisateur, et le fichier échouait au nettoyage, tous ses tests verts | `throwaway-database.integration.test.ts` |
+| lot `reliquats-asvs` | Le mot de passe provisoire d'un compte créé depuis l'administration (`AdminActionsService.createUser`) n'avait pas d'échéance, contrairement à ceux de `create-admin` et `reset-password` (NC-33) : 24 h, après quoi la connexion **et le SFTP** le refusent (le SFTP ne lisait pas l'échéance, scripts compris) ; avant, la première connexion mène à la page de changement, sans l'imposer route par route. Les comptes créés avant ce lot ne sont pas touchés (§0.5) | `admin-create-user.test.ts`, `sftp-auth.test.ts` |
+| lot `reliquats-asvs` | `SsoService.refresh` remplaçait l'adresse du compte par celle du fournisseur sans prévenir le titulaire (ASVS 2.5.5) : avis à l'ancienne adresse (cloche, et courriel si elle était confirmée), liens de réinitialisation et de vérification déjà partis éteints, comme pour un changement fait par l'administration | `google-sign-in.integration.test.ts` |
 | `0239c39` | Le « piège connu » de la consigne (`security-alert` › panne de courrier) n'était pas Argon2 : le test libérait l'envoi avant son départ et attendait pour toujours. La connexion, elle, répondait en 78 ms | le test lui-même, trois exécutions vertes |
 
 ### 0.5 Ce qui reste, et pourquoi
@@ -155,10 +157,31 @@ par cookie refusée depuis une autre origine (`Origin`, `Sec-Fetch-Site`,
 - **À l'exploitation** : jouer l'étape § 4 du runbook de la clé maître (NC-18)
   une fois la version en service ; conserver `backup.key` hors de la machine
   (NC-52).
-- **Restes signalés, non corrigés** : état `restoring` du SFTP (NC-44), jar de
-  plateforme non filtré (NC-47), mot de passe provisoire de
-  `AdminActionsService.createUser` sans échéance, changement d'adresse venu de
-  `SsoService.refresh` sans avis au titulaire.
+- **Restes signalés** : corrigés par le lot `reliquats-asvs` (NC-44, NC-47 et
+  deux lignes du §0.4). Limites connues : un éditeur de plateforme qui change
+  de domaine fait refuser l'installation de son jar jusqu'à ce que la liste
+  `ENGINE_DOWNLOAD_HOSTS` (`engine-sources.ts`) le suive ; le changement du
+  mot de passe provisoire est proposé à la première connexion, pas imposé
+  (l'échéance de 24 h tient ASVS 2.3.1).
+- **Comptes créés par l'administration avant ce lot** : leur mot de passe tiré
+  au sort n'a pas d'échéance. Pour les repérer (lecture seule), puis leur
+  envoyer un lien de réinitialisation depuis l'administration :
+
+  ```sql
+  SELECT u.id, u.email, u.role, a.at AS cree_le, u.last_login_at
+  FROM activity_logs AS a
+  JOIN users AS u ON u.id::text = a.properties ->> 'userId'
+  WHERE a.event = 'admin.user_created'
+    AND (a.properties ->> 'withPassword')::boolean
+    AND u.password_hash IS NOT NULL
+    AND u.password_expires_at IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM activity_logs AS b
+      WHERE b.actor_id = u.id
+        AND b.event IN ('account.password', 'account.password_reset')
+        AND b.at > a.at)
+  ORDER BY a.at;
+  ```
 - **Pentest externe** : non fait. Recommandé avant une ouverture au public.
 
 ---
@@ -707,7 +730,7 @@ Garde de classe `NodeTokenGuard` (`remote.controller.ts:55`), filtre
 | `POST /servers/:uuid/archive` | 188 | sans effet (journal seul) |
 | `POST /servers/:uuid/transfer/:state` | 205 | `isTransferTarget` / `reportedBy ∈ {from, to}` (`server-transfer.service.ts:348-357,489-503`) |
 | `GET/POST /backups/:uuid` | 253, 271 | `servers.nodeId` (`remote-backup.service.ts:58-59,102-103`) ; **sans test « en cours »** (NC-09) |
-| `POST /backups/:uuid/restore` | 293 | sans effet |
+| `POST /backups/:uuid/restore` | 293 | `servers.nodeId` (`RemoteBackupService.restored`) ; ne lève que l'état `restoring`, et consigne l'issue une fois (NC-44) |
 | `POST /activity` | 304 | serveurs du node (`remote-activity.service.ts:226-243`) ; auteur non lié (NC-45) |
 
 ---

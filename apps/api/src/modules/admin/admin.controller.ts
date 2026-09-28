@@ -34,6 +34,7 @@ import { authCookieOptions, SessionGuard, sessionCookie } from "../auth/session.
 import { SessionRepository } from "../auth/session.repository";
 import { BillingService } from "../billing/billing.service";
 import { ServerResizeService } from "../client/server-resize.service";
+import { SubdomainsService } from "../dns/subdomains.service";
 import { MailerService } from "../mail/mailer.service";
 import {
   BrandImagesService,
@@ -213,6 +214,7 @@ export class AdminController {
     // l.espace revendeur empruntent.
     @Inject(ServerResizeService) private readonly resize: ServerResizeService,
     @Inject(BillingService) private readonly billing: BillingService,
+    @Inject(SubdomainsService) private readonly subdomains: SubdomainsService,
     // En dernier : des tests construisent ce contrôleur par position.
     @Inject(BrandImagesService) private readonly brandImages: BrandImagesService,
   ) {}
@@ -356,6 +358,31 @@ export class AdminController {
       // L'issue, pas la phrase du facturier : elle peut nommer une adresse IP
       // ou un hôte, qui n'ont rien à faire dans un journal lu à plusieurs.
       properties: { ok: probe.ok, provider: probe.provider },
+    });
+
+    return { data: probe };
+  }
+
+  /**
+   * Essai de la zone DNS des sous-domaines.
+   *
+   * Lit la zone avec le jeton enregistré et vérifie que le domaine des serveurs
+   * en fait partie. N'écrit rien dans la zone.
+   */
+  @Post("settings/dns/test")
+  @UseGuards(AdminWriteGuard)
+  async testDns(@Req() request: AdminRequest) {
+    const probe = await this.subdomains.probe();
+
+    await this.activityLog.record({
+      event: "admin.dns_tested",
+      serverId: null,
+      actorId: request.user.id,
+      actorType: "user",
+      actorLabel: request.user.email,
+      ip: request.ip ?? null,
+      userAgent: headerValue(request.headers?.["user-agent"]),
+      properties: { ok: probe.ok },
     });
 
     return { data: probe };
@@ -1674,7 +1701,7 @@ export class AdminController {
   @Get("egg-catalogue")
   async eggCatalogue() {
     const source = await this.eggImport.defaultSource();
-    return { data: { source, entries: await this.eggImport.catalogue(source.id) } };
+    return { data: { source, ...(await this.eggImport.catalogue(source.id)) } };
   }
 
   @Post("egg-catalogue/import")

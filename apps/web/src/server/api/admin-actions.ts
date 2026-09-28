@@ -113,6 +113,29 @@ export async function testBilling(): Promise<{
   }
 }
 
+/**
+ * Essai de la zone DNS des sous-domaines : même forme que l'essai du facturier,
+ * la phrase du fournisseur est ce que l'exploitant doit lire.
+ */
+export async function testDns(): Promise<{
+  ok: boolean;
+  zone: string | null;
+  error: string | null;
+}> {
+  try {
+    const { data } = await apiSendFor<{
+      data: { ok: boolean; zone: string | null; error: string | null };
+    }>("/api/v1/admin/settings/dns/test", {});
+    return data;
+  } catch (error) {
+    return {
+      ok: false,
+      zone: null,
+      error: error instanceof Error ? error.message : "Essai impossible.",
+    };
+  }
+}
+
 export async function setFeatureFlag(
   key: string,
   enabled: boolean,

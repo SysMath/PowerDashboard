@@ -44,8 +44,10 @@ BASE=$NOM-postgres
 ETIQUETTES=(--label gd-ci --label "gd-ci.job=$NOM")
 
 # Variables transmises au conteneur, si elles sont posées sur le runner.
+# GITHUB_REPOSITORY : le dépôt écrit dans le RELEASE de l'archive autonome
+# (infra/release/autonome.mjs), où les hébergements cherchent leurs mises à jour.
 TRANSMISES=(CI APP_SECRET_KEY E2E_EMAIL E2E_PASSWORD TURBO_TELEMETRY_DISABLED NEXT_TELEMETRY_DISABLED
-  GAMEDASHBOARD_AUTONOME VERSION)
+  GAMEDASHBOARD_AUTONOME VERSION GITHUB_REPOSITORY)
 
 ouvrir() {
   local postgres=0 codeql=0 option

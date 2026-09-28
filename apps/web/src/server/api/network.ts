@@ -1,7 +1,8 @@
 "use server";
 
+import type { SubdomainState } from "@gamedashboard/contracts";
 import { revalidatePath } from "next/cache";
-import { apiFetch, apiSend } from "./client";
+import { apiFetch, apiReadFor, apiSend } from "./client";
 
 export interface Allocation {
   id: string;
@@ -58,6 +59,36 @@ export async function releaseAllocation(
 ): Promise<{ error: string | null }> {
   return act(serverId, () =>
     apiSend(`/api/v1/client/servers/${serverId}/allocations/${allocationId}`, undefined, "DELETE"),
+  );
+}
+
+/**
+ * Le sous-domaine du serveur, ou `null` si l'API ne répond pas : l'écran
+ * réseau doit rester lisible sans lui.
+ */
+export async function getSubdomain(serverId: string): Promise<SubdomainState | null> {
+  try {
+    // Lecture d'appoint : un refus (sous-utilisateur sans `allocations.read`)
+    // masque la carte, il ne renvoie pas vers la connexion.
+    const { data } = await apiReadFor<{ data: SubdomainState }>(
+      `/api/v1/client/servers/${serverId}/subdomain`,
+    );
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export async function chooseSubdomain(
+  serverId: string,
+  label: string,
+): Promise<{ error: string | null }> {
+  return act(serverId, () => apiSend(`/api/v1/client/servers/${serverId}/subdomain`, { label }));
+}
+
+export async function removeSubdomain(serverId: string): Promise<{ error: string | null }> {
+  return act(serverId, () =>
+    apiSend(`/api/v1/client/servers/${serverId}/subdomain`, undefined, "DELETE"),
   );
 }
 

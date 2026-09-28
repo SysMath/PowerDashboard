@@ -4,6 +4,7 @@ import { AnnouncementsService } from "../admin/announcements.service";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { AuthModule } from "../auth/auth.module";
 import { BillingModule } from "../billing/billing.module";
+import { DnsModule } from "../dns/dns.module";
 import { MailerService } from "../mail/mailer.service";
 import { MarketplaceModule } from "../marketplace/marketplace.module";
 import { NotificationsModule } from "../notifications/notifications.module";
@@ -36,6 +37,7 @@ import { ServerProvisioningService } from "./server-provisioning.service";
 import { ServerResizeService } from "./server-resize.service";
 import { ServerRuntimeController } from "./server-runtime.controller";
 import { ServerSettingsService } from "./server-settings.service";
+import { ServerSubdomainController } from "./server-subdomain.controller";
 import { ServerWebhooksService } from "./server-webhooks.service";
 import { SubusersService } from "./subusers.service";
 
@@ -57,6 +59,8 @@ import { SubusersService } from "./subusers.service";
     // Pour rendre une adresse signée vers une archive déposée sur le
     // compartiment : le panel ne relaie pas les octets.
     StorageModule,
+    // Le sous-domaine du serveur, sur l'écran réseau.
+    DnsModule,
   ],
   controllers: [
     ClientController,
@@ -64,6 +68,7 @@ import { SubusersService } from "./subusers.service";
     ServerFeaturesController,
     // L'historique des mesures : relu en base, jamais demandé au daemon.
     ServerMetricsController,
+    ServerSubdomainController,
     AccountController,
     NotificationsController,
     // Le bout du lien d'invitation. Sans garde de serveur, puisqu'à cet instant

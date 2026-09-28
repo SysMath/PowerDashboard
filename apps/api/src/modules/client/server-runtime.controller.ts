@@ -55,6 +55,9 @@ function principalOf(request: ClientRequest) {
   return { id: request.user.id, scopes: request.scopes, origin: requestOrigin(request) };
 }
 
+/** Un chemin passé en paramètre d'adresse ne s'y donne qu'une fois. */
+const QUERY_PATH_MESSAGE = "Chemin invalide : un seul chemin est attendu.";
+
 /**
  * Refuse, avant tout relais, un chemin qui remonterait au-dessus du volume ou
  * porterait un octet nul (`refusePath`). Les `paths` se lisent depuis `base`,
@@ -300,9 +303,12 @@ export class ServerRuntimeController {
   async files(
     @Req() request: ClientRequest,
     @Param("id") id: string,
-    @Query("directory") directory?: string,
+    @Query("directory") directory?: unknown,
   ) {
     const dossier = directory ?? "/";
+    // Un paramètre répété (`?directory=a&directory=b`) arrive en tableau : il
+    // faisait tomber `refusePath` en erreur 500 au lieu d'un refus.
+    if (typeof dossier !== "string") throw new BadRequestException(QUERY_PATH_MESSAGE);
     // Wings confine le chemin au volume du serveur, et c'est lui qui fait foi
     // (§4.3). Le panel refuse seulement ce qui n'a rien à y faire — sortie du
     // volume, octet nul —, en seconde ligne.
@@ -315,9 +321,10 @@ export class ServerRuntimeController {
   async fileContents(
     @Req() request: ClientRequest,
     @Param("id") id: string,
-    @Query("file") file?: string,
+    @Query("file") file?: unknown,
   ) {
     if (!file) throw new BadRequestException("Chemin de fichier manquant.");
+    if (typeof file !== "string") throw new BadRequestException(QUERY_PATH_MESSAGE);
     confine(file);
     await this.access.require(principalOf(request), id, "files.read");
     return { data: { content: await this.relay(() => this.wings.readFile(id, file)) } };
@@ -334,10 +341,11 @@ export class ServerRuntimeController {
   async writeFile(
     @Req() request: ClientRequest,
     @Param("id") id: string,
-    @Query("file") file: string | undefined,
+    @Query("file") file: unknown,
     @Body() body: unknown,
   ) {
     if (!file) throw new BadRequestException("Chemin de fichier manquant.");
+    if (typeof file !== "string") throw new BadRequestException(QUERY_PATH_MESSAGE);
     const content = (body as { content?: unknown })?.content;
     if (typeof content !== "string") throw new BadRequestException("Contenu manquant.");
     confine(file);
@@ -466,9 +474,10 @@ export class ServerRuntimeController {
   async downloadFile(
     @Req() request: ClientRequest,
     @Param("id") id: string,
-    @Query("file") file?: string,
+    @Query("file") file?: unknown,
   ) {
     if (!file) throw new BadRequestException("Chemin de fichier manquant.");
+    if (typeof file !== "string") throw new BadRequestException(QUERY_PATH_MESSAGE);
     // Le chemin est scellé dans le jeton que le daemon honorera : c'est le
     // dernier moment où le panel peut le refuser.
     confine(file);

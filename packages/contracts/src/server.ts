@@ -138,6 +138,22 @@ export function reinstallBlocked(state: string | null | undefined): boolean {
   return serverBlock(state) !== null;
 }
 
+/**
+ * La suppression d'une sauvegarde est-elle refusée dans cet état ?
+ *
+ * Seulement pendant une restauration. Supprimer libère de la place, et reste
+ * donc permis sur un serveur suspendu ou en échec d'installation ; mais
+ * pendant une restauration, effacer l'archive qu'on rend ferait répondre 404
+ * au compte rendu de fin de Wings, qui ne le rejoue pas : le serveur resterait
+ * en `restoring` sans issue. Le panel ne retient pas quelle archive est
+ * rendue, d'où un refus pour toutes, le temps de la restauration.
+ *
+ * Même règle des deux côtés : l'API refuse, l'écran grise.
+ */
+export function backupDeletionBlocked(state: string | null | undefined): boolean {
+  return state === "restoring";
+}
+
 export type ScheduleVerdict = "run" | "postpone" | "skip";
 
 export function scheduleVerdict(state: string | null | undefined): ScheduleVerdict {

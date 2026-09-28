@@ -29,6 +29,7 @@ import {
   savePlatformSettings,
   setFeatureFlag,
   testBilling,
+  testDns,
   testSmtp,
 } from "@/server/api/admin-actions";
 import { BrandImageUpload } from "./brand-image-upload";
@@ -147,6 +148,18 @@ function PlatformSettingsForm({
       startTransition(async () => {
         setBillingTest(null);
         setBillingTest(await testBilling());
+      }),
+    [],
+  );
+
+  /** Issue du dernier essai de la zone DNS des sous-domaines. */
+  const [dnsTest, setDnsTest] = useState<Awaited<ReturnType<typeof testDns>> | null>(null);
+
+  const runDnsTest = useCallback(
+    () =>
+      startTransition(async () => {
+        setDnsTest(null);
+        setDnsTest(await testDns());
       }),
     [],
   );
@@ -365,6 +378,11 @@ function PlatformSettingsForm({
                       {t("billingTest")}
                     </Button>
                   ) : null}
+                  {group.key === "dns" ? (
+                    <Button variant="secondary" disabled={pending} onClick={runDnsTest}>
+                      {t("dnsTest")}
+                    </Button>
+                  ) : null}
                 </div>
               )
             }
@@ -401,6 +419,17 @@ function PlatformSettingsForm({
                   {billingTest.ok
                     ? t(billingTest.knowsCaller ? "billingTestKnown" : "billingTestUnknown")
                     : billingTest.error}
+                </AlertBanner>
+              </div>
+            ) : null}
+            {group.key === "dns" && dnsTest ? (
+              <div className="mt-4">
+                <AlertBanner
+                  variant={dnsTest.ok ? "success" : "danger"}
+                  title={dnsTest.ok ? t("dnsTestOk") : t("dnsTestFailed")}
+                  dismissible
+                >
+                  {dnsTest.ok ? t("dnsTestZone", { zone: dnsTest.zone ?? "" }) : dnsTest.error}
                 </AlertBanner>
               </div>
             ) : null}

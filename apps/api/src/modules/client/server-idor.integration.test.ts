@@ -13,6 +13,7 @@ import { NotFoundException } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
+import { sousDomainesInertes } from "../../test/sous-domaines";
 import {
   createThrowawayDatabase,
   HAS_DATABASE,
@@ -95,7 +96,7 @@ describe.skipIf(!HAS_DATABASE)("objets d'un serveur étranger (IDOR)", () => {
       backups: new BackupsService(db, w, t, s3 as unknown as S3Service),
       databases: new DatabasesService(db, mysql as unknown as MysqlProvisionerService),
       schedules: new SchedulesService(db),
-      allocations: new AllocationsService(db, w),
+      allocations: new AllocationsService(db, w, sousDomainesInertes()),
       subusers: new SubusersService(
         db,
         w,

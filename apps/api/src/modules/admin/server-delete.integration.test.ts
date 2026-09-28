@@ -2,6 +2,7 @@ import { backups, type Database, servers } from "@gamedashboard/db";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
+import { sousDomainesInertes } from "../../test/sous-domaines";
 import {
   createThrowawayDatabase,
   HAS_DATABASE,
@@ -32,6 +33,7 @@ describe.skipIf(!HAS_DATABASE)("AdminActionsService.deleteServer (intégration)"
     discard: vi.fn(async () => undefined),
   };
   let service: AdminActionsService;
+  const sousDomaines = sousDomainesInertes();
 
   beforeAll(async () => {
     throwaway = await createThrowawayDatabase();
@@ -43,6 +45,7 @@ describe.skipIf(!HAS_DATABASE)("AdminActionsService.deleteServer (intégration)"
       { emit: async () => undefined } as unknown as WebhookEmitterService,
       {} as WingsTokenService,
       s3 as unknown as S3Service,
+      sousDomaines,
     );
   }, 60_000);
 
@@ -82,6 +85,9 @@ describe.skipIf(!HAS_DATABASE)("AdminActionsService.deleteServer (intégration)"
     expect(s3.discard).toHaveBeenCalledWith(`${serverId}/${terminee}.tar.gz`, null);
     expect(s3.discard).toHaveBeenCalledWith(`${serverId}/${enCours}.tar.gz`, "depot-ouvert");
     expect(await db.select().from(servers).where(eq(servers.id, serverId))).toEqual([]);
+    // Le sous-domaine du serveur disparaît avec lui, sans attendre le balayage.
+    expect(sousDomaines.departing).toHaveBeenCalledWith(expect.anything(), serverId);
+    expect(sousDomaines.sweepSoon).toHaveBeenCalled();
   });
 
   it("n'efface rien quand le node ne répond pas : le serveur reste", async () => {
@@ -90,6 +96,7 @@ describe.skipIf(!HAS_DATABASE)("AdminActionsService.deleteServer (intégration)"
 
     await expect(service.deleteServer(serverId)).rejects.toBeInstanceOf(WingsUnavailableError);
     expect(s3.discard).not.toHaveBeenCalled();
+    expect(sousDomaines.sweepSoon).not.toHaveBeenCalled();
     expect(await db.select().from(servers).where(eq(servers.id, serverId))).toHaveLength(1);
   });
 });

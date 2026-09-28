@@ -26,6 +26,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { z } from "zod";
+import { singleQuery } from "../../common/query-param";
 import { isUuid } from "../../common/uuid";
 import { ActivityService } from "../activity/activity.service";
 import { AdminActionsService } from "../admin/admin-actions.service";
@@ -143,11 +144,15 @@ export class ApplicationController {
   @RequireScopes("users.read")
   async findUser(
     @Req() request: ApplicationRequest,
-    @Query("email") email?: string,
-    @Query("externalId") externalId?: string,
-    @Query("id") id?: string,
+    @Query("email") email?: unknown,
+    @Query("externalId") externalId?: unknown,
+    @Query("id") id?: unknown,
   ) {
-    const user = await this.app.findUser({ id, email, externalId });
+    const user = await this.app.findUser({
+      id: singleQuery(id, "id"),
+      email: singleQuery(email, "email"),
+      externalId: singleQuery(externalId, "externalId"),
+    });
     // 404 plutôt qu'une liste vide : la route cherche **un** compte, et rendre
     // `[]` obligerait chaque intégration à écrire le même `if (length === 0)`.
     if (!user) throw new NotFoundException("Compte introuvable.");
@@ -275,10 +280,10 @@ export class ApplicationController {
 
   @Get("servers")
   @RequireScopes("servers.read")
-  async servers(@Req() request: ApplicationRequest, @Query("ownerId") ownerId?: string) {
+  async servers(@Req() request: ApplicationRequest, @Query("ownerId") ownerId?: unknown) {
     return {
       data: await this.app.servers({
-        ownerId,
+        ownerId: singleQuery(ownerId, "ownerId"),
         resellerId: request.application.resellerId,
       }),
     };

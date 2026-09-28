@@ -13,8 +13,10 @@ import { THEME_INIT_SCRIPT } from "@gamedashboard/ui";
  * une console qui crie à tort finit par ne plus être lue.
  *
  * **Pourquoi une route et non un fichier dans `public/`.** Le script est une
- * constante du design system, à côté de la bascule de thème qui lit la même
- * clé de stockage. Le recopier dans un fichier statique créerait deux vérités
+ * constante du design system (`lib/theme-init.ts`, sans `"use client"` :
+ * importée d'un module client, la route ne recevrait qu'une référence
+ * client), avec la clé de stockage que lit aussi la bascule de thème. Le
+ * recopier dans un fichier statique créerait deux vérités
  * qui divergeraient le jour où la clé change — et la divergence se
  * manifesterait par un thème qui ne tient pas entre deux chargements, sans
  * rien qui la désigne.

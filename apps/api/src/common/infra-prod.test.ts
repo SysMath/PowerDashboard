@@ -1180,4 +1180,60 @@ describe("archive autonome : externes de l'API", () => {
 
     expect(manquants).toEqual([]);
   });
+
+  // Toutes les causes à la fois : un import à la demande d'une autre
+  // dépendance, vers un paquet absent, casserait aussi la release.
+  it("regroupe l'API, son migrateur et la création d'un administrateur", async () => {
+    const { regrouperApi } = (await import(
+      join(RACINE, "infra", "release", "externes-api.mjs")
+    )) as { regrouperApi: (api: string) => Promise<void> };
+    await expect(regrouperApi(API)).resolves.toBeUndefined();
+  }, 120_000);
+});
+
+/*
+ * Le dépôt écrit dans le RELEASE de l'archive autonome est celui où chaque
+ * hébergement installé cherche ses mises à jour. Le conteneur de la CI ne
+ * recevait pas GITHUB_REPOSITORY, et autonome.mjs retombait en silence sur
+ * l'ancien nom du dépôt : les hébergements refusaient ensuite les archives
+ * publiées sous le nom actuel.
+ */
+describe("archive autonome : dépôt des releases", () => {
+  it("valide le dépôt avec le même motif que la mise à jour", async () => {
+    const { REPOSITORY_PATTERN } = await import("../modules/updates/github-releases");
+    const source = readFileSync(join(RACINE, "infra", "release", "autonome.mjs"), "utf8");
+    expect(source).toContain(`const DEPOT_VALABLE = ${REPOSITORY_PATTERN.toString()};`);
+  });
+
+  it("transmet GITHUB_REPOSITORY au conteneur de la CI", () => {
+    const script = readFileSync(join(RACINE, "infra", "ci", "linux.sh"), "utf8");
+    const transmises = script.match(/^TRANSMISES=\(([^)]*)\)/m)?.[1]?.split(/\s+/) ?? [];
+    expect(transmises).toContain("GITHUB_REPOSITORY");
+  });
+
+  it("refuse d'assembler sans dépôt, plutôt que d'en écrire un par défaut", () => {
+    const source = readFileSync(join(RACINE, "infra", "release", "autonome.mjs"), "utf8");
+    expect(source).toMatch(/`depot=\$\{DEPOT\}`/);
+    // Aucun nom de repli : ni vide accepté, ni dépôt écrit en dur.
+    expect(source).not.toMatch(/GITHUB_REPOSITORY \?\? "[^"]/);
+
+    const { GITHUB_REPOSITORY: _retire, ...env } = process.env;
+    for (const depot of [undefined, "", "PowerDashboard", "a/b/c", "a/..", "a/."]) {
+      let sortie = "";
+      try {
+        execFileSync(
+          process.execPath,
+          [join(RACINE, "infra", "release", "autonome.mjs"), "v1.0.0"],
+          {
+            env: depot === undefined ? env : { ...env, GITHUB_REPOSITORY: depot },
+            encoding: "utf8",
+            stdio: "pipe",
+          },
+        );
+      } catch (erreur) {
+        sortie = String((erreur as { stderr?: string }).stderr);
+      }
+      expect(sortie).toContain("GITHUB_REPOSITORY doit nommer le dépôt des releases");
+    }
+  });
 });

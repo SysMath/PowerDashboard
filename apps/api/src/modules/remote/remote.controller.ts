@@ -309,15 +309,21 @@ export class RemoteController {
   }
 
   /**
-   * Fin d'une restauration.
+   * Fin d'une restauration, réussie ou non (`{ "successful": bool }`).
    *
-   * Accusé de réception seulement : la restauration réécrit le volume du
-   * serveur et ne laisse rien à enregistrer côté panel. La demande, elle, est
-   * déjà au journal d'activité (`backup.restore`), avec son auteur.
+   * Relâche l'état `restoring` du serveur (NC-44). La demande est déjà au
+   * journal d'activité (`backup.restore`), avec son auteur.
    */
   @Post("backups/:uuid/restore")
   @HttpCode(204)
-  backupRestored(): void {}
+  async backupRestored(
+    @Req() request: RemoteRequest,
+    @Param("uuid", REMOTE_UUID) uuid: string,
+    @Body() body: unknown,
+  ): Promise<void> {
+    const successful = (body as { successful?: unknown } | null)?.successful === true;
+    await this.backups.restored(request.node.id, uuid, successful);
+  }
 
   /**
    * Journal remonté par le daemon.

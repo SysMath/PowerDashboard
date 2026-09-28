@@ -87,6 +87,14 @@ export async function seedNode(
   return row.id;
 }
 
+/**
+ * Prochain port des serveurs de test. Tiré au hasard pour chacun, deux
+ * serveurs d'un même fichier finissaient par tomber sur le même
+ * (`allocation_node_ip_port_unique`) : une chance sur trois pour soixante
+ * serveurs. Le départ reste tiré au hasard, la suite ne se répète plus.
+ */
+let nextPort = Math.floor(Math.random() * 5000);
+
 /** Un serveur complet, avec l'egg et le port que le schéma exige. */
 export async function seedServer(
   db: Database,
@@ -115,7 +123,7 @@ export async function seedServer(
     .values({
       nodeId: input.nodeId,
       ip: "127.0.0.1",
-      port: 25_000 + Math.floor(Math.random() * 5000),
+      port: 25_000 + (nextPort++ % 5000),
     })
     .returning({ id: allocations.id });
   if (!allocation) throw new Error("port non créé");

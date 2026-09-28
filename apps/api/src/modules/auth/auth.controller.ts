@@ -67,6 +67,7 @@ import {
   SsoExchangeError,
   SsoNoAccountError,
   type SsoProvider,
+  type SsoResolution,
   SsoService,
 } from "./sso.service";
 import { TurnstileService } from "./turnstile.service";
@@ -1624,7 +1625,7 @@ export class AuthController {
       return;
     }
 
-    let resolved: { id: string; created: boolean };
+    let resolved: SsoResolution;
     try {
       resolved = await this.sso.resolveUser(profile, {
         provider,
@@ -1657,6 +1658,22 @@ export class AuthController {
         ...(error instanceof SsoNoAccountError ? { noAccount: true } : {}),
       });
       return;
+    }
+
+    /*
+     * Le profil du fournisseur a remplacé l'adresse du compte : l'ancienne
+     * boîte est prévenue (ASVS 2.5.5), et les liens qui y sont partis
+     * s'éteignent, comme pour un changement fait par l'administration.
+     */
+    if (resolved.previousEmail) {
+      await this.tokens.revokePending(resolved.id, ["password_reset", "email_verify"]);
+      this.alerts.afterCredentialChange({
+        userId: resolved.id,
+        kind: "emailChanged",
+        ip: request.ip ?? null,
+        host: arrivalHost(request),
+        previousEmail: resolved.previousEmail,
+      });
     }
 
     await this.activity.record({

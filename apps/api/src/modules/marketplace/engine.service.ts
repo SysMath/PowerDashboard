@@ -19,6 +19,7 @@ import {
   serverVariables,
 } from "@gamedashboard/db";
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   HttpException,
@@ -28,7 +29,7 @@ import {
   NotFoundException,
   type OnApplicationBootstrap,
 } from "@nestjs/common";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { battre } from "../../common/background-tick";
 import { DATABASE } from "../../common/database.provider";
 import {
@@ -37,7 +38,7 @@ import {
   WingsUnavailableError,
 } from "../wings/wings-client.service";
 import { CurseForgePackService } from "./curseforge-pack";
-import { EngineSourcesService } from "./engine-sources";
+import { EditorHttpError, EngineSourcesService, isTrustedEngineDownload } from "./engine-sources";
 import { EulaService } from "./eula.service";
 import { ForgeInstallService, type LoaderResult } from "./forge-install.service";
 import { loaderName } from "./forge-loader";
@@ -131,6 +132,8 @@ interface InstallPlan {
   versionId: string;
   runtime: DetectedRuntime;
   prepared: PreparedPack | null;
+  /** Le jar d'une plateforme, résolu et contrôlé avant l'arrêt ; nul pour un modpack. */
+  jar: { url: string; fileName: string } | null;
   image: string | null;
   /** Ce qui est installé, lisible, pour l'écran pendant l'installation. */
   label: string;
@@ -525,11 +528,12 @@ export class EngineService implements OnApplicationBootstrap {
     }
     const isPack = optionId.startsWith("modpack:") || optionId.startsWith("curseforge-pack:");
     const prepared = isPack ? await this.installer.prepare(optionId, versionId, runtime) : null;
+    const jar = isPack ? null : await this.resolveJar(optionId, versionId);
     const image = await this.runtimeImageFor(serverId, prepared?.gameVersion ?? versionId);
     const label = prepared
       ? `${prepared.label || "Modpack"} ${prepared.versionLabel}`.trim()
       : `${this.sources.labelOf?.(optionId) ?? optionId} ${versionId}`;
-    return { optionId, versionId, runtime, prepared, image, label };
+    return { optionId, versionId, runtime, prepared, jar, image, label };
   }
 
   /**
@@ -544,7 +548,7 @@ export class EngineService implements OnApplicationBootstrap {
     plan: InstallPlan,
     options: EngineInstallOptions,
   ): Promise<EngineInstallResult> {
-    const { optionId, versionId, runtime, prepared, image } = plan;
+    const { optionId, versionId, runtime, prepared, jar, image } = plan;
 
     /*
      * Arrêt avant écriture, et non « si possible ».
@@ -555,9 +559,6 @@ export class EngineService implements OnApplicationBootstrap {
      * L'état d'avant est relevé : si rien n'est écrit, le serveur est rendu tel
      * qu'on l'a trouvé, redémarré s'il tournait.
      */
-    const wasRunning = await this.isRunning(serverId);
-    await this.wings.power(serverId, "stop").catch(() => undefined);
-
     /*
      * Le serveur est marqué « en installation » pendant toute l'opération.
      *
@@ -569,8 +570,16 @@ export class EngineService implements OnApplicationBootstrap {
      *
      * Relâché dans un `finally` : une installation qui échoue doit rendre le
      * serveur à son propriétaire, pas le laisser verrouillé.
+     *
+     * **Pris seulement sur un serveur sans état**, et avant l'arrêt : la route
+     * contrôle l'état avant `plan()`, qui attend l'éditeur quelques secondes ;
+     * une restauration, une suspension ou un transfert arrivés entre-temps
+     * étaient écrasés par « installation », puis effacés à la fin.
      */
-    await this.setState(serverId, "installing");
+    await this.claimInstalling(serverId);
+
+    const wasRunning = await this.isRunning(serverId);
+    await this.wings.power(serverId, "stop").catch(() => undefined);
 
     let installed: Omit<EngineInstallResult, "eulaReset">;
     let untouched = true;
@@ -600,17 +609,20 @@ export class EngineService implements OnApplicationBootstrap {
           notice: outcome.notice,
           loader: outcome.loader,
         };
-      } else {
+      } else if (jar) {
         installed = await this.installJar(
           serverId,
           optionId,
           versionId,
+          jar,
           image,
           options.installedBy,
         );
+      } else {
+        throw new NotFoundException("Cette version n'est plus proposée par son éditeur.");
       }
     } finally {
-      await this.setState(serverId, null);
+      await this.releaseInstalling(serverId);
       /*
        * La sauvegarde préalable a échoué (quota plein, daemon muet…) : rien
        * n'a été écrit, et le serveur ne doit pas rester arrêté pour autant.
@@ -755,7 +767,7 @@ export class EngineService implements OnApplicationBootstrap {
   }
 
   /**
-   * Pose ou lève l'état de gestion du serveur.
+   * Pose l'état « installation » (et `releaseInstalling` le lève).
    *
    * `null` veut dire « rien de particulier » : c'est l'état d'un serveur
    * installé, à l'arrêt ou en marche. Le panel n'y écrit jamais l'état du
@@ -765,11 +777,65 @@ export class EngineService implements OnApplicationBootstrap {
    * verrouillé — c'est la même exposition que le flux d'installation d'origine,
    * et `resetTransientStates` le libère au prochain démarrage du daemon.
    */
-  private async setState(serverId: string, state: "installing" | null): Promise<void> {
+  private async claimInstalling(serverId: string): Promise<void> {
+    const [claimed] = await this.db
+      .update(servers)
+      .set({ state: "installing", updatedAt: new Date().toISOString() })
+      .where(and(eq(servers.id, serverId), isNull(servers.state)))
+      .returning({ id: servers.id });
+    if (!claimed) {
+      throw new ConflictException(
+        "Ce serveur est occupé par une autre opération. Réessayez quand elle sera terminée.",
+      );
+    }
+  }
+
+  /** Ne lève que l'état posé par l'installation : une suspension décidée entre-temps reste. */
+  private async releaseInstalling(serverId: string): Promise<void> {
     await this.db
       .update(servers)
-      .set({ state, updatedAt: new Date().toISOString() })
-      .where(eq(servers.id, serverId));
+      .set({ state: null, updatedAt: new Date().toISOString() })
+      .where(and(eq(servers.id, serverId), eq(servers.state, "installing")));
+  }
+
+  /**
+   * L'adresse du jar d'une plateforme, demandée à son éditeur **avant** l'arrêt.
+   *
+   * Une version retirée ou une adresse hors des hôtes connus (NC-47) est
+   * refusée pendant que le serveur tourne encore : rien n'est touché.
+   */
+  private async resolveJar(
+    optionId: string,
+    versionId: string,
+  ): Promise<{ url: string; fileName: string }> {
+    /*
+     * Résolue pendant la requête, et non plus en tâche de fond, sous **une
+     * seule échéance** : Fabric et Vanilla enchaînent deux requêtes, et deux
+     * délais de 8 s dépassaient les 10 s après lesquels l'interface abandonne
+     * (`API_TIMEOUT_MS`), pendant que l'API poursuivait.
+     */
+    const resolved = await this.sources
+      .resolve(optionId, versionId, AbortSignal.timeout(JAR_RESOLVE_TIMEOUT_MS))
+      .catch((error: unknown) => {
+        this.logger.warn(`Jar de ${optionId} ${versionId} introuvable : ${describe(error)}`);
+        throw resolveFailure(error);
+      });
+    if (!resolved) {
+      throw new NotFoundException("Cette version n'est plus proposée par son éditeur.");
+    }
+    this.assertTrustedJar(resolved);
+    return resolved;
+  }
+
+  private assertTrustedJar(jar: { url: string; fileName: string }): void {
+    // PaperMC et Mojang rendent l'adresse ; le daemon la suivrait depuis le
+    // réseau du node sans regarder.
+    if (!isTrustedEngineDownload(jar)) {
+      this.logger.warn(`Jar de plateforme refusé : ${jar.url} (${jar.fileName})`);
+      throw new ConflictException(
+        "L'éditeur indique une adresse de téléchargement hors de ses dépôts habituels. Installation refusée ; réessayez plus tard.",
+      );
+    }
   }
 
   /** Une plateforme : un fichier, posé sous le nom que l'egg attend. */
@@ -777,14 +843,10 @@ export class EngineService implements OnApplicationBootstrap {
     serverId: string,
     optionId: string,
     versionId: string,
+    resolved: { url: string; fileName: string },
     image: string | null,
     installedBy: string | undefined,
   ): Promise<Omit<EngineInstallResult, "eulaReset">> {
-    const resolved = await this.sources.resolve(optionId, versionId);
-    if (!resolved) {
-      throw new NotFoundException("Cette version n'est plus proposée par son éditeur.");
-    }
-
     await this.placeJar(serverId, resolved);
     if (image) await this.applyRuntimeImage(serverId, image);
 
@@ -827,6 +889,8 @@ export class EngineService implements OnApplicationBootstrap {
     serverId: string,
     resolved: { url: string; fileName: string },
   ): Promise<void> {
+    // Second contrôle, pour le serveur Fabric qu'un modpack fait poser.
+    this.assertTrustedJar(resolved);
     const target = await this.jarNameOf(serverId);
     await this.wings.pullFile(serverId, "/", resolved.url, resolved.fileName);
     if (resolved.fileName !== target) {
@@ -949,6 +1013,30 @@ export class EngineService implements OnApplicationBootstrap {
 
     return detectRuntime(row.eggName, row.nestName, merged);
   }
+}
+
+/** Toute la résolution d'un jar, sous les 10 s de l'interface. */
+const JAR_RESOLVE_TIMEOUT_MS = 8000;
+
+/**
+ * Ce qu'un échec de résolution veut dire, pour qui a cliqué.
+ *
+ * Tout devenait « l'éditeur ne répond pas » : un 404 de PaperMC pour une
+ * version retirée comme une réponse mal formée. Trois cas, trois phrases.
+ */
+function resolveFailure(error: unknown): HttpException {
+  if (error instanceof EditorHttpError && error.status === 404) {
+    return new NotFoundException("Cette version n'est plus proposée par son éditeur.");
+  }
+  const silent =
+    (error instanceof EditorHttpError && error.status >= 500) ||
+    (error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError" || error.name === "TypeError"));
+  return new BadGatewayException(
+    silent
+      ? "L'éditeur de cette plateforme ne répond pas. Réessayez dans quelques minutes."
+      : "L'éditeur de cette plateforme a rendu une réponse inattendue. Installation refusée ; réessayez plus tard.",
+  );
 }
 
 function describe(error: unknown): string {

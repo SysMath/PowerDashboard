@@ -12,6 +12,7 @@ import { RemoteController } from "./remote.controller";
 import { RemoteActivityService } from "./remote-activity.service";
 import { RemoteBackupService } from "./remote-backup.service";
 import { RemoteServerService } from "./remote-server.service";
+import { RestoreReaperService } from "./restore-reaper.service";
 import { SftpAuthService } from "./sftp-auth.service";
 
 /**
@@ -35,6 +36,7 @@ import { SftpAuthService } from "./sftp-auth.service";
     NodeRepository,
     RemoteServerService,
     RemoteBackupService,
+    RestoreReaperService,
     RemoteActivityService,
     SftpAuthService,
     // Le dépôt de clés vient du module d'authentification par nature ; il est

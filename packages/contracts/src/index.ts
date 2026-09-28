@@ -38,6 +38,7 @@ export * from "./server";
 export * from "./server-reachability";
 export * from "./sso";
 export * from "./status";
+export * from "./subdomain";
 export * from "./updates";
 export * from "./user";
 export * from "./user-agent";

@@ -9,6 +9,7 @@ import {
   Query,
   Res,
 } from "@nestjs/common";
+import { singleQuery } from "../../common/query-param";
 import { BrandImagesService, type StoredBrandImage } from "./brand-images.service";
 import { BrandingService } from "./branding.service";
 
@@ -55,10 +56,10 @@ export class BrandingController {
    */
   @Get()
   async resolve(
-    @Query("host") host?: string,
+    @Query("host") host?: unknown,
     @Headers("x-gd-host") forwarded?: string,
   ): Promise<{ data: Branding }> {
-    return { data: await this.branding.forHost(host ?? forwarded ?? null) };
+    return { data: await this.branding.forHost(singleQuery(host, "host") ?? forwarded ?? null) };
   }
 
   /**

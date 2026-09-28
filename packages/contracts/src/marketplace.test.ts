@@ -311,6 +311,14 @@ describe("chooseRelease", () => {
 });
 
 describe("gameVersionFromPing", () => {
+  it("lit une longue suite de chiffres en temps linéaire", () => {
+    // Le texte vient du serveur de jeu : 50 000 « 0 » prenaient 3 s à l'ancienne regex.
+    const debut = performance.now();
+    expect(gameVersionFromPing("0".repeat(200_000))).toBe("");
+    expect(gameVersionFromPing(`${"0".repeat(200_000)}.5`)).toBe(`${"0".repeat(200_000)}.5`);
+    expect(performance.now() - debut).toBeLessThan(500);
+  });
+
   it("lit une version nue", () => {
     expect(gameVersionFromPing("1.21.1")).toBe("1.21.1");
   });

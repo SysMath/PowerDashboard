@@ -1,7 +1,8 @@
 import { backups, type Database, servers } from "@gamedashboard/db";
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, lt } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { ActivityService } from "../activity/activity.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { S3Service } from "../storage/s3.service";
 
@@ -22,6 +23,19 @@ export interface BackupReport {
 }
 
 /**
+ * Au-delà, une restauration sans compte rendu est tenue pour perdue.
+ *
+ * Wings ne rejoue le compte rendu de fin qu'une trentaine de secondes, et
+ * seulement sur une 5xx ou une erreur réseau : un panel en mise à jour ou une
+ * coupure entre le node et le panel suffisent à le perdre, et le serveur
+ * resterait en `restoring` jusqu'au prochain redémarrage du daemon. Six heures
+ * laissent passer la restauration d'une grosse archive distante. Lever l'état
+ * trop tôt n'expose pas les fichiers : Wings garde son propre drapeau de
+ * restauration et refuse le démarrage comme le SFTP tant qu'il restaure.
+ */
+export const RESTORE_STALE_MS = 6 * 60 * 60 * 1000;
+
+/**
  * Enregistrement des comptes rendus de sauvegarde.
  *
  * C'est le seul endroit où une sauvegarde cesse d'être « en cours ». Le panel
@@ -36,6 +50,7 @@ export class RemoteBackupService {
     @Inject(DATABASE) private readonly db: Database,
     @Inject(NotificationsService) private readonly notifications: NotificationsService,
     @Inject(S3Service) private readonly s3: S3Service,
+    @Inject(ActivityService) private readonly activity: ActivityService,
   ) {}
 
   /**
@@ -100,6 +115,68 @@ export class RemoteBackupService {
       .where(and(eq(backups.id, backupId), isNull(backups.completedAt)));
 
     return { parts: ticket.parts, part_size: ticket.partSize };
+  }
+
+  /**
+   * Fin d'une restauration, rapportée par Wings (NC-44).
+   *
+   * Relâche l'état `restoring` posé par `BackupsService.restore`, et lui seul :
+   * une suspension décidée entre-temps n'est pas levée par le daemon. La
+   * sauvegarde doit appartenir à un serveur **de ce node**, comme pour la
+   * clôture : un autre node ne rend pas la main sur un serveur qu'il n'héberge
+   * pas.
+   */
+  async restored(nodeId: string, backupId: string, successful: boolean): Promise<void> {
+    const [row] = await this.db
+      .select({ serverId: backups.serverId })
+      .from(backups)
+      .innerJoin(servers, eq(backups.serverId, servers.id))
+      .where(and(eq(backups.id, backupId), eq(servers.nodeId, nodeId)))
+      .limit(1);
+
+    if (!row) throw new NotFoundException("Sauvegarde introuvable.");
+
+    const released = await this.db
+      .update(servers)
+      .set({ state: null, updatedAt: new Date().toISOString() })
+      .where(and(eq(servers.id, row.serverId), eq(servers.state, "restoring")))
+      .returning({ id: servers.id });
+
+    // L'issue au journal du serveur, comme la demande (`backup.restore`) :
+    // sans elle, un échec ne laissait qu'une ligne dans le journal du panel.
+    // Une fois seulement, quand l'état est effectivement relâché : un compte
+    // rendu rejoué ou tardif n'ajoute rien.
+    if (released.length === 0) return;
+    if (!successful) {
+      this.logger.warn(`Restauration de ${backupId} sur ${row.serverId} échouée, selon le daemon.`);
+    }
+    await this.activity.record({
+      event: successful ? "backup.restore_completed" : "backup.restore_failed",
+      serverId: row.serverId,
+      actorId: null,
+      actorType: "system",
+      actorLabel: "Daemon",
+      properties: { backupId },
+    });
+  }
+
+  /**
+   * Relâche les restaurations restées sans compte rendu (`RESTORE_STALE_MS`).
+   *
+   * L'horloge est `servers.updated_at`, posé par `BackupsService.restore` au
+   * moment où il prend l'état. Rend le nombre de serveurs relâchés.
+   */
+  async expireStaleRestores(now: Date = new Date()): Promise<number> {
+    const threshold = new Date(now.getTime() - RESTORE_STALE_MS).toISOString();
+    const released = await this.db
+      .update(servers)
+      .set({ state: null, updatedAt: now.toISOString() })
+      .where(and(eq(servers.state, "restoring"), lt(servers.updatedAt, threshold)))
+      .returning({ id: servers.id });
+    for (const { id } of released) {
+      this.logger.warn(`Restauration sur ${id} sans compte rendu depuis six heures : état levé.`);
+    }
+    return released.length;
   }
 
   /**

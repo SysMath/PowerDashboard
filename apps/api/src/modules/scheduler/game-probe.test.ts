@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { ping, probeHost } from "./game-probe.service";
-import { encodeVarInt } from "./minecraft-ping";
+import { encodeVarInt, STATUS_FRAME_MAX_BYTES } from "./minecraft-ping";
 
 /**
  * La sonde est éprouvée contre un vrai serveur TCP, et non contre un faux
@@ -73,6 +73,50 @@ describe("sonde de jeu", () => {
       version: "1.20.4",
       sample: null,
     });
+  });
+
+  it("abandonne une réponse plus grosse que ce que le protocole permet", async () => {
+    // Longueur annoncée démesurée, puis un flot d'octets : sans plafond, tout
+    // s'accumulait en mémoire jusqu'au délai de la sonde.
+    const port = await listen((write) => {
+      write(encodeVarInt(0x7fff_ffff));
+      write(Buffer.alloc(STATUS_FRAME_MAX_BYTES + 1024, 0x30));
+    });
+
+    const debut = Date.now();
+    expect(await ping("127.0.0.1", port)).toBe(null);
+    expect(Date.now() - debut).toBeLessThan(2_000);
+  });
+
+  it("abandonne à l'échéance un serveur qui répond au compte-gouttes", async () => {
+    // Un octet toutes les 50 ms : l'inactivité ne dépasse jamais le délai, et
+    // seule une échéance fixe met fin à la sonde.
+    const server = createServer((socket) => {
+      socket.on("error", () => undefined);
+      socket.once("data", () => {
+        socket.write(encodeVarInt(1_000));
+        const goutte = setInterval(() => socket.write("0"), 50);
+        socket.on("close", () => clearInterval(goutte));
+      });
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new Error("port introuvable");
+    const port = address.port;
+
+    const debut = Date.now();
+    expect(await ping("127.0.0.1", port, 300)).toBe(null);
+    expect(Date.now() - debut).toBeLessThan(1_000);
+  });
+
+  it("borne la version annoncée", async () => {
+    const port = await listen((write) => {
+      write(statusFrame({ players: { online: 1, max: 2 }, version: { name: "0".repeat(50_000) } }));
+    });
+
+    const etat = await ping("127.0.0.1", port);
+    expect(etat?.version).toBe("0".repeat(128));
   });
 
   it("rend null sur un port fermé", async () => {

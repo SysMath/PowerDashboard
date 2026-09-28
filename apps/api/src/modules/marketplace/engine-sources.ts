@@ -43,6 +43,68 @@ const PURPUR_API = "https://api.purpurmc.org/v2";
 const FABRIC_API = "https://meta.fabricmc.net/v2";
 const MOJANG_MANIFEST = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
 
+/**
+ * Hôtes d'où un jar de plateforme peut être tiré par le daemon (NC-47).
+ *
+ * Relevés sur les réponses réelles des éditeurs (septembre 2026) : PaperMC
+ * sert ses builds sur `fill-data`, Mojang ses serveurs sur `piston-data`
+ * (`launcher.mojang.com` pour les versions anciennes, 1.2.5 à 1.12 environ),
+ * Purpur et Fabric depuis leur API. PaperMC et Mojang **rendent** l'adresse :
+ * sans cette liste, une réponse falsifiée ferait de Wings un relais vers
+ * `169.254.169.254` ou le réseau d'administration, depuis le node. Un éditeur
+ * qui change de domaine fait refuser l'installation, en le disant, plutôt que
+ * de la laisser passer sans contrôle.
+ */
+const ENGINE_DOWNLOAD_HOSTS = new Set([
+  "fill-data.papermc.io",
+  "api.purpurmc.org",
+  "meta.fabricmc.net",
+  "piston-data.mojang.com",
+  "launcher.mojang.com",
+]);
+
+/**
+ * Le jar résolu vient-il d'un éditeur connu, en https, sous un nom simple ?
+ *
+ * Le nom est rendu lui aussi par l'éditeur (PaperMC) et devient un chemin chez
+ * le daemon : un seul segment, terminé par `.jar`.
+ */
+export function isTrustedEngineDownload(jar: { url: string; fileName: string }): boolean {
+  if (!/^[\w.+-]{1,200}\.jar$/.test(jar.fileName) || jar.fileName.startsWith(".")) return false;
+  try {
+    const url = new URL(jar.url);
+    return (
+      url.protocol === "https:" &&
+      ENGINE_DOWNLOAD_HOSTS.has(url.hostname.toLowerCase()) &&
+      // Ni identifiants ni port : aucun éditeur n'en sert, et une adresse qui
+      // en porte est au mieux une erreur, au pire une forme piégée.
+      url.username === "" &&
+      url.password === "" &&
+      url.port === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hôtes du détail d'une version Vanilla, lu par le panel lui-même dans le
+ * manifeste de Mojang : une réponse falsifiée ne doit pas lui faire suivre
+ * une adresse arbitraire.
+ */
+const MOJANG_META_HOSTS = new Set(["piston-meta.mojang.com", "launchermeta.mojang.com"]);
+
+/** Réponse HTTP d'un éditeur autre que 2xx : son statut dit s'il faut parler d'absence ou de panne. */
+export class EditorHttpError extends Error {
+  constructor(
+    readonly url: string,
+    readonly status: number,
+  ) {
+    super(`${url} a répondu ${status}.`);
+    this.name = "EditorHttpError";
+  }
+}
+
 /** Ce qu'il faut savoir d'une plateforme pour la proposer et l'installer. */
 interface Platform {
   id: string;
@@ -174,9 +236,11 @@ export class EngineSourcesService {
   async resolve(
     optionId: string,
     versionId: string,
+    /** Une seule échéance pour toute la résolution, requêtes enchaînées comprises. */
+    signal?: AbortSignal,
   ): Promise<{ url: string; fileName: string } | null> {
     if (optionId.startsWith("paper:")) {
-      return this.paperDownload(optionId.slice("paper:".length), versionId);
+      return this.paperDownload(optionId.slice("paper:".length), versionId, signal);
     }
     if (optionId === "purpur:purpur") {
       return {
@@ -184,8 +248,8 @@ export class EngineSourcesService {
         fileName: `purpur-${versionId}.jar`,
       };
     }
-    if (optionId === "fabric:fabric") return this.fabricDownload(versionId);
-    if (optionId === "vanilla:vanilla") return this.vanillaDownload(versionId);
+    if (optionId === "fabric:fabric") return this.fabricDownload(versionId, "", signal);
+    if (optionId === "vanilla:vanilla") return this.vanillaDownload(versionId, signal);
     return null;
   }
 
@@ -248,6 +312,7 @@ export class EngineSourcesService {
   private async paperDownload(
     project: string,
     version: string,
+    signal?: AbortSignal,
   ): Promise<{ url: string; fileName: string } | null> {
     /*
      * La v3 rend l'adresse **toute faite**, sur un domaine de contenu distinct.
@@ -262,7 +327,7 @@ export class EngineSourcesService {
         channel: string;
         downloads: Record<string, { name: string; url: string } | undefined>;
       }[]
-    >(`${PAPER_API}/projects/${project}/versions/${encodeURIComponent(version)}/builds`);
+    >(`${PAPER_API}/projects/${project}/versions/${encodeURIComponent(version)}/builds`, signal);
 
     // Les builds arrivent du plus récent au plus ancien. Seul le canal stable
     // va sur un serveur de joueurs ; le repli sert aux versions qui n'en ont
@@ -309,10 +374,11 @@ export class EngineSourcesService {
   private async fabricDownload(
     gameVersion: string,
     wanted = "",
+    signal?: AbortSignal,
   ): Promise<{ url: string; fileName: string } | null> {
     const loaders = await this.get<
       { loader: { version: string }; intermediary: { stable: boolean } }[]
-    >(`${FABRIC_API}/versions/loader/${encodeURIComponent(gameVersion)}`);
+    >(`${FABRIC_API}/versions/loader/${encodeURIComponent(gameVersion)}`, signal);
     // La version demandée doit exister chez Fabric pour ce jeu : une adresse
     // composée avec une version inconnue rendrait une erreur au daemon.
     const loader =
@@ -322,6 +388,7 @@ export class EngineSourcesService {
 
     const installers = await this.get<{ version: string; stable: boolean }[]>(
       `${FABRIC_API}/versions/installer`,
+      signal,
     );
     const installer = installers.find((i) => i.stable)?.version ?? installers[0]?.version;
 
@@ -345,12 +412,19 @@ export class EngineSourcesService {
 
   private async vanillaDownload(
     version: string,
+    signal?: AbortSignal,
   ): Promise<{ url: string; fileName: string } | null> {
-    const manifest = await this.get<{ versions: { id: string; url: string }[] }>(MOJANG_MANIFEST);
+    const manifest = await this.get<{ versions: { id: string; url: string }[] }>(
+      MOJANG_MANIFEST,
+      signal,
+    );
     const entry = manifest.versions.find((v) => v.id === version);
     if (!entry) return null;
+    if (!isMojangMeta(entry.url)) {
+      throw new Error(`Adresse de version inattendue dans le manifeste de Mojang : ${entry.url}`);
+    }
 
-    const detail = await this.get<{ downloads?: { server?: { url: string } } }>(entry.url);
+    const detail = await this.get<{ downloads?: { server?: { url: string } } }>(entry.url, signal);
     const url = detail.downloads?.server?.url;
     // Les versions antérieures à 1.2.5 ne publient pas de serveur : l'absence
     // est un fait de Mojang, pas une panne à masquer.
@@ -359,7 +433,7 @@ export class EngineSourcesService {
     return { url, fileName: `minecraft_server.${version}.jar` };
   }
 
-  private async get<T>(url: string): Promise<T> {
+  private async get<T>(url: string, signal?: AbortSignal): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
@@ -370,13 +444,22 @@ export class EngineSourcesService {
         // vident par intermittence, et rien à l'écran ne dit que c'est le
         // fournisseur qui a refusé.
         headers: { Accept: "application/json", "User-Agent": USER_AGENT },
-        signal: controller.signal,
+        signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
       });
-      if (!response.ok) throw new Error(`${url} a répondu ${response.status}.`);
+      if (!response.ok) throw new EditorHttpError(url, response.status);
       return (await response.json()) as T;
     } finally {
       clearTimeout(timer);
     }
+  }
+}
+
+function isMojangMeta(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && MOJANG_META_HOSTS.has(url.hostname.toLowerCase());
+  } catch {
+    return false;
   }
 }
 

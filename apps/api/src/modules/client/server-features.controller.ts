@@ -23,6 +23,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { z } from "zod";
+import { singleQuery } from "../../common/query-param";
 import { requestOrigin } from "../../common/request-origin";
 import { ActivityService } from "../activity/activity.service";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
@@ -824,12 +825,13 @@ export class ServerFeaturesController {
   async marketplaceCatalogue(
     @Req() request: ClientRequest,
     @Param("id") id: string,
-    @Query("q") query?: string,
+    @Query("q") query?: unknown,
   ) {
+    const recherche = singleQuery(query, "q") ?? "";
     await this.requireMarketplace();
     await this.access.require(principalOf(request), id, "files.read");
     const [result, installed] = await Promise.all([
-      this.relay(() => this.marketplace.catalogue(id, query ?? "")),
+      this.relay(() => this.marketplace.catalogue(id, recherche)),
       this.marketplace.installed(id),
     ]);
     return {
@@ -887,10 +889,11 @@ export class ServerFeaturesController {
   async engineState(
     @Req() request: ClientRequest,
     @Param("id") id: string,
-    @Query("q") query?: string,
+    @Query("q") query?: unknown,
   ) {
+    const recherche = singleQuery(query, "q") ?? "";
     await this.access.require(principalOf(request), id, "files.read");
-    const state = await this.relay(() => this.engine.state(id, query ?? ""));
+    const state = await this.relay(() => this.engine.state(id, recherche));
     return {
       data: { platforms: state.platforms, packs: state.packs },
       meta: {
@@ -1082,13 +1085,15 @@ export class ServerFeaturesController {
   async listActivity(
     @Req() request: ClientRequest,
     @Param("id") id: string,
-    @Query("q") query?: string,
-    @Query("page") page?: string,
+    @Query("q") query?: unknown,
+    @Query("page") page?: unknown,
   ) {
+    const recherche = singleQuery(query, "q");
+    const numero = singleQuery(page, "page");
     const { isOwner } = await this.access.require(principalOf(request), id, "activity.read");
     const result = await this.activity.forServer(id, {
-      query,
-      page: Number.parseInt(page ?? "1", 10) || 1,
+      query: recherche,
+      page: Number.parseInt(numero ?? "1", 10) || 1,
       // Les adresses des acteurs ne vont qu'à qui a tous les droits sur ce
       // serveur : voir `ActivityService.forServer`.
       revealIp: isOwner,
