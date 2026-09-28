@@ -557,9 +557,9 @@ export class ServerFeaturesController {
     @Param("subuserId") subuserId: string,
   ) {
     await this.access.require(principalOf(request), id, "subusers.delete");
-    await this.subusers.remove(id, subuserId);
-    await this.log(request, id, "subuser.delete", { subuserId });
-    return { data: { removed: subuserId } };
+    const { sessionClosed } = await this.subusers.remove(id, subuserId);
+    await this.log(request, id, "subuser.delete", { subuserId, sessionClosed });
+    return { data: { removed: subuserId, sessionClosed } };
   }
 
   /* --- Planification ------------------------------------------------------ */

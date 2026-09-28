@@ -519,7 +519,7 @@ export class ResellerController {
     // Le périmètre d'abord, et il rend « introuvable » : un revendeur ne doit
     // pas pouvoir distinguer le serveur d'un confrère d'un serveur inexistant.
     await this.scope_.requireServer(request.user.id, serverId);
-    await this.actions_.setServerSuspended(
+    const { sessionsNotClosed } = await this.actions_.setServerSuspended(
       serverId,
       parsed.data.suspended,
       parsed.data.reason ?? "",
@@ -532,10 +532,12 @@ export class ResellerController {
       actorType: "user",
       actorLabel: request.user.email,
       ip: request.ip ?? null,
-      properties: { reason: parsed.data.reason ?? null },
+      properties: parsed.data.suspended
+        ? { reason: parsed.data.reason ?? null, sessionsNotClosed }
+        : { reason: parsed.data.reason ?? null },
     });
 
-    return { data: { serverId, suspended: parsed.data.suspended } };
+    return { data: { serverId, suspended: parsed.data.suspended, sessionsNotClosed } };
   }
 
   /**

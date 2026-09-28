@@ -2,7 +2,7 @@
 
 import type { RolePresets } from "@gamedashboard/contracts";
 import { revalidatePath } from "next/cache";
-import { apiFetch, apiSend } from "./client";
+import { apiFetch, apiSend, apiSendFor } from "./client";
 
 export interface Subuser {
   id: string;
@@ -91,13 +91,25 @@ export async function updateSubuser(
   );
 }
 
+/**
+ * Retire un accès. `sessionsNotClosed` vaut 1 quand le node n'a pas confirmé
+ * la fermeture de la session SFTP de la personne : l'accès est retiré quand
+ * même, l'écran le signale.
+ */
 export async function removeSubuser(
   serverId: string,
   subuserId: string,
-): Promise<{ error: string | null }> {
-  return act(serverId, () =>
-    apiSend(`/api/v1/client/servers/${serverId}/subusers/${subuserId}`, undefined, "DELETE"),
-  );
+): Promise<{ error: string | null; sessionsNotClosed: number }> {
+  let sessionsNotClosed = 0;
+  const result = await act(serverId, async () => {
+    const { data } = await apiSendFor<{ data: { sessionClosed?: boolean } }>(
+      `/api/v1/client/servers/${serverId}/subusers/${subuserId}`,
+      undefined,
+      "DELETE",
+    );
+    sessionsNotClosed = data.sessionClosed === false ? 1 : 0;
+  });
+  return { ...result, sessionsNotClosed };
 }
 
 async function act(serverId: string, call: () => Promise<void>): Promise<{ error: string | null }> {

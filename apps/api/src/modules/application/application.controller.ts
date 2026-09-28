@@ -363,15 +363,19 @@ export class ApplicationController {
     const { suspended, reason } = parse(Suspension, body);
 
     await this.scope.requireServer(request.application.resellerId, serverId);
-    await this.actions.setServerSuspended(serverId, suspended, reason ?? "");
+    const { sessionsNotClosed } = await this.actions.setServerSuspended(
+      serverId,
+      suspended,
+      reason ?? "",
+    );
     await this.trace(
       request,
       suspended ? "application.server_suspended" : "application.server_resumed",
       serverId,
-      { reason: reason ?? null },
+      suspended ? { reason: reason ?? null, sessionsNotClosed } : { reason: reason ?? null },
     );
 
-    return { data: { serverId, suspended } };
+    return { data: { serverId, suspended, sessionsNotClosed } };
   }
 
   /**

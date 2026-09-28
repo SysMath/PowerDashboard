@@ -21,15 +21,23 @@ export async function setResellerServerSuspended(
   serverId: string,
   suspended: boolean,
   reason?: string,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; sessionsNotClosed: number }> {
   try {
-    await apiSendFor(`/api/v1/reseller/servers/${serverId}/suspension`, { suspended, reason });
+    const { data } = await apiSendFor<{ data: { sessionsNotClosed?: number } }>(
+      `/api/v1/reseller/servers/${serverId}/suspension`,
+      { suspended, reason },
+    );
     // Le parc et la vue d'ensemble montrent le même état : c'est l'espace
     // entier qui est périmé, pas une seule page.
     revalidatePath("/reseller", "layout");
-    return { error: null };
+    // Comptes dont le node n'a pas confirmé la fermeture des sessions : la
+    // suspension est faite quand même, l'écran le signale.
+    return { error: null, sessionsNotClosed: data.sessionsNotClosed ?? 0 };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Opération refusée." };
+    return {
+      error: error instanceof Error ? error.message : "Opération refusée.",
+      sessionsNotClosed: 0,
+    };
   }
 }
 

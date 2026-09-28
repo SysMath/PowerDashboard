@@ -187,14 +187,25 @@ export async function deleteUser(userId: string): Promise<{ error: string | null
   return act("/admin/users", () => apiSend(`/api/v1/admin/users/${userId}`, undefined, "DELETE"));
 }
 
+/**
+ * Suspend ou rétablit. `sessionsNotClosed` compte les comptes dont le node
+ * n'a pas confirmé la fermeture des sessions : la suspension est faite quand
+ * même, l'écran le signale.
+ */
 export async function setServerSuspended(
   serverId: string,
   suspended: boolean,
   reason = "",
-): Promise<{ error: string | null }> {
-  return act("/admin/servers", () =>
-    apiSend(`/api/v1/admin/servers/${serverId}/suspend`, { suspended, reason }),
-  );
+): Promise<{ error: string | null; sessionsNotClosed: number }> {
+  let sessionsNotClosed = 0;
+  const result = await act("/admin/servers", async () => {
+    const { data } = await apiSendFor<{ data: { sessionsNotClosed?: number } }>(
+      `/api/v1/admin/servers/${serverId}/suspend`,
+      { suspended, reason },
+    );
+    sessionsNotClosed = data.sessionsNotClosed ?? 0;
+  });
+  return { ...result, sessionsNotClosed };
 }
 
 export async function deleteServer(serverId: string): Promise<{ error: string | null }> {
