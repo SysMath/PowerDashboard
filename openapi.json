@@ -1454,7 +1454,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « console.read »."
+            "description": "Authentifié, mais sans la portée « console.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -4092,7 +4099,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « consumption.read »."
+            "description": "Authentifié, mais sans la portée « consumption.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."

@@ -96,7 +96,13 @@ jobs:
       - name: Fins de ligne du dépôt
         run: git config --global core.autocrlf false
 
+      # Sans jeton dans .git/config : le dépôt est copié tel quel dans le
+      # conteneur, où tournent l'installation et les tests (code des
+      # dépendances compris). Aucune étape n'en a besoin : rien n'y parle à
+      # GitHub (même règle que release.yml, captures.yml et codeql.yml).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       # Avec une base : sans `DATABASE_URL`, les tests d'intégration
       # (`*.integration.test.ts`, plus de 300) se sautaient ici et ne
@@ -191,7 +197,13 @@ jobs:
       - name: Fins de ligne du dépôt
         run: git config --global core.autocrlf false
 
+      # Sans jeton dans .git/config : le dépôt est copié tel quel dans le
+      # conteneur, où tournent l'installation et les tests (code des
+      # dépendances compris). Aucune étape n'en a besoin : rien n'y parle à
+      # GitHub (même règle que release.yml, captures.yml et codeql.yml).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Conteneur Linux
         run: bash infra/ci/linux.sh ouvrir
@@ -291,7 +303,13 @@ jobs:
       - name: Fins de ligne du dépôt
         run: git config --global core.autocrlf false
 
+      # Sans jeton dans .git/config : le dépôt est copié tel quel dans le
+      # conteneur, où tournent l'installation et les tests (code des
+      # dépendances compris). Aucune étape n'en a besoin : rien n'y parle à
+      # GitHub (même règle que release.yml, captures.yml et codeql.yml).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Conteneur Linux et base
         run: bash infra/ci/linux.sh ouvrir --postgres
