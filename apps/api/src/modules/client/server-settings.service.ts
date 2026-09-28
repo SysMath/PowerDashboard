@@ -11,6 +11,7 @@ import {
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, eq } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { WingsClientService } from "../wings/wings-client.service";
 
 export interface StartupVariable {
@@ -53,6 +54,12 @@ export interface ServerSettings {
    * coupé — ce qui est précisément le cas qu'il sert à couvrir.
    */
   sftpIsOpen: boolean;
+  /**
+   * Faux quand l'annuaire est obligatoire : le SFTP n'accepte alors que les
+   * clés SSH (`SftpAuthService`). Le protocole ne sait rendre qu'un échec
+   * d'authentification ; c'est cet écran qui dit pourquoi.
+   */
+  sftpPasswordAccepted: boolean;
   variables: StartupVariable[];
 }
 
@@ -64,6 +71,7 @@ export class ServerSettingsService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(WingsClientService) private readonly wings: WingsClientService,
+    @Inject(PlatformSettingsService) private readonly platform: PlatformSettingsService,
   ) {}
 
   /**
@@ -152,6 +160,7 @@ export class ServerSettingsService {
       // pas le sien — puis conclure que le SFTP ne marche pas.
       sftpUsername: `${viewerEmail}.${row.shortId}`,
       sftpIsOpen: true,
+      sftpPasswordAccepted: (await this.platform.ssoConfiguration()) === null,
       variables: variables.map((v) => ({
         envVariable: v.envVariable,
         name: v.name,

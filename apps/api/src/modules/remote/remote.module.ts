@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { databaseProvider } from "../../common/database.provider";
 import { ActivityModule } from "../activity/activity.module";
 import { AdminModule } from "../admin/admin.module";
+import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { SshKeyRepository } from "../auth/ssh-key.repository";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { StorageModule } from "../storage/storage.module";
@@ -43,6 +44,8 @@ import { SftpAuthService } from "./sftp-auth.service";
     // fourni ici plutôt qu'importé, parce que ce module ne partage volontairement
     // aucune garde ni aucun intergiciel avec celui-là.
     SshKeyRepository,
+    // Pour l'annuaire obligatoire, qui ferme le SFTP au mot de passe.
+    PlatformSettingsService,
     NodeTokenGuard,
   ],
 })

@@ -216,7 +216,12 @@ export function SettingsWorkspace({
               label: tc("user"),
               value: <span className="gd-mono">{initial.sftpUsername}</span>,
             },
-            { label: tc("password"), value: t("samePasswordAsAccount") },
+            {
+              label: tc("password"),
+              value: initial.sftpPasswordAccepted
+                ? t("samePasswordAsAccount")
+                : t("sftpPasswordRefused"),
+            },
             { label: t("directory"), value: <span className="gd-mono">/home/container</span> },
           ]}
         />
@@ -224,7 +229,18 @@ export function SettingsWorkspace({
         {/* La clé plutôt que le mot de passe : un client SFTP garde ce qu'on lui
             confie, et le mot de passe du compte ouvre bien plus que des
             fichiers. Dit ici, où la question se pose. */}
-        {initial.sftpIsOpen ? (
+        {/* Annuaire obligatoire : la clé n'est plus un conseil mais le seul
+            chemin. Le client SFTP ne dira qu'« authentification refusée » ;
+            c'est ici que l'on apprend quoi faire. */}
+        {initial.sftpIsOpen && !initial.sftpPasswordAccepted ? (
+          <AlertBanner variant="warning" title={t("sftpKeyOnly")}>
+            {t("sftpKeyOnlyBody")}{" "}
+            <Link href="/account/security" className="font-semibold text-accent hover:underline">
+              {t("sftpKeyOnlyLink")}
+            </Link>
+          </AlertBanner>
+        ) : null}
+        {initial.sftpIsOpen && initial.sftpPasswordAccepted ? (
           <p className="text-muted text-xs">
             {t("sftpKeyHint")}{" "}
             <Link href="/account/security" className="font-semibold text-accent hover:underline">
