@@ -142,7 +142,7 @@ par cookie refusée depuis une autre origine (`Origin`, `Sec-Fetch-Site`,
 | `ba9e56d` | Le mot de passe provisoire d'un compte créé depuis l'administration (`AdminActionsService.createUser`) n'avait pas d'échéance, contrairement à ceux de `create-admin` et `reset-password` (NC-33) : 24 h, après quoi la connexion **et le SFTP** le refusent (le SFTP ne lisait pas l'échéance, scripts compris) ; avant, la première connexion mène à la page de changement, sans l'imposer route par route. Les comptes créés avant ce lot ne sont pas touchés (§0.5) | `admin-create-user.test.ts`, `sftp-auth.test.ts` |
 | `ba9e56d` | `SsoService.refresh` remplaçait l'adresse du compte par celle du fournisseur sans prévenir le titulaire (ASVS 2.5.5) : avis à l'ancienne adresse (cloche, et courriel si elle était confirmée), liens de réinitialisation et de vérification déjà partis éteints, comme pour un changement fait par l'administration | `google-sign-in.integration.test.ts` |
 | `6aa9cba` | Même famille que la prise conditionnelle de l'installation (NC-47) : `ForgeInstallService` reposait `installing` sans condition avant et après l'installeur du chargeur, écrasant une suspension, une restauration ou un transfert décidés pendant l'attente. Il ne le pose plus que sur un serveur libre, déjà en installation ou dont l'installeur vient d'échouer, et ne relance pas l'installeur sur un serveur pris | `forge-install.integration.test.ts` |
-| lot `sftp-cle-annuaire` | Annuaire obligatoire : la page de connexion refusait tout mot de passe local, mais le SFTP l'acceptait encore (« une seconde porte », relevée à la revalidation du lot `reliquats-asvs`) ; un compte retiré de l'annuaire gardait ses fichiers par son mot de passe. Le SFTP n'accepte plus alors que les clés SSH, pour tout le monde (choix de Matheol) ; les clés déjà posées restent valables, et retirer quelqu'un de l'annuaire se complète par la suspension de son compte dans le panel ; l'écran SFTP du serveur et le réglage de l'annuaire le disent (ADR 0001) | `sftp-annuaire.integration.test.ts` |
+| `8af3c32` | Annuaire obligatoire : la page de connexion refusait tout mot de passe local, mais le SFTP l'acceptait encore (« une seconde porte », relevée à la revalidation de `ba9e56d`) ; un compte retiré de l'annuaire gardait ses fichiers par son mot de passe. Le SFTP n'accepte plus alors que les clés SSH, pour tout le monde (choix de Matheol) ; les clés déjà posées restent valables, et retirer quelqu'un de l'annuaire se complète par la suspension de son compte dans le panel ; l'écran SFTP du serveur et le réglage de l'annuaire le disent (ADR 0001) | `sftp-annuaire.integration.test.ts` |
 | `0239c39` | Le « piège connu » de la consigne (`security-alert` › panne de courrier) n'était pas Argon2 : le test libérait l'envoi avant son départ et attendait pour toujours. La connexion, elle, répondait en 78 ms | le test lui-même, trois exécutions vertes |
 
 ### 0.5 Ce qui reste, et pourquoi
@@ -159,13 +159,13 @@ par cookie refusée depuis une autre origine (`Origin`, `Sec-Fetch-Site`,
 - **À l'exploitation** : jouer l'étape § 4 du runbook de la clé maître (NC-18)
   une fois la version en service ; conserver `backup.key` hors de la machine
   (NC-52).
-- **Restes signalés** : corrigés par le lot `reliquats-asvs` (NC-44, NC-47 et
+- **Restes signalés** : corrigés par `ba9e56d` (NC-44, NC-47 et
   deux lignes du §0.4). Limites connues : un éditeur de plateforme qui change
   de domaine fait refuser l'installation de son jar jusqu'à ce que la liste
   `ENGINE_DOWNLOAD_HOSTS` (`engine-sources.ts`) le suive ; le changement du
   mot de passe provisoire est proposé à la première connexion, pas imposé
   (l'échéance de 24 h tient ASVS 2.3.1).
-- **Restauration sans nouvelles** (lot `reliquats-asvs-suivi`) : au bout de six
+- **Restauration sans nouvelles** (`6aa9cba`) : au bout de six
   heures, le panel lève `restoring` et le consigne au journal du serveur
   (`backup.restore_expired`). Deux écarts, bornés par ce délai et acceptés :
   - après la levée, le gestionnaire de fichiers rouvre alors que Wings écrit
