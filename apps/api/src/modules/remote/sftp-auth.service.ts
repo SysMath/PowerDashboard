@@ -10,6 +10,7 @@ import { type Database, serverSubusers, servers, users } from "@gamedashboard/db
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { SshKeyRepository } from "../auth/ssh-key.repository";
 
 /**
@@ -99,6 +100,7 @@ export class SftpAuthService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(SshKeyRepository) private readonly sshKeys: SshKeyRepository,
+    @Inject(PlatformSettingsService) private readonly settings: PlatformSettingsService,
   ) {}
 
   /**
@@ -234,6 +236,20 @@ export class SftpAuthService {
     request: SftpAuthRequest,
   ): Promise<{ keyId: string | null } | null> {
     if (request.type === "password") {
+      /*
+       * Annuaire obligatoire : clés SSH seulement, pour tout le monde.
+       *
+       * La page de connexion refuse alors tout mot de passe local, et le SFTP
+       * l'acceptait encore : un compte retiré de l'annuaire gardait ses
+       * fichiers par son mot de passe. Les clés déjà posées restent valables :
+       * retirer quelqu'un de l'annuaire se complète par la suspension de son
+       * compte dans le panel, ou le retrait de ses clés. Refus avant
+       * toute vérification, comme à la connexion : le temps de réponse ne dit
+       * pas si le mot de passe était le bon. L'écran SFTP du serveur annonce la
+       * règle (`ServerSettings.sftpPasswordAccepted`), puisque le protocole ne
+       * sait transmettre qu'un échec. Choix de Matheol (2026-09-26).
+       */
+      if (await this.settings.ssoConfiguration()) return null;
       /*
        * Un compte sans mot de passe local — créé par authentification unique —
        * n'a rien à vérifier ici.

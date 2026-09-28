@@ -1,9 +1,17 @@
-import { hashPassword } from "@gamedashboard/auth";
+import { hashPassword, verifyPassword } from "@gamedashboard/auth";
 import type { SftpAuthRequest } from "@gamedashboard/contracts";
 import type { Database } from "@gamedashboard/db";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { PlatformSettingsService } from "../admin/platform-settings.service";
 import type { SshKeyRepository } from "../auth/ssh-key.repository";
 import { SftpAuthService, splitUsername, toWingsPermissions } from "./sftp-auth.service";
+
+// Espionne la vérification du mot de passe, sans la changer : l'annuaire
+// obligatoire doit refuser avant de l'appeler.
+vi.mock("@gamedashboard/auth", async (original) => {
+  const module = await original<typeof import("@gamedashboard/auth")>();
+  return { ...module, verifyPassword: vi.fn(module.verifyPassword) };
+});
 
 const NODE = "11111111-1111-1111-1111-111111111111";
 const SERVER = "1a2b3c4d-0000-4000-8000-000000000000";
@@ -16,7 +24,7 @@ const USERNAME = "client@exemple.fr.1a2b3c4d";
  * file, vide une fois la file épuisée. Le compteur dit si la base a été lue —
  * c'est-à-dire si un refus a été décidé avant ou après vérification.
  */
-function sftp(reponses: unknown[][] = []) {
+function sftp(reponses: unknown[][] = [], annuaire: object | null = null) {
   let lectures = 0;
   const chain = {
     from: () => chain,
@@ -27,7 +35,11 @@ function sftp(reponses: unknown[][] = []) {
     },
   };
   const db = { select: () => chain } as unknown as Database;
-  const svc = new SftpAuthService(db, { markUsed: vi.fn() } as unknown as SshKeyRepository);
+  const svc = new SftpAuthService(
+    db,
+    { markUsed: vi.fn() } as unknown as SshKeyRepository,
+    { ssoConfiguration: async () => annuaire } as unknown as PlatformSettingsService,
+  );
   return { svc, lectures: () => lectures };
 }
 
@@ -161,6 +173,39 @@ describe("SFTP : état du serveur, limitation, mémoire", () => {
 
     // Ne restent que les compteurs de ce dernier essai.
     expect(failures.size).toBeLessThanOrEqual(3);
+  });
+});
+
+/*
+ * Annuaire obligatoire : clés SSH seulement (relecture L2-a). Couvert aussi
+ * sans base, et le mot de passe n'est même pas vérifié : le temps de réponse
+ * ne dit rien de sa justesse.
+ */
+describe("SFTP : annuaire obligatoire", () => {
+  it("refuse le bon mot de passe sans le vérifier", async () => {
+    const passwordHash = await hashPassword(PASSWORD);
+    const compte = [
+      [{ id: SERVER, ownerId: OWNER, state: null }],
+      [
+        {
+          id: OWNER,
+          email: "client@exemple.fr",
+          passwordHash,
+          passwordExpiresAt: null,
+          suspendedAt: null,
+        },
+      ],
+    ];
+    vi.mocked(verifyPassword).mockClear();
+
+    const { svc } = sftp(structuredClone(compte), { clientId: "panel" });
+    await expect(svc.authenticate(NODE, demande())).resolves.toBeNull();
+    expect(verifyPassword).not.toHaveBeenCalled();
+
+    // Témoin : sans annuaire, le même mot de passe ouvre.
+    const temoin = sftp(structuredClone(compte)).svc;
+    await expect(temoin.authenticate(NODE, demande())).resolves.toMatchObject({ user: OWNER });
+    expect(verifyPassword).toHaveBeenCalledTimes(1);
   });
 });
 

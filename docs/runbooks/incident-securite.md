@@ -92,7 +92,9 @@ Questions à trancher :
   prise en main du compte par un administrateur ? En SFTP, le mot de passe
   suffit **même avec la double authentification** (le protocole ne sait pas
   demander de code, [ADR 0001](../adr/0001-wings-conserve.md)) : un mot de
-  passe connu ouvre les fichiers sans passer par le second facteur.
+  passe connu ouvre les fichiers sans passer par le second facteur. Seule
+  exception : quand l'annuaire est obligatoire, le SFTP n'accepte que les
+  clés SSH ; regarder alors les clés du compte.
 - **Quoi** : serveurs touchés, fichiers lus ou modifiés, sous-utilisateurs
   invités, clés ajoutées, rôle changé ?
 - **Depuis quand** : la première action de l'adresse ou de l'appareil

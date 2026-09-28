@@ -306,7 +306,9 @@ describe.skipIf(!HAS_DATABASE)("suspension et modification d'un compte (intégra
       .select({ shortId: servers.uuidShort })
       .from(servers)
       .where(eq(servers.id, serverId));
-    const sftp = new SftpAuthService(db, new SshKeyRepository(db));
+    const sftp = new SftpAuthService(db, new SshKeyRepository(db), {
+      ssoConfiguration: async () => null,
+    } as unknown as PlatformSettingsService);
     const attempt = () =>
       sftp.authenticate(nodeId, {
         type: "password",

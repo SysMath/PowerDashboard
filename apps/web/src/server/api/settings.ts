@@ -33,6 +33,8 @@ export interface ServerSettings {
   sftpUsername: string;
   /** Faux tant que l'authentification SFTP n'est pas servie par le panel. */
   sftpIsOpen: boolean;
+  /** Faux quand l'annuaire est obligatoire : clés SSH seulement. */
+  sftpPasswordAccepted: boolean;
   variables: StartupVariable[];
 }
 

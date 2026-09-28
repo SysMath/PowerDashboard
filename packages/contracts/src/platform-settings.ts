@@ -247,7 +247,10 @@ export const PLATFORM_SETTINGS: readonly SettingGroup[] = [
           "**y compris pour les personnes invitées sur un serveur**, qui n'existent pas " +
           "forcément dans votre annuaire. Vérifiez que le fournisseur les couvre avant de " +
           "basculer : personne ne pourra plus entrer autrement. Vos clients, eux, ne sont pas " +
-          "concernés : leur chemin est la facturation.",
+          "concernés : leur chemin est la facturation. **Le SFTP n'accepte plus alors que les " +
+          "clés SSH**, pour tout le monde, clients compris : prévenez ceux qui s'y connectent " +
+          "par mot de passe d'ajouter une clé à leur compte avant de basculer ; l'écran SFTP " +
+          "de chaque serveur le leur dit aussi.",
         fallback: false,
       },
       {

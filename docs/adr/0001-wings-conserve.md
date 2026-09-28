@@ -67,6 +67,17 @@ Concrètement :
   compte suspendu refusé, droit `files.sftp` exigé d'un sous-utilisateur, et
   les clés SSH proposées à l'écran — elles ne quittent pas la machine de
   leur porteur.
+- **Annuaire obligatoire : SFTP par clé SSH seulement** (choix de Matheol,
+  2026-09-26). La page de connexion refuse alors tout mot de passe local ;
+  le SFTP le refuse aussi, pour tout le monde, clients venus de la
+  facturation compris, sans même le vérifier (`SftpAuthService`). Sinon, un
+  compte retiré de l'annuaire gardait par son mot de passe les fichiers de
+  ses serveurs. Les clés SSH déjà posées restent valables : retirer
+  quelqu'un de l'annuaire se complète par la suspension de son compte dans
+  le panel (ou le retrait de ses clés). Le protocole ne rend qu'un échec
+  d'authentification : l'écran SFTP de chaque serveur annonce la règle et
+  mène à l'ajout d'une clé, et le réglage de l'annuaire en prévient
+  l'administrateur avant la bascule.
 - Les fonctions que Wings n'offre pas (sondes de jeu, par exemple) vivent
   dans le panel. On ne les demande pas au daemon.
 - Le projet dépend du rythme de maintenance amont. Si Wings cessait d'être
