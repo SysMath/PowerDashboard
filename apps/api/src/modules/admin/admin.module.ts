@@ -3,6 +3,7 @@ import { ActivityModule } from "../activity/activity.module";
 import { AuthModule } from "../auth/auth.module";
 import { BillingModule } from "../billing/billing.module";
 import { ClientModule } from "../client/client.module";
+import { ConsumptionModule } from "../consumption/consumption.module";
 import { DnsModule } from "../dns/dns.module";
 import { MailerService } from "../mail/mailer.service";
 import { NotificationsModule } from "../notifications/notifications.module";
@@ -15,6 +16,7 @@ import { AdminController } from "./admin.controller";
 import { AdminGuard } from "./admin.guard";
 import { AdminService } from "./admin.service";
 import { AdminActionsService } from "./admin-actions.service";
+import { AdminConsumptionController } from "./admin-consumption.controller";
 import { AdminNodesController } from "./admin-nodes.controller";
 import { AdminServerService } from "./admin-server.service";
 import { AdminUsersController } from "./admin-users.controller";
@@ -60,11 +62,18 @@ import { StaffTwoFactorGuard } from "./staff-2fa.guard";
     BillingModule,
     // Le sous-domaine suit le transfert et part avec le serveur ; essai de la zone.
     DnsModule,
+    // La consommation de la plateforme, à télécharger.
+    ConsumptionModule,
   ],
   // La fiche d'un node et la modification d'un compte ont leurs contrôleurs,
   // sous le même préfixe et les mêmes gardes : `AdminController` dépasse déjà
   // le millier de lignes.
-  controllers: [AdminController, AdminNodesController, AdminUsersController],
+  controllers: [
+    AdminController,
+    AdminNodesController,
+    AdminUsersController,
+    AdminConsumptionController,
+  ],
   providers: [
     AdminService,
     // Fourni ici comme dans les autres modules qui envoient : le service ne

@@ -4,6 +4,7 @@ import { AnnouncementsService } from "../admin/announcements.service";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { AuthModule } from "../auth/auth.module";
 import { BillingModule } from "../billing/billing.module";
+import { ConsumptionModule } from "../consumption/consumption.module";
 import { DnsModule } from "../dns/dns.module";
 import { MailerService } from "../mail/mailer.service";
 import { MarketplaceModule } from "../marketplace/marketplace.module";
@@ -28,6 +29,7 @@ import { MysqlProvisionerService } from "./mysql-provisioner.service";
 import { NotificationsController } from "./notifications.controller";
 import { SchedulesService } from "./schedules.service";
 import { ServerAccessService } from "./server-access.service";
+import { ServerConsumptionController } from "./server-consumption.controller";
 import { ServerFeaturesController } from "./server-features.controller";
 import { ServerInvitesService } from "./server-invites.service";
 import { ServerMetricsController } from "./server-metrics.controller";
@@ -61,6 +63,8 @@ import { SubusersService } from "./subusers.service";
     StorageModule,
     // Le sous-domaine du serveur, sur l'écran réseau.
     DnsModule,
+    // La consommation journalière, à télécharger depuis la page du serveur.
+    ConsumptionModule,
   ],
   controllers: [
     ClientController,
@@ -68,6 +72,7 @@ import { SubusersService } from "./subusers.service";
     ServerFeaturesController,
     // L'historique des mesures : relu en base, jamais demandé au daemon.
     ServerMetricsController,
+    ServerConsumptionController,
     ServerSubdomainController,
     AccountController,
     NotificationsController,

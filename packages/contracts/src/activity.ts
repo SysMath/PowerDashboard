@@ -380,6 +380,10 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "admin.billing_tested": { category: "settings", label: "Liaison avec la facturation éprouvée" },
   "admin.dns_tested": { category: "settings", label: "Zone DNS des sous-domaines éprouvée" },
   "admin.audit_exported": { category: "access", label: "Journal de la plateforme exporté" },
+  "admin.consumption_exported": {
+    category: "access",
+    label: "Consommation de la plateforme exportée",
+  },
   "admin.subuser_presets_saved": {
     category: "access",
     label: "Presets de sous-utilisateurs redéfinis",
@@ -454,6 +458,10 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "reseller.platform_access_set": {
     category: "account",
     label: "Accès de la plateforme au parc du revendeur modifié",
+  },
+  "reseller.consumption_exported": {
+    category: "access",
+    label: "Consommation du parc exportée par le revendeur",
   },
   "reseller.key_created": { category: "access", label: "Clé applicative émise par le revendeur" },
   "reseller.key_revoked": {

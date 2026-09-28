@@ -8,6 +8,7 @@ import { ResellerScopeService } from "../application/reseller-scope.service";
 import { AuthModule } from "../auth/auth.module";
 import { CatalogueService } from "../client/catalogue.service";
 import { ServerResizeService } from "../client/server-resize.service";
+import { ConsumptionModule } from "../consumption/consumption.module";
 import { DnsModule } from "../dns/dns.module";
 import { StorageModule } from "../storage/storage.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
@@ -18,6 +19,7 @@ import { BrandingService } from "./branding.service";
 import { ResellerController } from "./reseller.controller";
 import { ResellerGuard } from "./reseller.guard";
 import { ResellerService } from "./reseller.service";
+import { ResellerConsumptionController } from "./reseller-consumption.controller";
 import { ResellerQuotaService } from "./reseller-quota.service";
 import { ResellerShareService } from "./reseller-share.service";
 
@@ -47,8 +49,10 @@ import { ResellerShareService } from "./reseller-share.service";
     StorageModule,
     // Supprimer un serveur retire son sous-domaine.
     DnsModule,
+    // La consommation du parc, à télécharger.
+    ConsumptionModule,
   ],
-  controllers: [ResellerController, BrandingController],
+  controllers: [ResellerController, BrandingController, ResellerConsumptionController],
   providers: [
     ResellerService,
     ResellerQuotaService,

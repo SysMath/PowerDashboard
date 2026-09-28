@@ -55,6 +55,14 @@ export const CLIENT_ROUTES: ApiRoute[] = [
     group: "Serveurs",
   },
   {
+    method: "GET",
+    path: "/servers/{server}/consumption/export?from={jour}&to={jour}&format={format}",
+    summary:
+      "Consommation journalière à télécharger (jours UTC, un an au plus) : relevés, disponibilité, CPU, mémoire, disque, octets échangés. Le jour en cours est marqué incomplet.",
+    scope: "console.read",
+    group: "Serveurs",
+  },
+  {
     method: "POST",
     path: "/servers/{server}/power",
     summary: "Envoyer un signal start, stop, restart ou kill.",
@@ -589,6 +597,14 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
     summary: "Supprimer un serveur et son volume. Le node doit répondre.",
     scope: "servers.delete",
     group: "Serveurs",
+  },
+  {
+    method: "GET",
+    path: "/consumption?from={jour}&to={jour}&serverId={server}&ownerId={user}&page={n}",
+    summary:
+      "Consommation journalière des serveurs pour une facturation à l'usage : mille journées par page, « meta.hasMore » pour la suivante. Jours UTC, un an au plus, le mois en cours par défaut. Une clé de revendeur ne lit que son parc.",
+    scope: "consumption.read",
+    group: "Consommation",
   },
   {
     method: "GET",

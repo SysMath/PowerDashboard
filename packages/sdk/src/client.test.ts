@@ -167,6 +167,7 @@ describe("GameDashboardClient", () => {
     await c.resizeServer(id, { memoryMb: 4096 });
     await c.terminateServer(id);
     await c.ssoLink({ externalId: "client-42" });
+    await c.consumption({ from: "2026-09-01", to: "2026-09-30" });
     await c.openapi();
 
     const visees = appel.mock.calls.map(
@@ -188,6 +189,31 @@ describe("GameDashboardClient", () => {
       reason: "impayé",
     });
     expect(JSON.parse(String(initDe(appel, 1).body))).toEqual({ suspended: false });
+  });
+
+  it("enchaîne les pages de consommation tant que l'API en annonce d'autres", async () => {
+    // `meta.hasMore` décide, pas la longueur de la page : une page pleine peut
+    // être la dernière, et une page courte ne doit jamais arrêter la lecture
+    // si l'API dit qu'il en reste. Sans enchaînement, un facturier ne lirait
+    // que les mille premières journées d'un parc.
+    const appel = espion((url) => {
+      const page = new URL(url).searchParams.get("page");
+      return fausseReponse({
+        data: page === "1" ? [{ i: 1 }, { i: 2 }] : [{ i: 3 }],
+        meta: { page: Number(page), hasMore: page === "1" },
+      });
+    });
+
+    const lues: unknown[] = [];
+    for await (const jour of client(appel).consumptionDays({ from: "2026-09-01" })) {
+      lues.push(jour);
+    }
+
+    expect(lues).toEqual([{ i: 1 }, { i: 2 }, { i: 3 }]);
+    expect(appel.mock.calls.map(([url]) => new URL(String(url)).search)).toEqual([
+      "?from=2026-09-01&page=1",
+      "?from=2026-09-01&page=2",
+    ]);
   });
 });
 

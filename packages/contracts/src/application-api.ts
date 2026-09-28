@@ -48,6 +48,15 @@ export const APPLICATION_SCOPES = [
    */
   "servers.resize",
   "servers.delete",
+  /**
+   * Consommation journalière des serveurs (PLAN §10.3).
+   *
+   * Séparée de `servers.read` : lister les serveurs sert à provisionner,
+   * lire ce qu'ils ont consommé sert à facturer. Une clé de boutique qui ne
+   * facture pas à l'usage n'a pas à connaître l'activité de chaque client.
+   * Une clé de revendeur ne lit que les journées de son parc.
+   */
+  "consumption.read",
   /* Revendeurs : enveloppe de ressources et autorisations. */
   "resellers.read",
   "resellers.write",
@@ -143,6 +152,13 @@ export const APPLICATION_SCOPE_CATALOGUE: readonly ApplicationScopeGroup[] = [
       { scope: "servers.resize", label: "Changer les limites d'un serveur" },
       { scope: "servers.delete", label: "Supprimer un serveur" },
     ],
+  },
+  {
+    key: "consumption",
+    label: "Consommation",
+    description:
+      "Ce que chaque serveur a consommé, jour par jour : processeur, mémoire, disque, réseau, disponibilité. Pour une facturation à l'usage.",
+    scopes: [{ scope: "consumption.read", label: "Lire la consommation journalière" }],
   },
   {
     key: "resellers",

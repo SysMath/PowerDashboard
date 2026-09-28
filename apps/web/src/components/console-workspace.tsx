@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useCommandHistory } from "@/lib/command-history";
 import { useServerSocket } from "@/lib/use-server-socket";
 import type { ClientServer } from "@/server/api/client";
+import { ConsumptionExport } from "./consumption-export";
 import { ServerBlockNotice } from "./server-block-notice";
 import { ServerMetricsHistory } from "./server-metrics-history";
 
@@ -311,6 +312,12 @@ export function ConsoleWorkspace({
           quand ? » se pose en regardant la courbe du moment. Lu en base, il
           reste lisible quand le daemon se tait. */}
       <ServerMetricsHistory server={server} />
+      {/* Les mêmes relevés, résumés par jour et à emporter : pour vérifier une
+          facture à l'usage, ou la faire soi-même. */}
+      <ConsumptionExport
+        endpoint={`/api/servers/${encodeURIComponent(server.id)}/consumption-export`}
+        audience="server"
+      />
     </div>
   );
 }

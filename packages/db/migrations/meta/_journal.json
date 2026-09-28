@@ -393,6 +393,13 @@
       "when": 1790447041338,
       "tag": "0055_server_subdomains",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790587172602,
+      "tag": "0056_server_consumption_days",
+      "breakpoints": true
     }
   ]
 }

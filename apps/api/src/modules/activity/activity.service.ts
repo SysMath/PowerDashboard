@@ -81,6 +81,19 @@ export class ActivityService {
   }
 
   /**
+   * Consigne un événement **dont l'action dépend** : si l'écriture échoue,
+   * l'erreur remonte et l'action n'a pas lieu.
+   *
+   * Réservé aux sorties de données personnelles en masse — l'export du
+   * journal ci-dessous, celui de la consommation — pour la même raison :
+   * « qui a emporté quoi » est la question qu'un trou dans l'audit rendrait
+   * sans réponse (ASVS 8.3.5).
+   */
+  async recordRequired(input: RecordInput): Promise<void> {
+    await this.insert(input);
+  }
+
+  /**
    * Exporte le journal de la plateforme, après avoir consigné l'export.
    *
    * **La seule écriture de journal qui peut faire échouer son action**, à
