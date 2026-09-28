@@ -1,6 +1,7 @@
 import { encryptSecret, generateTotpSecret } from "@gamedashboard/auth";
 import {
   activityLogs,
+  authTokens,
   type Database,
   sessions as sessionsTable,
   userOauthAccounts,
@@ -8,7 +9,7 @@ import {
   userTotpCredentials,
 } from "@gamedashboard/db";
 import { Logger } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createThrowawayDatabase,
@@ -19,6 +20,7 @@ import { ActivityService } from "../activity/activity.service";
 import type { PlatformSettingsService, SsoConfiguration } from "../admin/platform-settings.service";
 import type { BrandingService } from "../reseller/branding.service";
 import { AuthController } from "./auth.controller";
+import { AuthTokenRepository } from "./auth-token.repository";
 import { readChallenge } from "./login-challenge";
 import { PasskeyRepository } from "./passkey.repository";
 import type { SecurityAlertService } from "./security-alert.service";
@@ -90,6 +92,8 @@ describe.skipIf(!HAS_DATABASE)("Connexion avec Google (intégration)", () => {
   let annuaire: SsoConfiguration | null;
   let inscriptionsOuvertes: boolean;
   let profilGoogle: Record<string, unknown>;
+  let jetons: AuthTokenRepository;
+  const avis = vi.fn();
   const panelAvant = process.env.PANEL_ORIGIN;
 
   beforeAll(async () => {
@@ -141,6 +145,8 @@ describe.skipIf(!HAS_DATABASE)("Connexion avec Google (intégration)", () => {
       text: async () => "gamedashboard.local",
     } as unknown as PlatformSettingsService;
 
+    jetons = new AuthTokenRepository(db);
+    avis.mockClear();
     const usersRepo = new UserRepository(db);
     const sessions = new SessionRepository(db);
     const issuer = new SessionIssuerService(sessions, usersRepo, {
@@ -158,12 +164,13 @@ describe.skipIf(!HAS_DATABASE)("Connexion avec Google (intégration)", () => {
       new SsoService(db, reglages),
       {} as never,
       issuer,
-      {} as never,
+      jetons,
       {} as never,
       reglages,
       {} as never,
       {} as never,
-      {} as never,
+      // Les alertes de sécurité : seul l'avis de changement d'adresse sert ici.
+      { afterCredentialChange: avis } as unknown as SecurityAlertService,
       {} as never,
       // Les consoles de Wings : aucune n'est ouverte ici.
       {} as never,
@@ -263,6 +270,57 @@ describe.skipIf(!HAS_DATABASE)("Connexion avec Google (intégration)", () => {
     expect(session?.authMethod).toBe("google");
     const [trace] = await db.select().from(activityLogs).where(eq(activityLogs.actorId, id));
     expect(trace?.event).toBe("account.google_login");
+  });
+
+  /**
+   * L'adresse du compte suit celle de Google ; le titulaire en est prévenu.
+   *
+   * Le changement se faisait sans un mot (reste signalé du rapport ASVS) : qui
+   * prenait la main sur le compte Google déplaçait vers une autre boîte la
+   * réinitialisation et les alertes du panel, et les liens déjà partis vers
+   * l'ancienne restaient valables.
+   */
+  it("prévient l'ancienne adresse quand Google en rend une autre, et éteint ses liens", async () => {
+    const id = await compte("alex@gmail.com");
+    await db
+      .update(users)
+      .set({ emailVerifiedAt: new Date().toISOString() })
+      .where(eq(users.id, id));
+    expect((await retour()).statusCode).toBe(200);
+    if (!(await jetons.issue(id, "password_reset", null))) throw new Error("jeton non émis");
+
+    profilGoogle.email = "Alex.Nouvelle@gmail.com";
+    const reply = await retour();
+
+    expect(reply.statusCode).toBe(200);
+    const [row] = await db.select({ email: users.email }).from(users).where(eq(users.id, id));
+    expect(row?.email).toBe("alex.nouvelle@gmail.com");
+    expect(avis).toHaveBeenCalledTimes(1);
+    expect(avis).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: id,
+        kind: "emailChanged",
+        previousEmail: { address: "alex@gmail.com", verified: true },
+      }),
+    );
+    // Le lien est lu en base plutôt que repassé par `consume()` : CodeQL prend
+    // le jeton aléatoire, haché en SHA-256, pour un mot de passe mal haché
+    // (js/insufficient-password-hash, faux positif déjà connu sur main).
+    const liens = await db
+      .select({ consumedAt: authTokens.consumedAt })
+      .from(authTokens)
+      .where(and(eq(authTokens.userId, id), eq(authTokens.purpose, "password_reset")));
+    expect(liens).toHaveLength(1);
+    expect(liens[0]?.consumedAt).not.toBeNull();
+  });
+
+  it("ne prévient personne quand l'adresse ne change que de casse", async () => {
+    await compte("alex@gmail.com");
+    profilGoogle.email = "Alex@Gmail.com";
+
+    expect((await retour()).statusCode).toBe(200);
+    expect((await retour()).statusCode).toBe(200);
+    expect(avis).not.toHaveBeenCalled();
   });
 
   it("ne crée aucun compte quand les inscriptions sont fermées", async () => {

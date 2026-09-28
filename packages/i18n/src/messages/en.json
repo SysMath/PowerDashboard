@@ -437,7 +437,7 @@
     "createAction": "Create the account",
     "createHint": "The password is not typed: it is drawn at random and shown once.",
     "createdTitle": "Account created for {email}",
-    "createdWithPassword": "Pass on this temporary password. It will not be shown again: only its digest is kept.",
+    "createdWithPassword": "Pass on this temporary password. It will not be shown again: only its digest is kept. It is valid for twenty-four hours, and the first sign-in leads to the page for choosing a new one.",
     "createdCopyHint": "Copy it now.",
     "createdWithoutPassword": "The account has no local password: it opens through external sign-in only.",
     "emailLabel": "Email address",

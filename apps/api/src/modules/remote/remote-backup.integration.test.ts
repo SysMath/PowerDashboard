@@ -8,6 +8,7 @@ import {
   HAS_DATABASE,
   type ThrowawayDatabase,
 } from "../../test/throwaway-database";
+import type { ActivityService } from "../activity/activity.service";
 import type { NotificationsService } from "../notifications/notifications.service";
 import type { S3Service } from "../storage/s3.service";
 import { RemoteBackupService } from "./remote-backup.service";
@@ -64,7 +65,14 @@ describe.skipIf(!HAS_DATABASE)("RemoteBackupService (intégration)", () => {
         notifiees.push(input.type);
       },
     } as unknown as NotificationsService;
-    service = new RemoteBackupService(db, notifications, s3 as unknown as S3Service);
+    service = new RemoteBackupService(
+      db,
+      notifications,
+      s3 as unknown as S3Service,
+      {
+        record: async () => undefined,
+      } as unknown as ActivityService,
+    );
   }, 60_000);
 
   afterAll(async () => {

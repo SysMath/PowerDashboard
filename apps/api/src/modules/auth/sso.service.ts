@@ -78,6 +78,17 @@ export class SsoNoAccountError extends Error {
   }
 }
 
+/** Le compte retenu par une cérémonie. */
+export interface SsoResolution {
+  id: string;
+  created: boolean;
+  /**
+   * L'adresse que le profil du fournisseur vient de remplacer, et si elle
+   * était confirmée ; absente quand l'adresse n'a pas bougé.
+   */
+  previousEmail?: { address: string; verified: boolean };
+}
+
 @Injectable()
 export class SsoService {
   private readonly logger = new Logger(SsoService.name);
@@ -257,7 +268,7 @@ export class SsoService {
   async resolveUser(
     profile: SsoProfile,
     options: { provider?: SsoProvider; mayCreate?: boolean } = {},
-  ): Promise<{ id: string; created: boolean }> {
+  ): Promise<SsoResolution> {
     const provider = options.provider ?? "oidc";
     const [byExternal] = await this.db
       .select({ id: userOauthAccounts.userId })
@@ -271,8 +282,8 @@ export class SsoService {
       .limit(1);
 
     if (byExternal) {
-      await this.refresh(byExternal.id, profile);
-      return { id: byExternal.id, created: false };
+      const previousEmail = await this.refresh(byExternal.id, profile);
+      return { id: byExternal.id, created: false, ...(previousEmail ? { previousEmail } : {}) };
     }
 
     if (profile.email && profile.emailVerified) {
@@ -299,8 +310,8 @@ export class SsoService {
         }
 
         await this.link(byEmail.id, profile, provider);
-        await this.refresh(byEmail.id, profile);
-        return { id: byEmail.id, created: false };
+        const previousEmail = await this.refresh(byEmail.id, profile);
+        return { id: byEmail.id, created: false, ...(previousEmail ? { previousEmail } : {}) };
       }
     }
 
@@ -409,9 +420,28 @@ export class SsoService {
    * voir ici, et l'inverse n'a pas de sens. Le rôle, lui, n'est jamais touché
    * — il appartient au panel, et le laisser piloter de l'extérieur ferait
    * qu'un fournisseur mal configuré distribuerait des droits d'administration.
+   *
+   * Rend l'**ancienne** adresse quand elle vient d'être remplacée, pour que
+   * l'appelant prévienne le titulaire (ASVS 2.5.5) : un changement fait chez
+   * le fournisseur, peut-être par qui y a pris la main, déplaçait sans un mot
+   * la boîte où arrivent la réinitialisation et les alertes du panel.
    */
-  private async refresh(userId: string, profile: SsoProfile): Promise<void> {
+  private async refresh(
+    userId: string,
+    profile: SsoProfile,
+  ): Promise<SsoResolution["previousEmail"] | null> {
     const now = new Date().toISOString();
+    const [current] = await this.db
+      .select({ email: users.email, emailVerifiedAt: users.emailVerifiedAt })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    const wanted = profile.email && profile.emailVerified ? profile.email.toLowerCase() : null;
+    const previousEmail =
+      current && wanted !== null && current.email.toLowerCase() !== wanted
+        ? { address: current.email, verified: current.emailVerifiedAt !== null }
+        : null;
+
     await this.db
       .update(users)
       .set({
@@ -422,7 +452,7 @@ export class SsoService {
         // L'adresse ne bouge que si le fournisseur atteste l'avoir vérifiée :
         // sans cela, il pourrait réécrire un compte sur une adresse qui n'est
         // pas à son titulaire. En minuscules, comme à la création.
-        ...(profile.email && profile.emailVerified ? { email: profile.email.toLowerCase() } : {}),
+        ...(wanted !== null ? { email: wanted } : {}),
         // `lastLoginAt` n'est **pas** touché ici : c'est `issueSession` qui le
         // pose, pour toutes les façons d'entrer. Deux écrivains pour la même
         // colonne finiraient par se contredire, et l'un des deux resterait en
@@ -430,5 +460,6 @@ export class SsoService {
         updatedAt: now,
       })
       .where(eq(users.id, userId));
+    return previousEmail;
   }
 }

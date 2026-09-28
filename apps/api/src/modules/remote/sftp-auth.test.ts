@@ -68,6 +68,43 @@ describe("SFTP : état du serveur, limitation, mémoire", () => {
     });
   });
 
+  // Tous les états fermés, `restoring` compris, que le panel pose désormais
+  // pendant une restauration (NC-44).
+  it.each(["installing", "restoring", "transferring", "install_failed", "suspended"])(
+    "n'ouvre pas un serveur à l'état %s",
+    async (state) => {
+      const { svc } = proprietaire(state);
+      await expect(svc.authenticate(NODE, demande())).resolves.toBeNull();
+    },
+  );
+
+  /*
+   * Mot de passe provisoire échu (revue du lot « reliquats-asvs », R3) : le
+   * panel le refusait, le SFTP non.
+   */
+  it("refuse un mot de passe provisoire échu, pas un provisoire encore valable", async () => {
+    const compte = (passwordExpiresAt: string) =>
+      sftp([
+        [{ id: SERVER, ownerId: OWNER, state: null }],
+        [
+          {
+            id: OWNER,
+            email: "client@exemple.fr",
+            passwordHash,
+            passwordExpiresAt,
+            suspendedAt: null,
+          },
+        ],
+      ]).svc;
+    const hier = new Date(Date.now() - 60_000).toISOString();
+    const demain = new Date(Date.now() + 3_600_000).toISOString();
+
+    await expect(compte(hier).authenticate(NODE, demande())).resolves.toBeNull();
+    await expect(compte(demain).authenticate(NODE, demande())).resolves.toMatchObject({
+      user: OWNER,
+    });
+  });
+
   it("n'ouvre pas un serveur en cours de transfert", async () => {
     // Le daemon de départ archive les fichiers pendant ce temps : une
     // écriture SFTP s'y perdrait, ou arriverait à moitié sur l'autre node.

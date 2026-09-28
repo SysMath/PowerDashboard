@@ -437,7 +437,7 @@
     "createAction": "Créer le compte",
     "createHint": "Le mot de passe n'est pas saisi : il est tiré au sort et affiché une seule fois.",
     "createdTitle": "Compte créé pour {email}",
-    "createdWithPassword": "Transmettez ce mot de passe provisoire. Il ne sera plus affiché : seul son condensat est conservé.",
+    "createdWithPassword": "Transmettez ce mot de passe provisoire. Il ne sera plus affiché : seul son condensat est conservé. Il vaut vingt-quatre heures, et la première connexion mène à la page où en choisir un autre.",
     "createdCopyHint": "Copiez-le maintenant.",
     "createdWithoutPassword": "Le compte n'a pas de mot de passe local : il s'ouvrira par la connexion externe.",
     "emailLabel": "Adresse e-mail",
