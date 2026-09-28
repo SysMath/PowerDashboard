@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { type Database, servers, users } from "@gamedashboard/db";
-import { NotFoundException } from "@nestjs/common";
+import { type Database, resellerCustomers, servers, users } from "@gamedashboard/db";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { seedLocation, seedNode, seedServer } from "../../test/fixtures";
@@ -10,6 +10,7 @@ import {
   type ThrowawayDatabase,
 } from "../../test/throwaway-database";
 import type { PlatformSettingsService } from "../admin/platform-settings.service";
+import { ResellerScopeService } from "../application/reseller-scope.service";
 import { AuthTokenRepository } from "./auth-token.repository";
 import { BillingSsoService } from "./billing-sso.service";
 
@@ -53,7 +54,7 @@ describe.skipIf(!HAS_DATABASE)("lien de facturation d'un revendeur (intégration
     nodeId = await seedNode(db, { locationId: await seedLocation(db) });
   });
 
-  async function compte(role: "user" | "reseller" = "user") {
+  async function compte(role: "user" | "reseller" | "admin" = "user") {
     const [row] = await db
       .insert(users)
       .values({
@@ -149,5 +150,97 @@ describe.skipIf(!HAS_DATABASE)("lien de facturation d'un revendeur (intégration
         NotFoundException,
       );
     }
+  });
+
+  it("refuse un compte revendeur, à toute clé, comme le personnel", async () => {
+    // Un confrère servi entièrement chez ce revendeur, ou un revendeur resté
+    // client de la plateforme : sa session ouvre son espace de revendeur,
+    // ses clients et ses machines. Elle ne se donne pas par la facturation.
+    const revendeur = await compte("reseller");
+    const confrere = await compte("reseller");
+    await serveur(confrere, revendeur);
+
+    // La plateforme reçoit la raison ; le revendeur, le refus de l'absence :
+    // un revendeur n'est jamais son client, il n'a rien à en apprendre.
+    const refus = billing.issue({ userId: confrere }, null);
+    await expect(refus).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(refus).rejects.toThrow("revendeur");
+    await expect(billing.issue({ userId: confrere }, revendeur)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it("n'apprend rien à une clé de revendeur sur un compte qui n'est pas à elle", async () => {
+    // Le refus « suspendu » ou « personnel » précédait le périmètre : la clé
+    // apprenait qu'un compte qu'elle ne sert pas existe, et dans quel état.
+    const revendeur = await compte("reseller");
+    const confrere = await compte("reseller");
+    const suspenduAilleurs = await compte();
+    await serveur(suspenduAilleurs, confrere);
+    await db
+      .update(users)
+      .set({ suspendedAt: new Date().toISOString() })
+      .where(eq(users.id, suspenduAilleurs));
+    const admin = await compte("admin");
+
+    for (const cible of [suspenduAilleurs, admin]) {
+      await expect(billing.issue({ userId: cible }, revendeur)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    }
+    // La plateforme, elle, garde la raison.
+    await expect(billing.issue({ userId: suspenduAilleurs }, null)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(billing.issue({ userId: admin }, null)).rejects.toBeInstanceOf(ForbiddenException);
+
+    // Son propre client suspendu : la raison lui est due, il le sert.
+    const sonClient = await compte();
+    await serveur(sonClient, revendeur);
+    await db
+      .update(users)
+      .set({ suspendedAt: new Date().toISOString() })
+      .where(eq(users.id, sonClient));
+    await expect(billing.issue({ userId: sonClient }, revendeur)).rejects.toThrow("suspendu");
+  });
+
+  it("ferme le chemin en deux temps : pas de serveur, donc pas de session, pour un compte qui n'est pas à lui", async () => {
+    // Le revendeur donnait un serveur à un compte sans serveur qui n'était à
+    // personne, puis demandait sa session : le compte n'avait plus que des
+    // serveurs chez lui. La première marche est refusée, la seconde aussi.
+    const scope = new ResellerScopeService(db);
+    const revendeur = await compte("reseller");
+    const confrere = await compte("reseller");
+    const inscrit = await compte();
+    const duConfrere = await compte();
+    await db
+      .insert(resellerCustomers)
+      .values({ userId: duConfrere, resellerId: confrere, origin: "api" });
+
+    for (const cible of [inscrit, duConfrere]) {
+      await expect(scope.requireRecipient(revendeur, cible)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(billing.issue({ userId: cible }, revendeur)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    }
+  });
+
+  it("ouvre la session du client que sa boutique a créé, une fois son serveur livré", async () => {
+    // Le parcours d'un facturier : POST /users, POST /servers, puis le lien.
+    const scope = new ResellerScopeService(db);
+    const revendeur = await compte("reseller");
+    const client = await compte();
+    await db
+      .insert(resellerCustomers)
+      .values({ userId: client, resellerId: revendeur, origin: "api" });
+
+    await expect(scope.requireRecipient(revendeur, client)).resolves.toBeUndefined();
+    await serveur(client, revendeur);
+
+    await expect(billing.issue({ userId: client }, revendeur)).resolves.toMatchObject({
+      url: expect.stringMatching(/^https:\/\/panel\.test\/sso\//),
+    });
   });
 });

@@ -530,7 +530,9 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
     method: "POST",
     path: "/users",
     summary:
-      "Créer un compte client. Aucun mot de passe n'est accepté : la connexion passe par le SSO.",
+      "Créer un compte client. Aucun mot de passe n'est accepté : la connexion passe par le SSO. " +
+      "Créé par une clé de revendeur, le compte est rattaché à ce revendeur, qui peut ensuite le " +
+      "lire et lui livrer un serveur.",
     scope: "users.write",
     group: "Comptes",
   },
@@ -576,8 +578,8 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
     summary:
       "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte " +
       "Idempotency-Key. Une clé de revendeur ne le donne qu'à un compte client non suspendu, " +
-      "entièrement chez elle ou encore sans serveur ; sans serveur, il ne doit être invité sur " +
-      "aucun serveur d'ailleurs.",
+      "entièrement chez elle, ou encore sans serveur et créé par sa propre clé (POST /users) ; " +
+      "sans serveur, il ne doit être invité sur aucun serveur d'ailleurs.",
     scope: "servers.create",
     group: "Serveurs",
   },
@@ -600,9 +602,10 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
       "porte le bilan (cleanup) : databasesNotRotated nomme les bases restées sur leur ancien " +
       "mot de passe, sessionsNotClosed compte les comptes que le node n'a pu déconnecter ; un rejeu " +
       "ne refait rien et rend le bilan du changement déjà fait (changed: false). Une clé de " +
-      "revendeur ne peut le donner qu'à un compte client non suspendu, entièrement chez elle ou " +
-      "encore sans serveur ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs. " +
-      "Son propre client suspendu est refusé en 403, avec la raison ; tout autre refus rend 404.",
+      "revendeur ne peut le donner qu'à un compte client non suspendu, entièrement chez elle, ou " +
+      "encore sans serveur et créé par sa propre clé ; sans serveur, il ne doit être invité sur " +
+      "aucun serveur d'ailleurs. Son propre client suspendu est refusé en 403, avec la raison ; " +
+      "tout autre refus rend 404.",
     scope: "servers.owner",
     group: "Serveurs",
   },

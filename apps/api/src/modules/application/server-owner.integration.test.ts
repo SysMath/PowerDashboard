@@ -4,6 +4,7 @@ import {
   type Database,
   databaseHosts,
   databases,
+  resellerCustomers,
   serverSubusers,
   servers,
   users,
@@ -92,6 +93,13 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
 
   async function role(userId: string, valeur: "admin" | "reseller" | "user"): Promise<void> {
     await db.update(users).set({ role: valeur }).where(eq(users.id, userId));
+  }
+
+  /** Un compte créé par la boutique de ce revendeur (`POST /users`). */
+  async function creePar(resellerId: string): Promise<string> {
+    const id = await seedUser(db);
+    await db.insert(resellerCustomers).values({ userId: id, resellerId, origin: "api" });
+    return id;
   }
 
   beforeAll(async () => {
@@ -288,8 +296,8 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
     expect(await titulaire(serveur)).toBe(ancien);
   });
 
-  it("clé de revendeur : un client tout juste créé, sans serveur, peut recevoir", async () => {
-    const nouveau = await seedUser(db);
+  it("clé de revendeur : un client tout juste créé par sa boutique, sans serveur, peut recevoir", async () => {
+    const nouveau = await creePar(revendeur);
 
     await controleur.setServerOwner(requete(revendeur), serveur, { ownerId: nouveau });
 
@@ -305,6 +313,21 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
     expect(await titulaire(serveur)).toBe(client);
   });
 
+  it("clé de revendeur : un compte sans serveur qu'il n'a pas créé ne reçoit pas", async () => {
+    // Inscrit de lui-même, ouvert par l'administration, ou créé par un
+    // confrère : il n'est pas à ce revendeur, et lui donner un serveur était
+    // la première marche vers sa session.
+    const inscrit = await seedUser(db);
+    const duConfrere = await creePar(autreRevendeur);
+
+    for (const cible of [inscrit, duConfrere]) {
+      await expect(
+        controleur.setServerOwner(requete(revendeur), serveur, { ownerId: cible }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    }
+    expect(await titulaire(serveur)).toBe(ancien);
+  });
+
   it("clé de revendeur : le client partagé avec un confrère ne reçoit pas", async () => {
     const client = await seedUser(db);
     await serveurDe(client, revendeur);
@@ -316,20 +339,29 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
     expect(await titulaire(serveur)).toBe(ancien);
   });
 
-  it("clé de revendeur : un compte suspendu ne reçoit pas, même sans serveur", async () => {
-    const suspendu = await seedUser(db);
+  it("clé de revendeur : un compte suspendu ne reçoit pas, même créé par lui", async () => {
+    const suspendu = await creePar(revendeur);
+    const inconnuSuspendu = await seedUser(db);
     await db
       .update(users)
       .set({ suspendedAt: new Date().toISOString() })
       .where(eq(users.id, suspendu));
+    await db
+      .update(users)
+      .set({ suspendedAt: new Date().toISOString() })
+      .where(eq(users.id, inconnuSuspendu));
 
+    // Le sien : le refus dit pourquoi. Celui d'un autre : introuvable.
     await expect(
       controleur.setServerOwner(requete(revendeur), serveur, { ownerId: suspendu }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      controleur.setServerOwner(requete(revendeur), serveur, { ownerId: inconnuSuspendu }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("clé de revendeur : un compte invité sur le serveur d'un autre ne reçoit pas", async () => {
-    const invite = await seedUser(db);
+    const invite = await creePar(revendeur);
     const chezLAutre = await serveurDe(await seedUser(db), autreRevendeur);
     await db.insert(serverSubusers).values({ serverId: chezLAutre, userId: invite });
 
@@ -340,7 +372,8 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
 
   it("clé de revendeur : un compte sans serveur, invité sur un serveur de la plateforme, ne reçoit pas", async () => {
     // `reseller_id` nul : `<>` ne l'aurait pas compté comme « ailleurs ».
-    const invite = await seedUser(db);
+    // Créé par sa boutique : seule l'invitation le fait refuser.
+    const invite = await creePar(revendeur);
     const aLaPlateforme = await serveurDe(await seedUser(db), null);
     await db.insert(serverSubusers).values({ serverId: aLaPlateforme, userId: invite });
 
@@ -378,13 +411,24 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
     expect(await titulaire(serveur)).toBe(ancien);
   });
 
-  it("clé de revendeur : un compte invité seulement chez lui peut recevoir", async () => {
-    const invite = await seedUser(db);
+  it("clé de revendeur : un compte qu'il a créé, invité seulement chez lui, peut recevoir", async () => {
+    const invite = await creePar(revendeur);
     await db.insert(serverSubusers).values({ serverId: serveur, userId: invite });
 
     await controleur.setServerOwner(requete(revendeur), serveur, { ownerId: invite });
 
     expect(await titulaire(serveur)).toBe(invite);
+  });
+
+  it("clé de revendeur : être invité chez lui ne suffit pas à être à lui", async () => {
+    // Le titulaire invite qui il veut, y compris un compte qui n'est à
+    // personne : l'invitation ne rattache pas au revendeur.
+    const invite = await seedUser(db);
+    await db.insert(serverSubusers).values({ serverId: serveur, userId: invite });
+
+    await expect(
+      controleur.setServerOwner(requete(revendeur), serveur, { ownerId: invite }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("clé de revendeur : le client d'un confrère est introuvable, comme partout", async () => {
@@ -499,6 +543,12 @@ describe.skipIf(!HAS_DATABASE)("périmètre des comptes d'une clé de revendeur 
     return id;
   }
 
+  async function creePar(resellerId: string): Promise<string> {
+    const id = await seedUser(db);
+    await db.insert(resellerCustomers).values({ userId: id, resellerId, origin: "api" });
+    return id;
+  }
+
   beforeAll(async () => {
     throwaway = await createThrowawayDatabase();
     db = throwaway.db;
@@ -558,8 +608,8 @@ describe.skipIf(!HAS_DATABASE)("périmètre des comptes d'une clé de revendeur 
     expect(createServer).not.toHaveBeenCalled();
   });
 
-  it("création : un compte neuf ou un client à lui reçoit ; une clé de plateforme n'est pas bornée", async () => {
-    const neuf = await seedUser(db);
+  it("création : le compte que sa boutique a créé ou un client à lui reçoit ; une clé de plateforme n'est pas bornée", async () => {
+    const neuf = await creePar(revendeur);
     const client = await seedUser(db);
     await serveurDe(client, revendeur);
     const clientDuConfrere = await seedUser(db);
@@ -604,6 +654,51 @@ describe.skipIf(!HAS_DATABASE)("périmètre des comptes d'une clé de revendeur 
     await expect(controleur.deleteUser(requete(revendeur), aLui)).rejects.toBeInstanceOf(
       ConflictException,
     );
+  });
+
+  it("création : un compte sans serveur qui n'est pas à lui ne reçoit pas, ce qui ferme le chemin vers sa session", async () => {
+    const inscrit = await seedUser(db);
+    const duConfrere = await creePar(confrere);
+
+    for (const cible of [inscrit, duConfrere]) {
+      await expect(
+        controleur.createServer(requete(revendeur), corps(cible)),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      // Et il reste hors de portée ensuite : ni lu, ni modifié.
+      await expect(scope.requireUser(revendeur, cible)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(scope.requireOwnedUser(revendeur, cible)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    }
+    expect(createServer).not.toHaveBeenCalled();
+    // Le confrère, lui, atteint le compte que sa boutique a créé.
+    await expect(scope.requireOwnedUser(confrere, duConfrere)).resolves.toBeUndefined();
+    await expect(scope.requireRecipient(confrere, duConfrere)).resolves.toBeUndefined();
+  });
+
+  it("lecture et écriture : le compte que sa boutique a créé, avant tout serveur", async () => {
+    // La boutique retrouve le compte qu'elle vient d'ouvrir (reprise d'une
+    // commande interrompue) et peut corriger son identifiant externe.
+    const neuf = await creePar(revendeur);
+
+    await expect(scope.requireUser(revendeur, neuf)).resolves.toBeUndefined();
+    await expect(scope.requireOwnedUser(revendeur, neuf)).resolves.toBeUndefined();
+  });
+
+  it("écriture : le compte qu'il a créé, invité depuis chez un confrère, se lit mais ne se modifie ni ne se supprime", async () => {
+    // Le supprimer retirait l'accès de l'équipe du confrère avec lui.
+    const cree = await creePar(revendeur);
+    const chezConfrere = await serveurDe(await seedUser(db), confrere);
+    await db.insert(serverSubusers).values({ serverId: chezConfrere, userId: cree });
+
+    await expect(scope.requireUser(revendeur, cree)).resolves.toBeUndefined();
+    await expect(scope.requireOwnedUser(revendeur, cree)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controleur.deleteUser(requete(revendeur), cree)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(
+      await db.select().from(serverSubusers).where(eq(serverSubusers.userId, cree)),
+    ).toHaveLength(1);
   });
 
   it("lecture : le personnel n'est pas un client, même avec un serveur chez le revendeur", async () => {
@@ -670,7 +765,11 @@ describe.skipIf(!HAS_DATABASE)("rejeu idempotent de POST /servers (intégration)
       .insert(applicationKeys)
       .values({ name: "Boutique", prefix: "gd_app_rejeu", keyHash: "x", resellerId: revendeur })
       .returning({ id: applicationKeys.id });
+    // Un compte que sa boutique a créé : il peut recevoir.
     const client = await seedUser(db);
+    await db
+      .insert(resellerCustomers)
+      .values({ userId: client, resellerId: revendeur, origin: "api" });
 
     const createServer = vi.fn(async () => ({ id: "serveur-cree" }));
     const controleur = new ApplicationController(
@@ -759,5 +858,61 @@ describe.skipIf(!HAS_DATABASE)("erreurs 500 de l'API applicative (intégration)"
     await expect(service.updateUser(premier, { externalId: "whmcs-7" })).resolves.toMatchObject({
       id: premier,
     });
+  });
+});
+
+/**
+ * `POST /users` d'une clé de revendeur rattache le compte à ce revendeur.
+ *
+ * C'est ce rattachement, et lui seul, qui permet à sa boutique de livrer
+ * ensuite un serveur à un compte qui n'en a encore aucun.
+ */
+describe.skipIf(!HAS_DATABASE)("création d'un compte par une clé (intégration)", () => {
+  let throwaway: ThrowawayDatabase;
+  let db: Database;
+  let service: ApplicationService;
+
+  beforeAll(async () => {
+    throwaway = await createThrowawayDatabase();
+    db = throwaway.db;
+  }, 60_000);
+
+  afterAll(async () => {
+    await throwaway?.drop();
+  });
+
+  beforeEach(async () => {
+    await db.execute(sql.raw(`truncate table servers, users cascade`));
+    service = new ApplicationService(
+      db,
+      {} as never,
+      {} as never,
+      { emit: vi.fn(async () => undefined) } as never,
+    );
+  });
+
+  it("une clé de revendeur rattache le compte qu'elle crée ; une clé de plateforme, non", async () => {
+    const revendeur = await seedUser(db);
+    await db.update(users).set({ role: "reseller" }).where(eq(users.id, revendeur));
+
+    const sien = await service.createUser(
+      { email: "sien@exemple.fr", nameFirst: "Camille", nameLast: "Martin" },
+      revendeur,
+    );
+    const plateforme = await service.createUser({
+      email: "plateforme@exemple.fr",
+      nameFirst: "Alex",
+      nameLast: "Durand",
+    });
+
+    const lignes = await db
+      .select({ userId: resellerCustomers.userId, resellerId: resellerCustomers.resellerId })
+      .from(resellerCustomers);
+    expect(lignes).toEqual([{ userId: sien.id, resellerId: revendeur }]);
+    const scope = new ResellerScopeService(db);
+    await expect(scope.requireRecipient(revendeur, sien.id)).resolves.toBeUndefined();
+    await expect(scope.requireRecipient(revendeur, plateforme.id)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

@@ -7,6 +7,7 @@ import {
   nests,
   nodeResellerShares,
   nodes,
+  resellerCustomers,
   servers,
   users,
 } from "@gamedashboard/db";
@@ -138,13 +139,20 @@ export class ApplicationService {
    * clair dans ses journaux, dans les nôtres et dans tout ce qui se trouve
    * entre les deux. L'utilisateur se connectera par le SSO, ou définira son
    * mot de passe lui-même depuis la procédure d'oubli.
+   *
+   * Créé par la clé d'un revendeur (`resellerId`), le compte lui est
+   * rattaché dans la même transaction (`reseller_customers`) : c'est ce qui
+   * permet à sa boutique de lui livrer ensuite un serveur, et à elle seule.
    */
-  async createUser(input: {
-    email: string;
-    nameFirst: string;
-    nameLast: string;
-    externalId?: string | null;
-  }): Promise<ApplicationUser> {
+  async createUser(
+    input: {
+      email: string;
+      nameFirst: string;
+      nameLast: string;
+      externalId?: string | null;
+    },
+    resellerId: string | null = null,
+  ): Promise<ApplicationUser> {
     const email = input.email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       throw new BadRequestException("Adresse e-mail invalide.");
@@ -178,25 +186,32 @@ export class ApplicationService {
       }
     }
 
-    const [created] = await this.db
-      .insert(users)
-      .values({
-        email,
-        // Voir le commentaire de la méthode : jamais de secret local ici.
-        passwordHash: null,
-        nameFirst,
-        nameLast,
-        externalId: input.externalId ?? null,
-        /**
-         * Le rôle n'est pas paramétrable depuis cette API.
-         *
-         * Un système de facturation compromis pourrait sinon se fabriquer un
-         * administrateur, et de là tout le reste. Élever un compte reste un
-         * geste fait depuis le panel, par une personne.
-         */
-        role: "user",
-      })
-      .returning({ id: users.id });
+    const created = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(users)
+        .values({
+          email,
+          // Voir le commentaire de la méthode : jamais de secret local ici.
+          passwordHash: null,
+          nameFirst,
+          nameLast,
+          externalId: input.externalId ?? null,
+          /**
+           * Le rôle n'est pas paramétrable depuis cette API.
+           *
+           * Un système de facturation compromis pourrait sinon se fabriquer un
+           * administrateur, et de là tout le reste. Élever un compte reste un
+           * geste fait depuis le panel, par une personne.
+           */
+          role: "user",
+        })
+        .returning({ id: users.id });
+
+      if (row && resellerId !== null) {
+        await tx.insert(resellerCustomers).values({ userId: row.id, resellerId, origin: "api" });
+      }
+      return row;
+    });
 
     if (!created) throw new ConflictException("Le compte n'a pas pu être créé.");
 
@@ -216,9 +231,8 @@ export class ApplicationService {
      * À la plateforme, y compris quand c'est la boutique d'un revendeur qui
      * crée le compte.
      *
-     * Le compte n'a encore aucun serveur : il n'est donc à personne, et le
-     * rattacher à qui l'a créé serait une propriété que le modèle ne reconnaît
-     * pas — c'est déjà pour cette raison que `POST users` n'a pas de périmètre.
+     * Le rattachement au créateur ne vaut que pour les clés de ce revendeur ;
+     * les abonnés de la plateforme restent ceux qui voient naître les comptes.
      * Le revendeur ne perd rien : il vient d'obtenir l'identifiant en réponse à
      * son propre appel, et l'écho ne lui apprendrait rien.
      */

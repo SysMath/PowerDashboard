@@ -187,8 +187,13 @@ export class ApplicationController {
       idempotencyKey,
       input,
       async () => {
-        const user = await this.app.createUser(input);
-        await this.trace(request, "application.user_created", null, { userId: user.id });
+        // Créé par une clé de revendeur, le compte lui est rattaché : sa
+        // boutique pourra lui livrer un serveur (`requireRecipient`).
+        const user = await this.app.createUser(input, request.application.resellerId);
+        await this.trace(request, "application.user_created", null, {
+          userId: user.id,
+          resellerId: request.application.resellerId,
+        });
         return { data: user };
       },
     );
