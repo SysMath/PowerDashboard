@@ -944,6 +944,25 @@
     "exportCsv": "Exporter en CSV",
     "exportJsonl": "Exporter en JSON"
   },
+  "consumption": {
+    "metaTitle": "Consommation",
+    "pageTitle": "Consommation des serveurs",
+    "adminSubtitle": "Ce que chaque serveur de la plateforme a consommé, jour par jour.",
+    "resellerSubtitle": "Ce que chaque serveur de votre parc a consommé, jour par jour.",
+    "title": "Exporter la consommation",
+    "adminDescription": "Une ligne par serveur et par jour : disponibilité, processeur, mémoire, disque et octets échangés, avec le titulaire du jour et son identifiant chez le facturier.",
+    "resellerDescription": "Une ligne par serveur de votre parc et par jour, avec le client titulaire ce jour-là : de quoi facturer à l'usage.",
+    "serverDescription": "Les relevés de ce serveur résumés par jour : disponibilité, processeur, mémoire, disque et octets échangés.",
+    "adminOnly": "L'export de la consommation est réservé aux administrateurs : il nomme chaque client.",
+    "from": "Du",
+    "to": "Au (inclus)",
+    "csv": "CSV",
+    "jsonl": "JSON (une ligne par jour)",
+    "hint": "Jours en temps universel, treize mois conservés. La journée en cours est marquée incomplète : elle se recalcule chaque heure.",
+    "missingDates": "Choisissez les deux dates.",
+    "reversed": "La période finit avant de commencer.",
+    "tooLong": "{max} jours au plus par export."
+  },
   "databaseHosts": {
     "metaTitle": "Hôtes MySQL",
     "title": "Hôtes de bases de données",
@@ -1298,7 +1317,8 @@
     "activity": "Journal d'activité",
     "incidents": "Incidents",
     "engine": "Moteur",
-    "players": "Joueurs"
+    "players": "Joueurs",
+    "consumption": "Consommation"
   },
   "network": {
     "title": "Réseau",

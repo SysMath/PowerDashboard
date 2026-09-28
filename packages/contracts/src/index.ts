@@ -11,6 +11,7 @@ export * from "./branding";
 export * from "./browser-provenance";
 export * from "./client-webhooks";
 export * from "./console-command";
+export * from "./consumption";
 export * from "./cron";
 export * from "./discord-webhook";
 export * from "./egg-editor";

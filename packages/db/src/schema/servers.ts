@@ -3,10 +3,12 @@ import { relations } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   real,
   text,
   uniqueIndex,
@@ -243,6 +245,64 @@ export const serverMetrics = pgTable(
     players: integer("players"),
   },
   (table) => [index("server_metric_server_at_idx").on(table.serverId, table.at)],
+);
+
+/**
+ * Consommation d'un serveur, jour par jour (PLAN §10.3, métriques exportables).
+ *
+ * `server_metrics` ne garde que trente jours : un facturier qui clôt son mois
+ * le 3 du suivant n'y trouverait déjà plus le début du mois précédent, et un
+ * litige ouvert six semaines plus tard n'aurait plus rien à relire. Cette
+ * table en garde le résumé d'une journée par serveur, treize mois durant
+ * (`retention.service.ts`), recalculé chaque heure pour la veille et le jour
+ * en cours (`consumption-rollup.service.ts`). Les jours sont ceux du temps
+ * universel : un facturier qui compare deux panels ne doit pas tomber sur
+ * deux découpages.
+ *
+ * **Aucune clé étrangère vers `servers`**, à dessein : un serveur supprimé le
+ * 15 a consommé du 1er au 15, et c'est justement ce que la dernière facture
+ * doit lire. Le nom, le propriétaire, le revendeur et les limites sont
+ * recopiés au jour du calcul, pour la même raison, et parce qu'un transfert de
+ * titulaire ne réécrit pas le passé : la journée d'hier reste à celui qui
+ * possédait le serveur hier.
+ *
+ * Le propriétaire et le revendeur passent à `null` si leur compte disparaît :
+ * la consommation reste, sans plus nommer personne.
+ */
+export const serverConsumptionDays = pgTable(
+  "server_consumption_days",
+  {
+    day: date("day", { mode: "string" }).notNull(),
+    serverId: uuid("server_id").notNull(),
+    serverName: varchar("server_name", { length: 120 }).notNull(),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    resellerId: uuid("reseller_id").references(() => users.id, { onDelete: "set null" }),
+    /** Limites au moment du calcul : ce que le client payait, pas ce qu'il a pris. */
+    memoryLimitMb: integer("memory_limit_mb").notNull(),
+    diskLimitMb: integer("disk_limit_mb").notNull(),
+    cpuLimitPct: integer("cpu_limit_pct").notNull(),
+    /** Relevés reçus ce jour-là, un par minute quand tout va bien. */
+    samples: integer("samples").notNull(),
+    /** Dont serveur démarré : la disponibilité se lit dans le rapport des deux. */
+    onlineSamples: integer("online_samples").notNull(),
+    /** Nuls quand le serveur n'a jamais tourné ce jour-là : zéro serait une mesure. */
+    cpuAvgPct: real("cpu_avg_pct"),
+    cpuMaxPct: real("cpu_max_pct"),
+    memoryAvgBytes: bigint("memory_avg_bytes", { mode: "number" }),
+    memoryMaxBytes: bigint("memory_max_bytes", { mode: "number" }),
+    diskMaxBytes: bigint("disk_max_bytes", { mode: "number" }),
+    /** Octets échangés dans la journée, tirés des compteurs cumulés de Wings. */
+    networkRxBytes: bigint("network_rx_bytes", { mode: "number" }).notNull(),
+    networkTxBytes: bigint("network_tx_bytes", { mode: "number" }).notNull(),
+    playersMax: integer("players_max"),
+    rolledAt: moment("rolled_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ name: "server_consumption_day_pk", columns: [table.serverId, table.day] }),
+    index("server_consumption_day_idx").on(table.day),
+    index("server_consumption_owner_day_idx").on(table.ownerId, table.day),
+    index("server_consumption_reseller_day_idx").on(table.resellerId, table.day),
+  ],
 );
 
 /** Résultat des sondes de jeu, exécutées par le worker puisque Wings ne les expose pas (§8.2). */

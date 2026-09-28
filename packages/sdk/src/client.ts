@@ -53,6 +53,15 @@ export class ApiProblem extends Error {
   }
 }
 
+/** Période et filtres d'une lecture de la consommation (jours `AAAA-MM-JJ`, inclus). */
+export interface ConsumptionRequest {
+  from?: string;
+  to?: string;
+  serverId?: string;
+  ownerId?: string;
+  page?: number;
+}
+
 export class GameDashboardClient {
   private readonly baseUrl: string;
   private readonly token: string;
@@ -190,6 +199,41 @@ export class GameDashboardClient {
     return this.call("POST", "/api/v1/application/users/sso-link", client);
   }
 
+  /**
+   * Une page de la consommation journalière des serveurs, pour une
+   * facturation à l'usage (portée `consumption.read`). Sans période, le mois
+   * en cours ; les jours sont ceux du temps universel. `hasMore` dit s'il faut
+   * demander la page suivante ; `consumptionDays` les enchaîne.
+   */
+  async consumption(
+    query: ConsumptionRequest = {},
+  ): Promise<{ days: unknown[]; hasMore: boolean }> {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) search.set(key, String(value));
+    }
+    const suffix = search.size > 0 ? `?${search}` : "";
+    // L'enveloppe entière : `meta.hasMore` est la seule façon sûre de savoir
+    // qu'une page pleine est aussi la dernière.
+    const corps = await this.request("GET", `/api/v1/application/consumption${suffix}`);
+    const meta = corps?.meta as { hasMore?: unknown } | undefined;
+    return {
+      days: Array.isArray(corps?.data) ? corps.data : [],
+      hasMore: meta?.hasMore === true,
+    };
+  }
+
+  /** Toutes les journées d'une période, page après page, jusqu'à `hasMore` faux. */
+  async *consumptionDays(
+    query: Omit<ConsumptionRequest, "page"> = {},
+  ): AsyncGenerator<unknown, void, undefined> {
+    for (let page = 1; ; page += 1) {
+      const { days, hasMore } = await this.consumption({ ...query, page });
+      yield* days;
+      if (!hasMore) return;
+    }
+  }
+
   terminateServer(serverId: string): Promise<unknown> {
     return this.call("DELETE", `/api/v1/application/servers/${encodeURIComponent(serverId)}`);
   }
@@ -208,6 +252,18 @@ export class GameDashboardClient {
    * longtemps à comprendre.
    */
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const corps = await this.request(method, path, body);
+    // L'API enveloppe ses réponses dans `data`. Le client la déballe : c'est
+    // une convention de transport, pas une information pour l'appelant.
+    return (corps && "data" in corps ? corps.data : corps) as T;
+  }
+
+  /** L'appel HTTP, corps rendu tel quel (enveloppe comprise). */
+  private async request(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<Record<string, unknown> | null> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -236,10 +292,7 @@ export class GameDashboardClient {
       const corps = lireJson(brut);
 
       if (!response.ok) throw probleme(response.status, corps);
-
-      // L'API enveloppe ses réponses dans `data`. Le client la déballe : c'est
-      // une convention de transport, pas une information pour l'appelant.
-      return (corps && "data" in corps ? corps.data : corps) as T;
+      return corps;
     } finally {
       clearTimeout(timer);
     }

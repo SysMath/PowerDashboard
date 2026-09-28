@@ -4,12 +4,14 @@ import { AdminModule } from "../admin/admin.module";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { AuthModule } from "../auth/auth.module";
 import { ClientModule } from "../client/client.module";
+import { ConsumptionModule } from "../consumption/consumption.module";
 import { ResellerModule } from "../reseller/reseller.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { WingsModule } from "../wings/wings.module";
 import { ApplicationController } from "./application.controller";
 import { ApplicationGuard } from "./application.guard";
 import { ApplicationService } from "./application.service";
+import { ApplicationConsumptionController } from "./application-consumption.controller";
 import { ApplicationKeyRepository } from "./application-key.repository";
 import { ApplicationKeysController } from "./application-keys.controller";
 import { ApplicationKeysService } from "./application-keys.service";
@@ -39,9 +41,12 @@ import { WebhooksController } from "./webhooks.controller";
     ActivityModule,
     WingsModule,
     WebhooksModule,
+    // La consommation journalière, pour la facturation à l'usage.
+    ConsumptionModule,
   ],
   controllers: [
     ApplicationController,
+    ApplicationConsumptionController,
     ApplicationKeysController,
     WebhooksController,
     // Sur `/api/application`, le préfixe que Wings impose — pas le nôtre.

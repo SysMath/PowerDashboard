@@ -944,6 +944,25 @@
     "exportCsv": "Export as CSV",
     "exportJsonl": "Export as JSON"
   },
+  "consumption": {
+    "metaTitle": "Consumption",
+    "pageTitle": "Server consumption",
+    "adminSubtitle": "What every server on the platform consumed, day by day.",
+    "resellerSubtitle": "What every server in your fleet consumed, day by day.",
+    "title": "Export consumption",
+    "adminDescription": "One row per server and per day: availability, CPU, memory, disk and bytes transferred, with that day's owner and their billing system identifier.",
+    "resellerDescription": "One row per server in your fleet and per day, with the client who owned it that day: everything you need for usage-based billing.",
+    "serverDescription": "This server's readings summarised per day: availability, CPU, memory, disk and bytes transferred.",
+    "adminOnly": "Exporting consumption is reserved for administrators: it names every client.",
+    "from": "From",
+    "to": "To (inclusive)",
+    "csv": "CSV",
+    "jsonl": "JSON (one line per day)",
+    "hint": "Days in UTC, kept for thirteen months. Today is marked incomplete: it is recomputed every hour.",
+    "missingDates": "Pick both dates.",
+    "reversed": "The period ends before it starts.",
+    "tooLong": "{max} days at most per export."
+  },
   "databaseHosts": {
     "metaTitle": "MySQL hosts",
     "title": "Database hosts",
@@ -1298,7 +1317,8 @@
     "activity": "Activity log",
     "incidents": "Incidents",
     "engine": "Engine",
-    "players": "Players"
+    "players": "Players",
+    "consumption": "Consumption"
   },
   "network": {
     "title": "Network",

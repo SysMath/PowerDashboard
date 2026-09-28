@@ -40,6 +40,9 @@
       "name": "Connexion"
     },
     {
+      "name": "Consommation"
+    },
+    {
       "name": "Double authentification"
     },
     {
@@ -1375,6 +1378,83 @@
                 }
               }
             }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/consumption/export": {
+      "get": {
+        "summary": "Consommation journalière à télécharger (jours UTC, un an au plus) : relevés, disponibilité, CPU, mémoire, disque, octets échangés. Le jour en cours est marqué incomplet.",
+        "description": "Clé personnelle. Portée requise : `console.read`.",
+        "tags": [
+          "Serveurs"
+        ],
+        "operationId": "client-get-servers-by-server-consumption-export",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Premier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut le 1er du mois de « to ».",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Dernier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut aujourd'hui.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "« csv » (par défaut) ou « jsonl », un objet JSON par ligne.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "console.read"
+            ]
+          }
+        ],
+        "x-gd-scope": "console.read",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « console.read »."
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3565,7 +3645,7 @@
             "name": "ownerId",
             "in": "query",
             "required": false,
-            "description": "Valeur de « ownerId ».",
+            "description": "Ne garder que les serveurs de ce compte (pour la consommation : titulaire du jour).",
             "schema": {
               "type": "string"
             }
@@ -3930,6 +4010,92 @@
           },
           "2XX": {
             "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/application/consumption": {
+      "get": {
+        "summary": "Consommation journalière des serveurs pour une facturation à l'usage : mille journées par page, « meta.hasMore » pour la suivante. Jours UTC, un an au plus, le mois en cours par défaut. Une clé de revendeur ne lit que son parc.",
+        "description": "Clé de plateforme. Portée requise : `consumption.read`.",
+        "tags": [
+          "Consommation"
+        ],
+        "operationId": "application-get-consumption",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Premier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut le 1er du mois de « to ».",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Dernier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut aujourd'hui.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverId",
+            "in": "query",
+            "required": false,
+            "description": "Ne garder qu'un serveur.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerId",
+            "in": "query",
+            "required": false,
+            "description": "Ne garder que les serveurs de ce compte (pour la consommation : titulaire du jour).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page demandée, à partir de 1.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "applicationKey": [
+              "consumption.read"
+            ]
+          }
+        ],
+        "x-gd-scope": "consumption.read",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « consumption.read »."
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
           }
         }
       }

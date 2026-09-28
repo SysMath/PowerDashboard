@@ -1,3 +1,4 @@
+import { CONSUMPTION_RETENTION_DAYS } from "@gamedashboard/contracts";
 import { describe, expect, it } from "vitest";
 import { RETENTION_RULES } from "./retention.service";
 
@@ -20,6 +21,18 @@ describe("fenêtres de rétention", () => {
     const audit = byTable.get("activity_logs");
     const metrics = byTable.get("server_metrics");
     expect(audit?.days).toBeGreaterThan(metrics?.days ?? 0);
+  });
+
+  it("garde la consommation journalière treize mois, bien après les relevés bruts", () => {
+    /*
+     * C'est tout son intérêt : `server_metrics` ne garde qu'un mois, et un
+     * facturier qui clôt le 3 du mois suivant doit encore trouver le 1er du
+     * précédent. Taillée comme les relevés, la table ne servirait à rien.
+     */
+    const consumption = byTable.get("server_consumption_days");
+    expect(consumption?.column).toBe("day");
+    expect(consumption?.days).toBe(CONSUMPTION_RETENTION_DAYS);
+    expect(consumption?.days).toBeGreaterThanOrEqual(395);
   });
 
   it("n'efface jamais une notification non lue", () => {

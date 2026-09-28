@@ -1,3 +1,4 @@
+import { CONSUMPTION_RETENTION_DAYS } from "@gamedashboard/contracts";
 import type { Database } from "@gamedashboard/db";
 import {
   Inject,
@@ -76,6 +77,17 @@ const RULES: readonly RetentionRule[] = [
     column: "at",
     days: 30,
     reason: "un mois de courbes de consommation ; au-delà, personne ne remonte",
+  },
+  {
+    /*
+     * Le résumé journalier de `server_metrics`, qui lui survit : treize mois,
+     * pour qu'un facturier compare un mois à celui de l'an passé et qu'un
+     * litige tardif ait encore de quoi se relire (`CONSUMPTION_RETENTION_DAYS`).
+     */
+    table: "server_consumption_days",
+    column: "day",
+    days: CONSUMPTION_RETENTION_DAYS,
+    reason: "treize mois de consommation journalière, pour la facturation et ses litiges",
   },
   {
     table: "server_health",

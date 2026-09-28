@@ -222,6 +222,12 @@ const PARAMETRES_CONNUS: Record<string, string> = {
   chemin: "Chemin dans le volume du serveur, à partir de la racine.",
   directory: "Répertoire à lister, à partir de la racine du volume.",
   file: "Chemin du fichier, à partir de la racine du volume.",
+  from: "Premier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut le 1er du mois de « to ».",
+  to: "Dernier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut aujourd'hui.",
+  format: "« csv » (par défaut) ou « jsonl », un objet JSON par ligne.",
+  serverId: "Ne garder qu'un serveur.",
+  ownerId: "Ne garder que les serveurs de ce compte (pour la consommation : titulaire du jour).",
+  page: "Page demandée, à partir de 1.",
 };
 
 function descriptionParametre(nom: string): string {

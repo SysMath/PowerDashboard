@@ -3,6 +3,7 @@ import {
   Activity,
   Archive,
   Calendar,
+  ChartColumn,
   Cpu,
   Database,
   Egg,
@@ -114,6 +115,7 @@ export function resellerNav(t: Translate): NavSection[] {
         { label: t("nodes"), href: "/reseller/nodes", icon: <HardDrive /> },
         { label: t("servers"), href: "/reseller/servers", icon: <Server /> },
         { label: t("clients"), href: "/reseller/clients", icon: <Users /> },
+        { label: t("consumption"), href: "/reseller/consumption", icon: <ChartColumn /> },
       ],
     },
     {
@@ -148,6 +150,9 @@ export function adminNav(t: Translate): NavSection[] {
         // Le journal est rangé avec la supervision : on l'ouvre pour répondre à
         // « que s'est-il passé », pas pour configurer quoi que ce soit.
         { label: t("audit"), href: "/admin/audit", icon: <History /> },
+        // Avec la supervision aussi : on y vient lire ce que le parc a
+        // consommé, pour le facturer ou le comprendre.
+        { label: t("consumption"), href: "/admin/consumption", icon: <ChartColumn /> },
       ],
     },
     {
