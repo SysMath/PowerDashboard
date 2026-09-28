@@ -431,6 +431,17 @@ verifie(
     var_export($retour, true)
 );
 
+scenario(['bilan' => ['databasesNotRotated' => ['s1_boutique'], 'sessionsNotClosed' => 0]]);
+$retour = gamedashboard_ReassignOwner(params([
+    'customfields' => [GAMEDASHBOARD_CHAMP_SERVEUR => 'serveur-42'],
+]));
+verifie(
+    'base restée sur son ancien mot de passe : le transfert a lieu, le message la nomme',
+    is_string($retour) && $retour !== 'success' && str_contains($retour, 's1_boutique')
+        && in_array('transfere:serveur-42:compte-neuf', gestes(), true),
+    var_export($retour, true) . ' | ' . implode(' | ', gestes())
+);
+
 echo $echecs === 0 ? "\nTout passe.\n" : "\n{$echecs} échec(s).\n";
 exit($echecs === 0 ? 0 : 1);
 

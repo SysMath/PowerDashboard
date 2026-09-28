@@ -90,3 +90,30 @@ describe("relais du renommage vers Wings", () => {
     });
   });
 });
+
+/*
+ * `POST /api/deauthorize-user` (`router/router_system.go`, Wings 1.13.3) :
+ * `{ user, servers }`. Une liste de serveurs vide déconnecterait le compte de
+ * tout le node : elle ne doit jamais partir vide.
+ */
+describe("déconnexion d'un compte chez Wings", () => {
+  const COMPTE = "0b6f1c8e-2d1a-4f7e-9a51-3c2b7d9e4f10";
+
+  it("poste le compte et ce seul serveur sur deauthorize-user", async () => {
+    const appel = fetchRepondant(204);
+    await client().deauthorizeUser(SERVEUR, COMPTE);
+
+    expect(appel).toHaveBeenCalledTimes(1);
+    const [url, init] = appel.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://node.test:8080/api/deauthorize-user");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ user: COMPTE, servers: [SERVEUR] });
+  });
+
+  it("signale un node qui ne répond pas, pour que l'appelant le consigne", async () => {
+    fetchRepondant(502);
+    await expect(client().deauthorizeUser(SERVEUR, COMPTE)).rejects.toBeInstanceOf(
+      WingsUnavailableError,
+    );
+  });
+});

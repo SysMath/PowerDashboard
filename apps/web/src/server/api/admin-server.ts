@@ -41,6 +41,20 @@ export interface AdminServerDetail {
   limits: { backups: number; databases: number; allocations: number };
   variables: AdminServerVariable[];
   ports: { id: string; ip: string; port: number; isDefault: boolean }[];
+  /**
+   * Ce que le dernier changement de propriétaire n'a pas pu nettoyer, lu dans
+   * le journal : nul quand tout a été fait. Qu'il vienne de cet écran ou de la
+   * facturation, il reste signalé tant qu'une base garde son ancien mot de
+   * passe.
+   */
+  ownerChange: OwnerChangeLeftovers | null;
+}
+
+export interface OwnerChangeLeftovers {
+  /** Date du changement. */
+  at: string;
+  databasesNotRotated: string[];
+  sessionsNotClosed: number;
 }
 
 export async function fetchAdminServer(serverId: string): Promise<AdminServerDetail> {

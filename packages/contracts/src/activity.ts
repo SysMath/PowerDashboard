@@ -382,6 +382,15 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
     category: "account",
     label: "Propriétaire d'un serveur changé",
   },
+  /*
+   * Le bilan du nettoyage qui suit un changement de titulaire, par l'un ou
+   * l'autre chemin. Il nomme l'ancien titulaire et ses invités : réservé à
+   * l'administration (`SERVER_ADMIN_ONLY_EVENTS`).
+   */
+  "server.owner_change_cleanup": {
+    category: "account",
+    label: "Nettoyage après un changement de titulaire",
+  },
   "admin.smtp_tested": { category: "settings", label: "Envoi de courrier éprouvé" },
   "admin.billing_tested": { category: "settings", label: "Liaison avec la facturation éprouvée" },
   "admin.dns_tested": { category: "settings", label: "Zone DNS des sous-domaines éprouvée" },
@@ -519,3 +528,26 @@ export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, string> = {
   settings: "Paramètres",
   account: "Compte",
 };
+
+/**
+ * Les événements qui changent le titulaire d'un serveur.
+ *
+ * L'espace client ne montre du journal d'un serveur que ce qui suit le dernier
+ * d'entre eux : ce qui précède appartient à l'ancien titulaire — ses gestes,
+ * ses adresses IP — et seule l'administration le lit encore. Un nouveau chemin
+ * de transfert qui écrirait un autre nom d'événement laisserait tout
+ * l'historique visible : il doit s'ajouter ici.
+ */
+export const SERVER_OWNER_CHANGE_EVENTS = [
+  "admin.server_owner_changed",
+  "application.server_owner_changed",
+] as const;
+
+/**
+ * Les lignes d'un serveur que seule l'administration lit.
+ *
+ * Le bilan d'un changement de titulaire nomme l'ancien titulaire et ses
+ * invités, par leur identifiant : écrit après le changement, il tomberait
+ * sinon dans la partie du journal que le nouveau titulaire voit.
+ */
+export const SERVER_ADMIN_ONLY_EVENTS = ["server.owner_change_cleanup"] as const;

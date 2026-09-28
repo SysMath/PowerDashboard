@@ -2,22 +2,30 @@ import {
   platformAccessOf,
   platformMayProvision,
   reinstallBlocked,
+  SERVER_OWNER_CHANGE_EVENTS,
   serverBlock,
 } from "@gamedashboard/contracts";
 import {
+  activityLogs,
   allocations,
   type Database,
+  databases,
   eggs,
   eggVariables,
   nodes,
+  serverInvites,
+  serverSubusers,
   servers,
   serverVariables,
   users,
+  webhooks,
 } from "@gamedashboard/db";
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 import { isUuid } from "../../common/uuid";
+import { ActivityService } from "../activity/activity.service";
+import { DatabasesService } from "../client/databases.service";
 import { WingsClientService } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
 
@@ -37,6 +45,51 @@ import { WingsTokenService } from "../wings/wings-token.service";
  * Afficher ce que Wings exécutera rend ce genre d'écart visible avant le
  * démarrage, pas après.
  */
+
+/**
+ * Ce qu'un changement de titulaire a effacé derrière l'ancien.
+ *
+ * Rendu pour être consigné au journal : le jour où un ancien client affirme
+ * avoir perdu l'accès à une base, c'est cette ligne qui dit pourquoi — et
+ * celle qui dit quelles bases n'ont **pas** pu changer de mot de passe.
+ */
+export interface OwnerChangeCleanup {
+  /** Faux quand le serveur appartenait déjà à ce compte : rien n'a été touché. */
+  changed: boolean;
+  subusersRemoved: number;
+  invitesRemoved: number;
+  webhooksRemoved: number;
+  databasesRotated: number;
+  /** Bases dont l'hôte a refusé le nouveau mot de passe : l'ancien vaut encore. */
+  databasesNotRotated: string[];
+  /**
+   * Comptes dont Wings n'a pas confirmé la déconnexion (node injoignable) :
+   * une session SFTP déjà ouverte a pu leur rester.
+   */
+  sessionsNotClosed: string[];
+}
+
+/** Qui change le titulaire, et par quel chemin : la ligne qui coupe le journal le dit. */
+export interface OwnerChangeAuthor {
+  event: (typeof SERVER_OWNER_CHANGE_EVENTS)[number];
+  actorId: string | null;
+  actorType: "user" | "api_key";
+  actorLabel: string;
+  ip: string | null;
+}
+
+/**
+ * Ce que le dernier changement de titulaire n'a pas pu nettoyer, pour la
+ * fiche d'administration : le transfert a eu lieu, mais une base garde le mot
+ * de passe que l'ancien titulaire connaît, ou le node n'a pas confirmé la
+ * fermeture de ses sessions.
+ */
+export interface OwnerChangeLeftovers {
+  /** Date du changement. */
+  at: string;
+  databasesNotRotated: string[];
+  sessionsNotClosed: number;
+}
 
 export interface AdminServerVariable {
   name: string;
@@ -77,14 +130,20 @@ export interface AdminServerDetail {
   limits: { backups: number; databases: number; allocations: number };
   variables: AdminServerVariable[];
   ports: { id: string; ip: string; port: number; isDefault: boolean }[];
+  /** Nul quand le dernier changement de titulaire a tout nettoyé, ou s'il n'y en a pas eu. */
+  ownerChange: OwnerChangeLeftovers | null;
 }
 
 @Injectable()
 export class AdminServerService {
+  private readonly logger = new Logger(AdminServerService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(WingsClientService) private readonly wings: WingsClientService,
     @Inject(WingsTokenService) private readonly tokens: WingsTokenService,
+    @Inject(DatabasesService) private readonly databasesService: DatabasesService,
+    @Inject(ActivityService) private readonly activity: ActivityService,
   ) {}
 
   async detail(serverId: string): Promise<AdminServerDetail> {
@@ -179,6 +238,7 @@ export class AdminServerService {
       },
       variables,
       ports: ports.map((p) => ({ ...p, isDefault: p.id === row.allocationId })),
+      ownerChange: await this.ownerChangeLeftovers(serverId),
     };
   }
 
@@ -199,19 +259,56 @@ export class AdminServerService {
    * appartient. Un compte fusionné, une reprise d'activité, un client qui
    * rachète le serveur d'un autre : il fallait passer par la base.
    *
-   * Trois choses ne bougent pas, et chacune pour une raison :
+   * Deux choses ne bougent pas :
    *
    * - **le rattachement au revendeur** reste, parce qu'il dit *qui héberge*,
    *   pas *qui possède*. Le déplacer ferait changer de parc un serveur qui
    *   n'a pas déménagé, et fausserait l'enveloppe des deux revendeurs d'un
    *   coup ;
-   * - **les sous-utilisateurs** restent : ce sont des invitations à ce
-   *   serveur, pas au compte. Les effacer priverait une équipe de son accès
-   *   sans que personne l'ait demandé ;
    * - **l'identifiant court**, évidemment : c'est le nom du serveur pour le
    *   daemon et pour tous les journaux déjà écrits.
+   *
+   * **Tout ce que l'ancien titulaire a installé autour du serveur s'en va**
+   * (décision de Matheo, 26 septembre 2026). Le transfert était un geste rare
+   * de l'administration ; la facturation le fait désormais à chaque changement
+   * de client, et le nouveau titulaire hérite d'un serveur, pas des accès de
+   * l'ancien :
+   *
+   * - **les sous-utilisateurs et les invitations en attente** sont retirés, et
+   *   leurs sessions fermées chez Wings, SFTP et consoles, comme celles de
+   *   l'ancien titulaire. Sinon l'ancien titulaire gardait la main par un
+   *   second compte qu'il s'était invité ;
+   * - **les mots de passe des bases** sont renouvelés : il les connaît. Un
+   *   hôte qui refuse n'annule pas le transfert, la base qui garde son ancien
+   *   mot de passe est rendue, pour être consignée et montrée ;
+   * - **les rappels sortants du serveur** sont supprimés : ils envoyaient ce
+   *   qui arrive au serveur vers une adresse de l'ancien titulaire ;
+   * - **son journal** reste, mais l'espace client ne montre plus que ce qui
+   *   suit le changement (`ActivityService.forServer`) : les adresses IP et
+   *   les gestes de l'ancien titulaire ne regardent pas le nouveau.
+   *   L'administration voit tout.
+   *
+   * La ligne du changement, qui fait cette coupure, est écrite **dans la
+   * transaction** du changement. Écrite après, par `ActivityService.record`
+   * qui avale ses erreurs, elle pouvait manquer — et l'ancien journal restait
+   * alors visible pour toujours — et elle manquait de toute façon pendant le
+   * nettoyage chez Wings et chez les hôtes MySQL. Pas de ligne, pas de
+   * changement : le transfert échoue plutôt que de livrer l'historique.
+   *
+   * Le bilan du nettoyage suit dans une seconde ligne, réservée à
+   * l'administration (`SERVER_ADMIN_ONLY_EVENTS`) : il nomme l'ancien titulaire
+   * et ses invités. C'est aussi lui que rend un rejeu, et que montre la fiche
+   * d'administration (`detail`).
+   *
+   * Rien de tout cela quand le serveur appartient déjà à ce compte : rejouer
+   * un transfert ne doit pas vider le serveur de son équipe, ni couper une
+   * seconde fois le journal du titulaire.
    */
-  async setOwner(serverId: string, ownerId: string): Promise<void> {
+  async setOwner(
+    serverId: string,
+    ownerId: string,
+    auteur: OwnerChangeAuthor,
+  ): Promise<OwnerChangeCleanup> {
     /*
      * Deux identifiants contrôlés avant d'atteindre la base : PostgreSQL
      * refusait la conversion d'une valeur illisible en UUID, et le refus
@@ -246,38 +343,255 @@ export class AdminServerService {
       );
     }
 
-    const [avant] = await this.db
-      .select({ ownerId: servers.ownerId })
-      .from(servers)
-      .where(eq(servers.id, serverId))
-      .limit(1);
+    /*
+     * Le titulaire, ses invités, ses rappels et la ligne qui coupe le journal
+     * changent ensemble, sous le verrou de la ligne du serveur : deux
+     * transferts simultanés ne doivent pas se croiser, et une invitation
+     * acceptée pendant le transfert (qui prend le même verrou,
+     * `ServerInvitesService.accept`) ne doit pas survivre au nettoyage.
+     */
+    const bilan = await this.db.transaction(async (tx) => {
+      const [avant] = await tx
+        .select({ ownerId: servers.ownerId })
+        .from(servers)
+        .where(eq(servers.id, serverId))
+        .for("update")
+        .limit(1);
 
-    const [updated] = await this.db
-      .update(servers)
-      .set({ ownerId, updatedAt: new Date().toISOString() })
-      .where(eq(servers.id, serverId))
-      .returning({ id: servers.id });
+      if (!avant) throw new NotFoundException("Serveur introuvable.");
+      if (avant.ownerId === ownerId) return null;
 
-    if (!updated) throw new NotFoundException("Serveur introuvable.");
+      const now = new Date().toISOString();
+      await tx.update(servers).set({ ownerId, updatedAt: now }).where(eq(servers.id, serverId));
+
+      // Aucun identifiant d'un tiers : c'est la première ligne que lit le
+      // nouveau titulaire.
+      await tx.insert(activityLogs).values({
+        event: auteur.event,
+        serverId,
+        actorId: auteur.actorId,
+        actorType: auteur.actorType,
+        actorLabel: auteur.actorLabel,
+        ip: auteur.ip,
+        properties: { ownerId },
+        at: now,
+      });
+
+      const invites = await tx
+        .delete(serverSubusers)
+        .where(eq(serverSubusers.serverId, serverId))
+        .returning({ userId: serverSubusers.userId });
+      const invitations = await tx
+        .delete(serverInvites)
+        .where(eq(serverInvites.serverId, serverId))
+        .returning({ id: serverInvites.id });
+      const rappels = await tx
+        .delete(webhooks)
+        .where(eq(webhooks.serverId, serverId))
+        .returning({ id: webhooks.id });
+
+      return {
+        ancien: avant.ownerId,
+        invites: invites.map((row) => row.userId),
+        invitationsRetirees: invitations.length,
+        rappelsRetires: rappels.length,
+      };
+    });
+
+    if (bilan === null) {
+      /*
+       * Un rejeu : le module de facturation a abandonné l'appel avant la
+       * réponse, et rejoue. Le bilan du changement qui a déjà eu lieu est
+       * rendu, sinon une base restée sur son ancien mot de passe ne se
+       * signalerait plus nulle part.
+       */
+      const precedent = await this.lastCleanup(serverId);
+      const deja = precedent?.ownerId === ownerId ? precedent : null;
+      return {
+        changed: false,
+        subusersRemoved: deja?.subusersRemoved ?? 0,
+        invitesRemoved: deja?.invitesRemoved ?? 0,
+        webhooksRemoved: deja?.webhooksRemoved ?? 0,
+        databasesRotated: deja?.databasesRotated ?? 0,
+        databasesNotRotated: deja?.databasesNotRotated ?? [],
+        sessionsNotClosed: deja?.sessionsNotClosed ?? [],
+      };
+    }
 
     /*
      * La configuration du daemon n'a rien à apprendre ici : la propriété est
      * une notion du panel, et Wings ne connaît qu'un identifiant de serveur,
      * un conteneur et des limites.
      *
-     * **Ses jetons de console, si.** Celui de l'ancien propriétaire vit dix
-     * minutes et Wings ne revérifie pas qui le porte : sans révocation, il
-     * gardait la console d'un serveur qui n'était plus le sien — ce que la
-     * suspension et le retrait d'un sous-utilisateur empêchent déjà. Ceux des
-     * sous-utilisateurs restent : ils sont toujours invités.
+     * **Les jetons de console, si.** Celui de l'ancien titulaire et ceux de
+     * ses invités vivent dix minutes et Wings ne revérifie pas qui les porte :
+     * sans révocation, ils gardaient la console d'un serveur qui n'était plus
+     * le leur — ce que la suspension et le retrait d'un sous-utilisateur
+     * empêchent déjà.
+     *
+     * **Les sessions SFTP aussi**, et `deauthorizeUser` est la seule façon de
+     * les couper : un client SFTP resté connecté gardait les fichiers du
+     * serveur après le transfert. Il ferme aussi les consoles, jetons compris ;
+     * la révocation par jti reste pour un Wings qui n'aurait pas cette route.
+     *
+     * Le nouveau titulaire, s'il était invité du serveur, n'est pas déconnecté
+     * de ce qui est désormais à lui.
      *
      * Un node injoignable n'annule pas le transfert : la base fait foi, et le
-     * jeton expire de lui-même.
+     * compte qui a pu garder une session ouverte est cité au bilan.
      */
-    if (avant && avant.ownerId !== ownerId) {
-      const jtis = this.tokens.revocableFor(serverId, avant.ownerId);
-      await this.wings.denyWebsocketTokens(serverId, jtis).catch(() => undefined);
+    const evinces = [bilan.ancien, ...bilan.invites].filter((userId) => userId !== ownerId);
+    const jtis = evinces.flatMap((userId) => this.tokens.revocableFor(serverId, userId));
+
+    // Les mots de passe des bases changent par l'hôte MySQL, après la
+    // transaction : un hôte lent ne doit pas tenir le verrou du serveur.
+    const bases = await this.db
+      .select({ id: databases.id, name: databases.name })
+      .from(databases)
+      .where(eq(databases.serverId, serverId));
+
+    /*
+     * **Tout part en même temps.** Chaque appel à Wings et chaque connexion à
+     * un hôte MySQL a son délai de 8 s : en série, un node muet et un hôte
+     * injoignable faisaient durer la réponse plus de 20 s, le délai du client
+     * des modules de facturation, qui affichait alors une erreur pour un
+     * transfert pourtant fait. En parallèle, le pire cas est un seul délai.
+     */
+    const [, deconnexions, renouvellements] = await Promise.all([
+      this.wings.denyWebsocketTokens(serverId, jtis).catch(() => undefined),
+      Promise.allSettled(evinces.map((userId) => this.wings.deauthorizeUser(serverId, userId))),
+      Promise.allSettled(
+        bases.map((base) => this.databasesService.rotatePassword(serverId, base.id)),
+      ),
+    ]);
+
+    const sessionsNotClosed: string[] = [];
+    deconnexions.forEach((issue, i) => {
+      const userId = evinces[i] as string;
+      if (issue.status === "fulfilled") return;
+      sessionsNotClosed.push(userId);
+      this.logger.warn(
+        `Changement de titulaire de ${serverId} : les sessions de ${userId} n'ont pas pu ` +
+          `être fermées (${raison(issue.reason)}).`,
+      );
+    });
+
+    let databasesRotated = 0;
+    const databasesNotRotated: string[] = [];
+    renouvellements.forEach((issue, i) => {
+      const nom = bases[i]?.name ?? "";
+      if (issue.status === "fulfilled") {
+        databasesRotated++;
+        return;
+      }
+      databasesNotRotated.push(nom);
+      this.logger.warn(
+        `Changement de titulaire de ${serverId} : le mot de passe de la base ${nom} ` +
+          `n'a pas pu être renouvelé (${raison(issue.reason)}).`,
+      );
+    });
+
+    const nettoyage: OwnerChangeCleanup = {
+      changed: true,
+      subusersRemoved: bilan.invites.length,
+      invitesRemoved: bilan.invitationsRetirees,
+      webhooksRemoved: bilan.rappelsRetires,
+      databasesRotated,
+      databasesNotRotated,
+      sessionsNotClosed,
+    };
+
+    await this.activity.record({
+      event: "server.owner_change_cleanup",
+      serverId,
+      actorId: auteur.actorId,
+      actorType: auteur.actorType,
+      actorLabel: auteur.actorLabel,
+      ip: auteur.ip,
+      properties: { ownerId, previousOwnerId: bilan.ancien, ...nettoyage },
+    });
+
+    return nettoyage;
+  }
+
+  /**
+   * Le bilan du dernier changement de titulaire, s'il concerne le titulaire
+   * actuel : aucun changement n'a eu lieu depuis.
+   *
+   * Lu dans le journal, qui est la seule trace durable du nettoyage : c'est ce
+   * que rend un rejeu, et ce que la fiche d'administration signale.
+   */
+  private async lastCleanup(
+    serverId: string,
+  ): Promise<(OwnerChangeCleanup & { ownerId: string; at: string }) | null> {
+    const [ligne] = await this.db
+      .select({ properties: activityLogs.properties, at: activityLogs.at })
+      .from(activityLogs)
+      .where(
+        and(
+          eq(activityLogs.serverId, serverId),
+          eq(activityLogs.event, "server.owner_change_cleanup"),
+          sql`${activityLogs.at} >= coalesce((
+            select max(a.at) from activity_logs a
+            where a.server_id = ${serverId}
+              and a.event in (${sql.join(
+                SERVER_OWNER_CHANGE_EVENTS.map((event) => sql`${event}`),
+                sql`, `,
+              )})
+          ), '-infinity'::timestamptz)`,
+        ),
+      )
+      .orderBy(desc(activityLogs.at))
+      .limit(1);
+    if (!ligne) return null;
+
+    const p = (ligne.properties ?? {}) as Record<string, unknown>;
+    const nombre = (v: unknown) => (typeof v === "number" ? v : 0);
+    const textes = (v: unknown) =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    return {
+      ownerId: typeof p.ownerId === "string" ? p.ownerId : "",
+      at: ligne.at,
+      changed: true,
+      subusersRemoved: nombre(p.subusersRemoved),
+      invitesRemoved: nombre(p.invitesRemoved),
+      webhooksRemoved: nombre(p.webhooksRemoved),
+      databasesRotated: nombre(p.databasesRotated),
+      databasesNotRotated: textes(p.databasesNotRotated),
+      sessionsNotClosed: textes(p.sessionsNotClosed),
+    };
+  }
+
+  /**
+   * Ce que le dernier changement de titulaire a laissé derrière lui, pour la
+   * fiche d'administration.
+   *
+   * Une base reste signalée tant que son mot de passe n'a pas changé depuis ;
+   * les sessions que le node n'a pas confirmées restent signalées, avec la
+   * date, jusqu'au changement suivant : rien ne dit au panel qu'elles se sont
+   * fermées depuis.
+   */
+  private async ownerChangeLeftovers(serverId: string): Promise<OwnerChangeLeftovers | null> {
+    const dernier = await this.lastCleanup(serverId);
+    if (!dernier) return null;
+
+    let databasesNotRotated: string[] = [];
+    if (dernier.databasesNotRotated.length > 0) {
+      const restees = await this.db
+        .select({ name: databases.name })
+        .from(databases)
+        .where(
+          and(
+            eq(databases.serverId, serverId),
+            inArray(databases.name, dernier.databasesNotRotated),
+            lte(databases.updatedAt, dernier.at),
+          ),
+        );
+      databasesNotRotated = restees.map((row) => row.name).sort();
     }
+    const sessionsNotClosed = dernier.sessionsNotClosed.length;
+    if (databasesNotRotated.length === 0 && sessionsNotClosed === 0) return null;
+    return { at: dernier.at, databasesNotRotated, sessionsNotClosed };
   }
 
   /**
@@ -560,4 +874,8 @@ export function unresolvedIn(template: string, environment: Record<string, strin
     if (name && (environment[name] ?? "") === "") missing.add(name);
   }
   return [...missing];
+}
+
+function raison(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

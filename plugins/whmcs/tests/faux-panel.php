@@ -125,7 +125,11 @@ if (preg_match('#^/api/v1/application/servers/([^/]+)/owner$#', $chemin, $m) && 
     if ($m[1] === 'deja-parti') {
         repond(404, ['message' => 'Serveur introuvable.']);
     }
-    repond(201, ['data' => ['serverId' => $m[1], 'ownerId' => $corps['ownerId'] ?? null]]);
+    repond(201, ['data' => [
+        'serverId' => $m[1],
+        'ownerId' => $corps['ownerId'] ?? null,
+        'cleanup' => $etat['bilan'] ?? [],
+    ]]);
 }
 
 if (preg_match('#^/api/v1/application/servers/([^/]+)$#', $chemin, $m) && $methode === 'DELETE') {

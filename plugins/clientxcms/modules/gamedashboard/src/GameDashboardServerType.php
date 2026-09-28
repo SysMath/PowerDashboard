@@ -202,8 +202,9 @@ class GameDashboardServerType extends AbstractServerType implements ServerTypeIn
      * geste, l'ancien titulaire garderait l'accès à un serveur qui ne lui
      * appartient plus, et le nouveau ne le verrait pas.
      *
-     * Le panel ferme les consoles ouvertes de l'ancien titulaire et laisse les
-     * sous-utilisateurs en place. Rejouer le changement ne fait rien de plus.
+     * Le panel efface ce que l'ancien titulaire avait installé autour du
+     * serveur : sous-utilisateurs, rappels sortants, mots de passe des bases,
+     * sessions SFTP et consoles ouvertes. Rejouer le changement ne fait rien de plus.
      */
     public function changeCustomer(Service $service, Customer $customer): ServiceStateChangeDTO
     {
@@ -226,9 +227,17 @@ class GameDashboardServerType extends AbstractServerType implements ServerTypeIn
                 );
             }
 
-            $client->setServerOwner($id, (string) $compte['id']);
+            $reponse = $client->setServerOwner($id, (string) $compte['id']);
 
-            return new ServiceStateChangeDTO($service, true, 'Serveur transféré au nouveau client sur GameDashboard.');
+            // Le transfert a eu lieu : ce qui n'a pas pu être nettoyé se dit
+            // dans le message, sans faire échouer le changement.
+            $avertissement = \GameDashboardClient::ownerChangeWarning($reponse);
+
+            return new ServiceStateChangeDTO(
+                $service,
+                true,
+                $avertissement !== '' ? $avertissement : 'Serveur transféré au nouveau client sur GameDashboard.'
+            );
         } catch (\GameDashboardNotFound $e) {
             return new ServiceStateChangeDTO(
                 $service,

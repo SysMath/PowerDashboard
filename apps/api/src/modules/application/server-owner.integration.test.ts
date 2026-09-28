@@ -1,4 +1,13 @@
-import { applicationKeys, type Database, serverSubusers, servers, users } from "@gamedashboard/db";
+import {
+  activityLogs,
+  applicationKeys,
+  type Database,
+  databaseHosts,
+  databases,
+  serverSubusers,
+  servers,
+  users,
+} from "@gamedashboard/db";
 import {
   BadRequestException,
   ConflictException,
@@ -13,10 +22,11 @@ import {
   HAS_DATABASE,
   type ThrowawayDatabase,
 } from "../../test/throwaway-database";
-import type { ActivityService } from "../activity/activity.service";
+import { ActivityService } from "../activity/activity.service";
 import type { AdminActionsService } from "../admin/admin-actions.service";
 import { AdminServerService } from "../admin/admin-server.service";
 import type { BillingSsoService } from "../auth/billing-sso.service";
+import type { DatabasesService } from "../client/databases.service";
 import type { ServerResizeService } from "../client/server-resize.service";
 import type { BrandingService } from "../reseller/branding.service";
 import type { ResellerQuotaService } from "../reseller/reseller-quota.service";
@@ -44,8 +54,12 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
   let throwaway: ThrowawayDatabase;
   let db: Database;
 
-  const wings = { denyWebsocketTokens: vi.fn(async () => undefined) };
-  const activity = { record: vi.fn(async () => undefined) };
+  const wings = {
+    denyWebsocketTokens: vi.fn(async () => undefined),
+    deauthorizeUser: vi.fn(async () => undefined),
+  };
+  const rotation = vi.fn(async () => "nouveau");
+  const activity = { record: vi.fn(async (_input: unknown): Promise<void> => undefined) };
   let controleur: ApplicationController;
 
   let revendeur: string;
@@ -91,9 +105,13 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
 
   beforeEach(async () => {
     await db.execute(
-      sql.raw(`truncate table servers, allocations, eggs, nests, nodes, locations, users cascade`),
+      sql.raw(
+        `truncate table activity_logs, servers, allocations, eggs, nests, nodes, locations, users cascade`,
+      ),
     );
     vi.clearAllMocks();
+    activity.record.mockReset();
+    activity.record.mockResolvedValue(undefined);
 
     const tokens = new WingsTokenService(db);
     controleur = new ApplicationController(
@@ -106,7 +124,13 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
       new ResellerScopeService(db),
       {} as BrandingService,
       {} as ServerResizeService,
-      new AdminServerService(db, wings as unknown as WingsClientService, tokens),
+      new AdminServerService(
+        db,
+        wings as unknown as WingsClientService,
+        tokens,
+        { rotatePassword: rotation } as unknown as DatabasesService,
+        activity as unknown as ActivityService,
+      ),
     );
 
     revendeur = await seedUser(db);
@@ -123,17 +147,127 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
 
     const reponse = await controleur.setServerOwner(requete(null), serveur, { ownerId: nouveau });
 
-    expect(reponse).toEqual({ data: { serverId: serveur, ownerId: nouveau } });
-    expect(await titulaire(serveur)).toBe(nouveau);
-    expect(activity.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event: "application.server_owner_changed",
+    expect(reponse).toEqual({
+      data: {
         serverId: serveur,
+        ownerId: nouveau,
+        cleanup: {
+          changed: true,
+          subusersRemoved: 0,
+          invitesRemoved: 0,
+          webhooksRemoved: 0,
+          databasesRotated: 0,
+          databasesNotRotated: [],
+          sessionsNotClosed: 0,
+        },
+      },
+    });
+    expect(await titulaire(serveur)).toBe(nouveau);
+    // La ligne du changement, écrite avec lui : sans identifiant de tiers,
+    // c'est la première que lit le nouveau titulaire.
+    const lignes = await db
+      .select({
+        event: activityLogs.event,
+        actorType: activityLogs.actorType,
+        actorLabel: activityLogs.actorLabel,
+        properties: activityLogs.properties,
+      })
+      .from(activityLogs)
+      .where(eq(activityLogs.serverId, serveur));
+    expect(lignes).toEqual([
+      {
+        event: "application.server_owner_changed",
         actorType: "api_key",
         actorLabel: "application:Boutique",
         properties: { ownerId: nouveau },
+      },
+    ]);
+    // Le bilan, à part, pour l'administration.
+    expect(activity.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "server.owner_change_cleanup",
+        serverId: serveur,
+        actorType: "api_key",
+        actorLabel: "application:Boutique",
+        properties: expect.objectContaining({ ownerId: nouveau, previousOwnerId: ancien }),
       }),
     );
+  });
+
+  it("le nouveau titulaire ne lit plus le journal de l'ancien, par ce chemin aussi", async () => {
+    const nouveau = await seedUser(db);
+    await db.insert(activityLogs).values({
+      event: "server.command",
+      serverId: serveur,
+      actorId: ancien,
+      actorType: "user",
+      actorLabel: "ancien@exemple.fr",
+      ip: "192.0.2.55",
+      properties: {},
+      at: new Date(Date.now() - 60_000).toISOString(),
+    });
+
+    await controleur.setServerOwner(requete(null), serveur, { ownerId: nouveau });
+
+    const vu = await new ActivityService(db).forServer(serveur, { revealIp: true });
+    expect(vu.items.map((item) => item.event)).toEqual(["application.server_owner_changed"]);
+  });
+
+  it("un rejeu rend le bilan du changement déjà fait, pour la facturation qui a abandonné l'appel", async () => {
+    const nouveau = await seedUser(db);
+    const [hote] = await db
+      .insert(databaseHosts)
+      .values({ name: "hôte", host: "127.0.0.1", username: "racine", passwordEnc: "x" })
+      .returning({ id: databaseHosts.id });
+    await db.insert(databases).values({
+      serverId: serveur,
+      databaseHostId: hote?.id ?? "",
+      name: "s1_creatif",
+      username: "u_creatif",
+      passwordEnc: "x",
+    });
+    rotation.mockRejectedValueOnce(new Error("hôte injoignable"));
+    // Le bilan passe par le vrai journal : c'est lui que relit le rejeu.
+    const journal = new ActivityService(db);
+    activity.record.mockImplementation((input) => journal.record(input as never));
+
+    await controleur.setServerOwner(requete(null), serveur, { ownerId: nouveau });
+    const rejeu = await controleur.setServerOwner(requete(null), serveur, { ownerId: nouveau });
+
+    expect(rejeu.data.cleanup).toMatchObject({
+      changed: false,
+      databasesNotRotated: ["s1_creatif"],
+      sessionsNotClosed: 0,
+    });
+    expect(rotation).toHaveBeenCalledTimes(1);
+  });
+
+  it("la réponse dit à la facturation ce qui n'a pas pu être nettoyé", async () => {
+    const nouveau = await seedUser(db);
+    const [hote] = await db
+      .insert(databaseHosts)
+      .values({ name: "hôte", host: "127.0.0.1", username: "racine", passwordEnc: "x" })
+      .returning({ id: databaseHosts.id });
+    await db.insert(databases).values({
+      serverId: serveur,
+      databaseHostId: hote?.id ?? "",
+      name: "s1_boutique",
+      username: "u_boutique",
+      passwordEnc: "x",
+    });
+    rotation.mockRejectedValueOnce(new Error("hôte injoignable"));
+    wings.deauthorizeUser.mockRejectedValueOnce(new Error("node injoignable"));
+
+    const reponse = await controleur.setServerOwner(requete(null), serveur, { ownerId: nouveau });
+
+    // Le transfert a eu lieu ; le bilan nomme la base, et ne fait que
+    // compter les comptes : un invité n'est pas forcément un client de la clé.
+    expect(await titulaire(serveur)).toBe(nouveau);
+    expect(reponse.data.cleanup).toMatchObject({
+      databasesRotated: 0,
+      databasesNotRotated: ["s1_boutique"],
+      sessionsNotClosed: 1,
+    });
   });
 
   it("le revendeur hébergeur reste : il dit qui héberge, pas qui possède", async () => {

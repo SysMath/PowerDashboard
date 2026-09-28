@@ -134,6 +134,9 @@ import { SubusersService } from "./subusers.service";
     // regardée.
     ServerResizeService,
     BackupsService,
+    // Pour le changement de titulaire : les mots de passe des bases changent
+    // avec lui, par le même chemin que le bouton du client.
+    DatabasesService,
   ],
 })
 export class ClientModule {}

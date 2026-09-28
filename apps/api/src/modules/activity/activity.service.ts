@@ -1,7 +1,12 @@
-import type { AuditExportFormat, AuditFilters } from "@gamedashboard/contracts";
+import {
+  type AuditExportFormat,
+  type AuditFilters,
+  SERVER_ADMIN_ONLY_EVENTS,
+  SERVER_OWNER_CHANGE_EVENTS,
+} from "@gamedashboard/contracts";
 import { activityLogs, type Database, servers, users } from "@gamedashboard/db";
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { and, desc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, notInArray, or, type SQL, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 import { type AuditExportFile, auditExportFile } from "./audit-export";
 
@@ -168,7 +173,26 @@ export class ActivityService {
     // Fermé par défaut : un appelant qui oublie la question ne montre rien.
     const revealIp = options.revealIp === true;
 
-    const conditions = [eq(activityLogs.serverId, serverId)];
+    const conditions = [
+      eq(activityLogs.serverId, serverId),
+      /*
+       * Rien d'avant le dernier changement de titulaire : ces lignes sont
+       * celles de l'ancien — ses gestes, ses adresses IP — et le nouveau n'a
+       * pas à les lire. L'administration les garde toutes (`forPlatform`).
+       * La ligne du changement elle-même reste : c'est le début de l'histoire
+       * du nouveau titulaire.
+       */
+      sql`${activityLogs.at} >= coalesce((
+        select max(a.at) from activity_logs a
+        where a.server_id = ${serverId}
+          and a.event in (${sql.join(
+            SERVER_OWNER_CHANGE_EVENTS.map((event) => sql`${event}`),
+            sql`, `,
+          )})
+      ), '-infinity'::timestamptz)`,
+      // Le bilan du changement nomme l'ancien titulaire et ses invités.
+      notInArray(activityLogs.event, [...SERVER_ADMIN_ONLY_EVENTS]),
+    ];
     if (search) {
       const pattern = `%${search}%`;
       const ipMatch = or(

@@ -33,6 +33,17 @@ const WRITES: Route[] = [...ADMIN_CONTROLLERS, ResellerController]
 /** `activity.record(…)`, l'aide `trace(…)`, `traceBinding(…)`, ou l'export consigné. */
 const CONSIGNE = /\.record\(|\.trace\w*\(|\.exportPlatform\(/;
 
+/*
+ * Les routes dont le service écrit lui-même la ligne, et pourquoi. Le
+ * changement de propriétaire l'écrit dans la transaction du changement : c'est
+ * cette ligne qui cache l'ancien journal au nouveau titulaire, et elle ne doit
+ * pas pouvoir manquer (`AdminServerService.setOwner`, testé dans
+ * `server-owner.integration.test.ts`).
+ */
+const CONSIGNE_PAR_LE_SERVICE: Record<string, RegExp> = {
+  "AdminController.setServerOwner": /\.setOwner\([^)]*event: "admin\.server_owner_changed"/s,
+};
+
 describe("gestes d'administration consignés", () => {
   it("relève les routes d'écriture", () => {
     expect(WRITES.length).toBeGreaterThan(60);
@@ -40,8 +51,8 @@ describe("gestes d'administration consignés", () => {
 
   it.each(WRITES.map((route) => [routeLabel(route), route] as const))(
     "%s consigne son geste",
-    (_, route) => {
-      expect(route.handler.toString()).toMatch(CONSIGNE);
+    (label, route) => {
+      expect(route.handler.toString()).toMatch(CONSIGNE_PAR_LE_SERVICE[label] ?? CONSIGNE);
     },
   );
 });

@@ -180,8 +180,12 @@ export class GameDashboardClient {
   /**
    * Changer le titulaire : le service a changé de client chez le facturier.
    * `ownerId` est l'identifiant du compte **dans le panel** — celui que rend
-   * `POST /users` ou `GET /users?externalId=`. Rejouer l'appel ne fait rien de
-   * plus.
+   * `POST /users` ou `GET /users?externalId=`. Sous-utilisateurs, rappels
+   * sortants et mots de passe des bases de l'ancien titulaire ne suivent pas,
+   * ses sessions sont fermées. La réponse porte le bilan (`data.cleanup`) :
+   * `databasesNotRotated` nomme les bases restées sur leur ancien mot de
+   * passe. Rejouer l'appel ne fait rien de plus, et rend le bilan du
+   * changement déjà fait (`changed: false`).
    */
   setServerOwner(serverId: string, ownerId: string): Promise<unknown> {
     return this.call("POST", `/api/v1/application/servers/${encodeURIComponent(serverId)}/owner`, {
