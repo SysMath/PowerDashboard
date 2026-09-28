@@ -26,12 +26,14 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 import { isUuid } from "../../common/uuid";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
+import { ResellerScopeService } from "../application/reseller-scope.service";
 import { ResellerQuotaService } from "../reseller/reseller-quota.service";
 import { WebhookEmitterService } from "../webhooks/webhook-emitter.service";
 import { WingsClientService } from "../wings/wings-client.service";
@@ -418,6 +420,19 @@ export class ServerProvisioningService {
       throw new ForbiddenException("Vous ne pouvez créer un serveur que sur votre propre compte.");
     }
 
+    /*
+     * Un revendeur reçoit la même réponse pour un compte qui n'existe pas et
+     * pour un compte qui n'est pas à lui : deux messages lui disaient qu'un
+     * identifiant désigne un compte du panel. Un identifiant illisible est
+     * refusé avant la base, qui répondait 500.
+     */
+    const horsPerimetre = new ForbiddenException(
+      "Ce compte n'est pas l'un de vos clients : il ne peut pas recevoir de serveur de votre part.",
+    );
+    const inconnu =
+      mode === "assisted" ? horsPerimetre : new BadRequestException("Compte destinataire inconnu.");
+    if (!isUuid(requested)) throw inconnu;
+
     const [target] = await this.db
       .select({
         id: users.id,
@@ -428,41 +443,29 @@ export class ServerProvisioningService {
       .where(eq(users.id, requested))
       .limit(1);
 
-    if (!target) throw new BadRequestException("Compte destinataire inconnu.");
+    if (!target) throw inconnu;
 
     /*
-     * Un revendeur ne sert que ses clients, ou des comptes qui ne sont à
-     * personne.
+     * Un revendeur ne sert que ses propres comptes : la règle de la clé de
+     * sa boutique (`ResellerScopeService.requireRecipient`), et la même.
      *
-     * « À personne » est la situation normale d'un client tout neuf : le
-     * rattachement se lit sur les serveurs, et il n'en a pas encore. Le
-     * refuser rendrait impossible la première livraison, c'est-à-dire toutes.
+     * Poser un serveur à un compte le fait entrer dans son périmètre — et de
+     * là, sa console, ses fichiers et un lien de connexion à son nom. Cet
+     * écran ne vérifiait que les serveurs possédés ailleurs : un compte
+     * invité sur le serveur d'un autre, un compte suspendu, un administrateur
+     * ou un autre revendeur recevaient un serveur, après quoi la clé de la
+     * boutique lisait la fiche et ouvrait la session. Une seule règle, pour
+     * les deux portes.
      *
-     * Ce qui est refusé, c'est le compte qui possède déjà un serveur **chez un
-     * autre revendeur**. Sans cette borne, poser un serveur à un inconnu le
-     * ferait entrer dans son périmètre — et de là, sa console, ses fichiers et
-     * un lien de connexion à son nom. On annexerait un client en lui offrant
-     * un cadeau.
+     * Le refus est dit ici en clair : c'est l'écran du revendeur, qui a
+     * désigné ce compte lui-même. Il ne dit pas si le compte existe.
      */
     if (mode === "assisted") {
-      const [ailleurs] = await this.db
-        .select({ id: servers.id })
-        .from(servers)
-        .where(
-          and(
-            eq(servers.ownerId, target.id),
-            // `is distinct from` et non `<>` : avec `<>`, un serveur sans
-            // revendeur — donc de la plateforme — ne correspondrait pas, et le
-            // client de la plateforme resterait annexable.
-            sql`${servers.resellerId} is distinct from ${requester.id}`,
-          ),
-        )
-        .limit(1);
-
-      if (ailleurs) {
-        throw new ForbiddenException(
-          "Ce compte est déjà servi par un autre hébergeur. Il ne peut pas recevoir de serveur de votre part.",
-        );
+      try {
+        await new ResellerScopeService(this.db).requireRecipient(requester.id, target.id);
+      } catch (error) {
+        if (error instanceof NotFoundException) throw horsPerimetre;
+        throw error;
       }
     }
 

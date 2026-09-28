@@ -4,11 +4,13 @@ import {
   type Database,
   eggs,
   nests,
+  resellerCustomers,
   resellerQuotas,
+  serverSubusers,
   servers,
   users,
 } from "@gamedashboard/db";
-import { ConflictException } from "@nestjs/common";
+import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { count, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
@@ -228,5 +230,66 @@ describe.skipIf(!HAS_DATABASE)("ServerProvisioningService — enveloppe du reven
       expect((issue as PromiseRejectedResult).reason).toBeInstanceOf(ConflictException);
     }
     expect(await serveursDuRevendeur()).toBe(2);
+  });
+  /*
+   * L'espace revendeur donne un serveur selon la règle de la clé de sa
+   * boutique. Il ne regardait que les serveurs possédés ailleurs : un compte
+   * invité à la plateforme, un administrateur ou un autre revendeur
+   * recevaient un serveur, après quoi la clé lisait la fiche et ouvrait la
+   * session.
+   */
+  describe("destinataire désigné depuis l'espace revendeur", () => {
+    const destinataire = (ownerId: string) =>
+      (
+        service as unknown as {
+          resolveOwner: (r: unknown, m: string, o: string) => Promise<string>;
+        }
+      ).resolveOwner({ id: revendeur, role: "reseller" }, "assisted", ownerId);
+
+    it("refuse un compte qui n'est pas à lui : invité ailleurs, inscrit, personnel, revendeur", async () => {
+      const inviteAilleurs = await seedUser(db);
+      const aLaPlateforme = await seedServer(db, { nodeId, ownerId: await seedUser(db) });
+      await db.update(servers).set({ resellerId: null }).where(eq(servers.id, aLaPlateforme));
+      await db.insert(serverSubusers).values({ serverId: aLaPlateforme, userId: inviteAilleurs });
+      const inscrit = await seedUser(db);
+      const administrateur = await seedUser(db);
+      await db.update(users).set({ role: "admin" }).where(eq(users.id, administrateur));
+      const confrere = await seedUser(db);
+      await db
+        .update(users)
+        .set({ role: "reseller", platformAccess: "provision" })
+        .where(eq(users.id, confrere));
+
+      for (const cible of [inviteAilleurs, inscrit, administrateur, confrere]) {
+        await expect(destinataire(cible)).rejects.toBeInstanceOf(ForbiddenException);
+      }
+    });
+
+    it("même réponse pour un compte inexistant, hors de son périmètre ou illisible", async () => {
+      const ailleurs = await seedUser(db);
+      const refus = async (cible: string) => {
+        const erreur = await destinataire(cible).catch((e: unknown) => e);
+        expect(erreur).toBeInstanceOf(ForbiddenException);
+        return (erreur as ForbiddenException).message;
+      };
+
+      const messages = new Set([
+        await refus(ailleurs),
+        await refus("5f7c2d1e-8a0b-4c3d-9e2f-1a2b3c4d5e6f"),
+        // PostgreSQL refusait la conversion : 500.
+        await refus("abc"),
+      ]);
+      expect(messages.size).toBe(1);
+    });
+
+    it("accepte son client et le compte que sa boutique a créé", async () => {
+      const cree = await seedUser(db);
+      await db
+        .insert(resellerCustomers)
+        .values({ userId: cree, resellerId: revendeur, origin: "api" });
+
+      await expect(destinataire(client)).resolves.toBe(client);
+      await expect(destinataire(cree)).resolves.toBe(cree);
+    });
   });
 });

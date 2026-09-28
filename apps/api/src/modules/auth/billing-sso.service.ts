@@ -34,9 +34,11 @@ import { AuthTokenRepository } from "./auth-token.repository";
  * 1. **Le compte doit exister.** Le plugin le crée à la commande ; le panel ne
  *    fabrique personne sur présentation d'un identifiant. Rien n'apparaît ici
  *    qui n'ait été commandé.
- * 2. **Jamais un compte du personnel.** Une clé applicative qui fuite doit
- *    pouvoir provisionner, pas devenir administrateur du panel. C'est la seule
- *    escalade que ce chemin rendrait possible, et elle est fermée d'emblée.
+ * 2. **Jamais un compte du personnel ni d'un revendeur.** Une clé
+ *    applicative qui fuite doit pouvoir provisionner, pas devenir
+ *    administrateur du panel ni revendeur à la place d'un revendeur. Ce sont
+ *    les escalades que ce chemin rendrait possibles, et elles sont fermées
+ *    d'emblée.
  * 3. **Le lien vit deux minutes et ne sert qu'une fois**, comme un jeton de
  *    réinitialisation — parce que c'en est un, techniquement, et qu'il ouvre
  *    davantage.
@@ -49,6 +51,14 @@ export interface BillingSsoLink {
   url: string;
   expiresAt: string;
 }
+
+/**
+ * Le refus de l'absence, et celui de tout compte qui n'est pas à la clé : les
+ * deux doivent se confondre.
+ */
+const AUCUN_COMPTE =
+  "Aucun compte ne correspond. Créez-le d'abord par POST /api/v1/application/users : " +
+  "le panel n'ouvre pas de session pour un client qu'il ne connaît pas.";
 
 @Injectable()
 export class BillingSsoService {
@@ -111,33 +121,24 @@ export class BillingSsoService {
       // Message explicite : c'est l'erreur que fera tout intégrateur qui croit
       // que le panel crée le compte à la volée. Lui dire quoi faire ici épargne
       // une lecture de la documentation au moment où il est bloqué.
-      throw new NotFoundException(
-        "Aucun compte ne correspond. Créez-le d'abord par POST /api/v1/application/users : " +
-          "le panel n'ouvre pas de session pour un client qu'il ne connaît pas.",
-      );
+      throw new NotFoundException(AUCUN_COMPTE);
     }
 
     /*
-     * Un compte suspendu ne reçoit pas de lien.
+     * **Pour une clé de revendeur, le périmètre d'abord.**
      *
-     * La session serait de toute façon refusée à la consommation
-     * (`SessionIssuerService`) ; le dire dès l'émission épargne au facturier
-     * de rediriger son client vers une page d'erreur, et lui donne une raison
-     * lisible à afficher de son côté.
+     * Les refus qui suivent (compte suspendu, personnel, revendeur) disent
+     * quelque chose du compte. Rendus avant le périmètre, ils apprenaient à
+     * une clé qu'un compte qui n'est pas à elle existe, et qu'il est suspendu
+     * ou qu'il appartient au personnel. Hors de son périmètre, elle ne reçoit
+     * que le refus de l'absence ; le personnel et les revendeurs, qui ne sont
+     * jamais les clients d'un revendeur, en sont hors par nature.
      */
-    if (compte.suspendedAt !== null) {
-      throw new ForbiddenException(
-        "Ce compte est suspendu dans le panel : aucun lien de connexion n'est émis tant qu'il n'est pas réactivé.",
-      );
-    }
-
-    if (PERSONNEL.has(compte.role)) {
-      throw new ForbiddenException(
-        "Ce compte appartient au personnel du panel : il ne se connecte pas depuis la facturation.",
-      );
-    }
-
     if (resellerId !== null) {
+      if (compte.role !== "user") {
+        throw new NotFoundException(AUCUN_COMPTE);
+      }
+
       /*
        * Une clé de revendeur n'ouvre que les comptes **entièrement** à lui.
        *
@@ -163,12 +164,50 @@ export class BillingSsoService {
         .from(servers)
         .where(eq(servers.ownerId, compte.id));
 
+      /*
+       * Le chemin en deux temps (donner un serveur à un compte qui n'est à
+       * personne, puis demander sa session) est fermé à la création :
+       * `requireRecipient` n'accepte qu'un compte que ce revendeur servait
+       * déjà ou avait créé.
+       */
       if (parcs.length !== 1 || parcs[0]?.resellerId !== resellerId) {
-        throw new NotFoundException(
-          "Aucun compte ne correspond. Créez-le d'abord par POST /api/v1/application/users : " +
-            "le panel n'ouvre pas de session pour un client qu'il ne connaît pas.",
-        );
+        throw new NotFoundException(AUCUN_COMPTE);
       }
+    }
+
+    /*
+     * Un compte suspendu ne reçoit pas de lien.
+     *
+     * La session serait de toute façon refusée à la consommation
+     * (`SessionIssuerService`) ; le dire dès l'émission épargne au facturier
+     * de rediriger son client vers une page d'erreur, et lui donne une raison
+     * lisible à afficher de son côté.
+     */
+    if (compte.suspendedAt !== null) {
+      throw new ForbiddenException(
+        "Ce compte est suspendu dans le panel : aucun lien de connexion n'est émis tant qu'il n'est pas réactivé.",
+      );
+    }
+
+    if (PERSONNEL.has(compte.role)) {
+      throw new ForbiddenException(
+        "Ce compte appartient au personnel du panel : il ne se connecte pas depuis la facturation.",
+      );
+    }
+
+    /*
+     * Ni un compte revendeur, quelle que soit la clé.
+     *
+     * Sa session ouvre son espace de revendeur : ses clients, ses machines,
+     * sa marque, ses clés. Une clé de confrère qui le sert entièrement
+     * l'obtenait (tous ses serveurs chez elle), et une clé de plateforme
+     * aussi. Comme pour le personnel, un revendeur se connecte par ses
+     * propres moyens, second facteur compris.
+     */
+    if (compte.role === "reseller") {
+      throw new ForbiddenException(
+        "Ce compte est celui d'un revendeur : il ne se connecte pas depuis la facturation.",
+      );
     }
 
     const emis = await this.tokens.issue(compte.id, "billing_sso", null);

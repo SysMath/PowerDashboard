@@ -430,6 +430,46 @@ export const resellerQuotas = pgTable("reseller_quotas", {
 });
 
 /**
+ * Le revendeur qui a créé un compte, par la clé applicative de sa boutique.
+ *
+ * Le périmètre d'une clé de revendeur se lisait **seulement** sur les
+ * serveurs : un compte était à lui dès qu'il en possédait un chez lui. La clé
+ * pouvait donc créer un serveur chez un compte qui n'était à personne, puis le
+ * lire, le modifier et lui ouvrir une session. Le destinataire d'un serveur
+ * doit désormais être déjà à ce revendeur : un client qu'il sert, ou un compte
+ * qu'il a créé. Cette table dit le second, que les serveurs ne disent pas
+ * encore — le compte que la boutique vient d'ouvrir pour une commande.
+ *
+ * **Un créateur par compte**, d'où la clé primaire sur `user_id` : l'adresse
+ * est unique, un compte ne naît qu'une fois. Rien ne s'écrit pour un compte
+ * créé par la plateforme, l'administration ou l'inscription : il n'est à
+ * aucun revendeur tant qu'aucun ne le sert.
+ *
+ * `cascade` des deux côtés : un compte supprimé n'a plus de créateur, et un
+ * revendeur supprimé n'a plus de clé pour s'en prévaloir.
+ */
+export const resellerCustomers = pgTable(
+  "reseller_customers",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    resellerId: uuid("reseller_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * D'où vient la ligne : `api` (créé par `POST /users` d'une clé de ce
+     * revendeur) ou `journal` (retrouvé à la migration dans la trace de
+     * création). Rien ne la lit pour décider ; elle dit à un administrateur
+     * pourquoi ce compte est rattaché.
+     */
+    origin: varchar("origin", { length: 16 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("reseller_customers_reseller_idx").on(table.resellerId)],
+);
+
+/**
  * Clés de l'API applicative (§5.2).
  *
  * Table distincte d'`api_keys`, et non une colonne « type » sur celle-ci : les

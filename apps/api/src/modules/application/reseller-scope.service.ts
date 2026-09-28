@@ -10,6 +10,8 @@ interface Rattachement {
   suspendu: boolean;
   /** Possède au moins un serveur hébergé par ce revendeur. */
   possedeIci: boolean;
+  /** A été créé par une clé de ce revendeur (`reseller_customers`). */
+  creeIci: boolean;
   /** Possède au moins un serveur hébergé ailleurs : confrère ou plateforme. */
   possedeAilleurs: boolean;
   /** Est sous-utilisateur d'au moins un serveur hébergé ailleurs. */
@@ -32,11 +34,12 @@ interface Rattachement {
  * colonne que le modèle n'a pas et qui mentirait dès qu'un client achète
  * ailleurs.
  *
- * Conséquence assumée : **un compte tout neuf n'est à personne**. Une clé de
- * revendeur peut le créer — c'est ce que fait sa boutique à la commande — mais
- * ne peut ni le lire ni ouvrir sa session tant qu'il n'a pas de serveur chez
- * elle. C'est la bonne direction pour se tromper : on refuse trop, jamais trop
- * peu.
+ * **Sauf le compte qu'il a créé** (`reseller_customers`), que les serveurs ne
+ * disent pas encore : celui que sa boutique vient d'ouvrir pour une commande.
+ * Un compte est donc à ce revendeur s'il le **sert** (un serveur chez lui) ou
+ * s'il l'a **créé**, et à aucun autre titre. Avant, un compte sans serveur
+ * était à qui voulait lui en donner un : la clé créait un serveur chez un
+ * compte qui n'était à personne, puis lui ouvrait une session.
  */
 @Injectable()
 export class ResellerScopeService {
@@ -48,7 +51,7 @@ export class ResellerScopeService {
    * Une clé de plateforme (`resellerId` nul) passe sans contrôle : c'est son
    * rôle, et c'est le comportement qu'avaient toutes les clés jusqu'ici.
    *
-   * **Seul un compte client** en relève. Un membre du personnel ou un
+   * Un compte qu'il sert ou qu'il a créé. **Seul un compte client** en relève. Un membre du personnel ou un
    * revendeur qui posséderait un serveur chez ce revendeur n'est pas son
    * client pour autant, et sa fiche ne lui est pas lisible.
    *
@@ -64,7 +67,7 @@ export class ResellerScopeService {
     if (resellerId === null) return;
 
     const compte = await this.rattachement(resellerId, userId);
-    if (compte?.role !== "user" || !compte.possedeIci) {
+    if (compte?.role !== "user" || !(compte.possedeIci || compte.creeIci)) {
       throw new NotFoundException("Compte introuvable.");
     }
   }
@@ -83,7 +86,15 @@ export class ResellerScopeService {
     if (resellerId === null) return;
 
     const compte = await this.rattachement(resellerId, userId);
-    if (compte?.role !== "user" || !compte.possedeIci || compte.possedeAilleurs) {
+    if (
+      compte?.role !== "user" ||
+      !(compte.possedeIci || compte.creeIci) ||
+      compte.possedeAilleurs ||
+      // Même règle que le destinataire d'un serveur : créé ici mais sans
+      // serveur ici, et invité chez un confrère, le compte sert ailleurs.
+      // Le supprimer retirait au passage l'accès de l'équipe du confrère.
+      (compte.inviteAilleurs && !compte.possedeIci)
+    ) {
       throw new NotFoundException("Compte introuvable.");
     }
   }
@@ -114,12 +125,14 @@ export class ResellerScopeService {
    * client d'un confrère ou un administrateur, dont elle lisait puis
    * réécrivait la fiche.
    *
-   * Le destinataire doit donc être un compte client, non suspendu, qui n'est
-   * rattaché à personne d'autre : aucun serveur possédé ailleurs, et, s'il
-   * n'est pas encore client ici, aucune invitation sur un serveur d'ailleurs.
-   * Un compte **sans aucun serveur** est accepté : c'est celui que la
-   * boutique vient de créer pour une commande ou un changement de titulaire,
-   * et le refuser rendrait les deux impossibles.
+   * Le destinataire doit donc être un compte client, non suspendu, **déjà à
+   * ce revendeur avant la requête** — un client qu'il sert, ou un compte que
+   * sa clé a créé — et rattaché à personne d'autre : aucun serveur possédé
+   * ailleurs, et, s'il n'est pas encore servi ici, aucune invitation sur un
+   * serveur d'ailleurs. Le compte que la boutique vient de créer pour une
+   * commande ou un changement de titulaire passe ainsi ; un compte sans
+   * serveur qui n'est à personne, non : c'était la première marche du chemin
+   * vers `users.sso`.
    *
    * Refusés, avec le même 404 que l'absence :
    *
@@ -128,7 +141,9 @@ export class ResellerScopeService {
    * - le client d'un confrère ou de la plateforme, y compris celui qu'on
    *   partage : lui donner un serveur de plus, c'est prendre pied chez
    *   l'autre ;
-   * - un compte qui n'est pas encore client ici et qui est invité sur le
+   * - un compte que ce revendeur ne sert pas et n'a pas créé : inscrit de
+   *   lui-même, ouvert par l'administration ou par un confrère ;
+   * - un compte qui n'est pas encore servi ici et qui est invité sur le
    *   serveur d'un autre : la session qu'on pourrait lui ouvrir ensuite
    *   donnerait aussi cet accès-là.
    *
@@ -138,7 +153,7 @@ export class ResellerScopeService {
    * seulement une vente ou un transfert entre ses propres clients.
    *
    * **Un compte suspendu est refusé**, qu'un revendeur n'a pas à réactiver de
-   * fait en lui livrant un serveur. Quand c'est son propre client, qu'il lit
+   * fait en lui livrant un serveur. Quand c'est son propre compte, qu'il lit
    * déjà, le refus le dit : « introuvable » pour un compte que la boutique
    * vient de trouver l'aurait envoyée chercher ailleurs.
    *
@@ -151,13 +166,14 @@ export class ResellerScopeService {
     const compte = await this.rattachement(resellerId, userId);
     if (
       compte?.role !== "user" ||
+      !(compte.possedeIci || compte.creeIci) ||
       compte.possedeAilleurs ||
       (compte.inviteAilleurs && !compte.possedeIci)
     ) {
       throw new NotFoundException("Compte introuvable.");
     }
     if (compte.suspendu) {
-      if (compte.possedeIci) {
+      if (compte.possedeIci || compte.creeIci) {
         throw new ForbiddenException(
           "Ce compte est suspendu dans le panel : aucun serveur ne lui est livré tant qu'il n'est pas réactivé.",
         );
@@ -187,6 +203,10 @@ export class ResellerScopeService {
         possedeIci: sql<boolean>`exists (
           select 1 from servers s
           where s.owner_id = users.id and s.reseller_id = ${resellerId}
+        )`,
+        creeIci: sql<boolean>`exists (
+          select 1 from reseller_customers rc
+          where rc.user_id = users.id and rc.reseller_id = ${resellerId}
         )`,
         possedeAilleurs: sql<boolean>`exists (
           select 1 from servers s
@@ -237,14 +257,18 @@ export class ResellerScopeService {
    * Restreint une liste de comptes au périmètre.
    *
    * Un `exists` plutôt qu'une jointure : une jointure dupliquerait le compte
-   * autant de fois qu'il a de serveurs chez ce revendeur.
+   * autant de fois qu'il a de serveurs chez ce revendeur. Même règle que
+   * `requireUser` : servi ou créé par lui.
    */
   userFilter(resellerId: string | null) {
     if (resellerId === null) return undefined;
-    return sql`exists (
-      select 1 from ${servers}
-      where ${servers.ownerId} = ${users.id}
-        and ${servers.resellerId} = ${resellerId}
-    )`;
+    // Tables nommées en toutes lettres, pour la raison dite à `rattachement`.
+    return sql`(exists (
+      select 1 from servers s
+      where s.owner_id = users.id and s.reseller_id = ${resellerId}
+    ) or exists (
+      select 1 from reseller_customers rc
+      where rc.user_id = users.id and rc.reseller_id = ${resellerId}
+    ))`;
   }
 }

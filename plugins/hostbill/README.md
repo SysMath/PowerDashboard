@@ -133,12 +133,16 @@ qui le fixe.
 Concrètement, une clé de revendeur :
 
 - ne voit que **ses** clients, c'est-à-dire ceux qui possèdent au moins un
-  serveur qu'il héberge ;
+  serveur qu'il héberge, et les comptes que sa boutique a créés ;
 - ne peut ni lire, ni suspendre, ni supprimer le serveur d'un autre ;
 - ne crée ou ne donne un serveur qu'à un compte client entièrement à lui,
-  ou à un compte encore sans serveur ; jamais au client d'un autre, même
-  partagé, ni à un compte suspendu, du personnel, ou encore sans serveur et
-  invité chez un autre (son propre client invité ailleurs reçoit) ;
+  ou à un compte encore sans serveur **que sa boutique a créé** ; jamais au
+  client d'un autre, même partagé, ni à un compte inscrit de lui-même ou
+  ouvert par l'administration, ni à un compte suspendu, du personnel, ou
+  encore sans serveur et invité chez un autre (son propre client invité
+  ailleurs reçoit). Un client qui existe déjà dans le panel sans être à ce
+  revendeur se rattache depuis l'administration, en lui donnant un serveur
+  de ce revendeur ;
 - ne modifie la fiche que d'un client entièrement à lui : l'identifiant
   externe d'un client partagé est celui de l'autre facturation ;
 - ne peut pas ouvrir de session au nom d'un client qui n'est pas le sien ;
