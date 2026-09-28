@@ -68,8 +68,12 @@ HostBill : le serveur reste à l'ancien titulaire. Faites alors le geste dans le
 panel, sur la fiche du serveur dans l'administration (changement de
 propriétaire), ou par l'API applicative : `POST
 /api/v1/application/servers/{serveur}/owner` avec `{"ownerId": "…"}` et une clé
-portant `servers.owner`. Dans les deux cas, le panel ferme les consoles
-ouvertes de l'ancien titulaire.
+portant `servers.owner`. Dans les deux cas, le panel retire les
+sous-utilisateurs, les invitations et les rappels sortants du serveur,
+renouvelle les mots de passe des bases et ferme les sessions SFTP et consoles
+de l'ancien titulaire et des invités. Ce qui n'a pas pu être fait est rendu :
+à l'écran d'administration, ou dans `data.cleanup` de la réponse de l'API
+(`databasesNotRotated`, `sessionsNotClosed`).
 
 ## Échéances sur l'accueil du panel (facultatif)
 

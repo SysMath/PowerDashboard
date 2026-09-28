@@ -82,8 +82,12 @@ l'adresse e-mail, et n'en crée un que s'il ne trouve rien.
 
 Quand un service change de client dans ClientXCMS, le module retrouve ou crée
 le compte du nouveau client dans le panel, puis **lui donne le serveur**. Le
-panel ferme au passage les consoles ouvertes de l'ancien titulaire ; les
-sous-utilisateurs invités sur le serveur restent. Un service dont le serveur
+panel efface au passage ce que l'ancien titulaire avait installé autour :
+sous-utilisateurs et invitations, rappels sortants, mots de passe des bases
+(renouvelés), sessions SFTP et consoles ouvertes ; son journal n'est plus
+visible que de l'administration. Si une base garde son ancien mot de passe
+(hôte injoignable) ou si le node n'a pas pu fermer une session, le changement
+réussit quand même et son message le dit. Un service dont le serveur
 n'a pas encore été livré n'a rien à transférer : seul le compte est préparé.
 
 Il faut pour cela la portée `servers.owner`. Une clé créée avant cette version

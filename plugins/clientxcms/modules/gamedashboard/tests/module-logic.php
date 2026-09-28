@@ -177,6 +177,7 @@ class ClientSimule extends GameDashboardClient
     public array $appels = [];
     public ?array $parExterne = null;
     public ?array $parEmail = null;
+    public array $bilan = [];
     public array $portees = [
         'users.read', 'users.write', 'users.sso',
         'servers.create', 'servers.suspend', 'servers.delete', 'servers.owner',
@@ -242,7 +243,7 @@ class ClientSimule extends GameDashboardClient
         if (!in_array('servers.owner', $this->portees, true)) {
             throw new GameDashboardError('Le panel a refusé la clé applicative : Portée manquante : servers.owner.');
         }
-        return ['data' => ['serverId' => $serverId, 'ownerId' => $ownerId]];
+        return ['data' => ['serverId' => $serverId, 'ownerId' => $ownerId, 'cleanup' => $this->bilan]];
     }
 
     public function deleteServer(string $serverId): array
@@ -464,6 +465,19 @@ $dto = $type->changeCustomer($service, new Customer);
 verifie(
     'serveur absent du panel : échec explicite',
     $dto->success === false && str_contains($dto->message, 'introuvable'),
+    $dto->message
+);
+
+$s = new ClientSimule();
+$s->parExterne = ['id' => 'compte-connu'];
+$s->bilan = ['databasesNotRotated' => ['s1_boutique'], 'sessionsNotClosed' => 1];
+[$type, $service] = service($s, ['gamedashboard_server_id' => 'serveur-42']);
+$dto = $type->changeCustomer($service, new Customer);
+verifie(
+    'base restée sur son ancien mot de passe : succès, mais le message la nomme',
+    $dto->success === true
+        && str_contains($dto->message, 's1_boutique')
+        && str_contains($dto->message, '1 compte(s)'),
     $dto->message
 );
 

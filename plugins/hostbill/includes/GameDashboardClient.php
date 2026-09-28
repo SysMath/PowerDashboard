@@ -134,10 +134,12 @@ class GameDashboardClient
      * client chez vous.
      *
      * `$ownerId` est l'identifiant **du panel**, celui que rendent
-     * `createUser` et les recherches. Le panel ferme au passage les consoles
-     * ouvertes de l'ancien titulaire ; les sous-utilisateurs restent. Demande
-     * la portée `servers.owner`, qu'une clé plus ancienne n'a pas : le refus
-     * la nomme.
+     * `createUser` et les recherches. Le panel efface au passage ce que
+     * l'ancien titulaire avait installé autour : sous-utilisateurs, rappels
+     * sortants, mots de passe des bases, sessions SFTP et consoles ouvertes.
+     * Demande la portée `servers.owner`, qu'une clé plus ancienne n'a pas :
+     * le refus la nomme. Ce qui n'a pas pu être nettoyé se lit dans la
+     * réponse avec `ownerChangeWarning`.
      */
     public function setServerOwner(string $serverId, string $ownerId): array
     {
@@ -146,6 +148,32 @@ class GameDashboardClient
             '/api/v1/application/servers/' . rawurlencode($serverId) . '/owner',
             ['ownerId' => $ownerId]
         );
+    }
+
+    /**
+     * Ce que le changement de titulaire n'a pas pu nettoyer, en une phrase à
+     * montrer à l'administrateur de la boutique ; vide quand tout est fait.
+     *
+     * Le transfert a eu lieu dans tous les cas : une base dont l'hôte a
+     * refusé le nouveau mot de passe garde l'ancien, que l'ancien client
+     * connaît, et un node injoignable a pu lui laisser une session SFTP.
+     */
+    public static function ownerChangeWarning(array $response): string
+    {
+        $bilan = $response['data']['cleanup'] ?? [];
+        $parties = [];
+
+        $bases = $bilan['databasesNotRotated'] ?? [];
+        if (is_array($bases) && count($bases) > 0) {
+            $parties[] = 'le mot de passe de ces bases n\'a pas pu être renouvelé : '
+                . implode(', ', array_map('strval', $bases));
+        }
+        $sessions = (int) ($bilan['sessionsNotClosed'] ?? 0);
+        if ($sessions > 0) {
+            $parties[] = 'le node n\'a pas pu fermer les sessions de ' . $sessions . ' compte(s)';
+        }
+
+        return $parties === [] ? '' : 'Serveur transféré, mais ' . implode(' ; ', $parties) . '.';
     }
 
     public function deleteServer(string $serverId): array

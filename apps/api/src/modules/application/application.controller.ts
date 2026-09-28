@@ -418,14 +418,15 @@ export class ApplicationController {
    * ne payait plus.
    *
    * Tout le métier est celui de l'administration (`AdminServerService.setOwner`) :
-   * le revendeur hébergeur et les sous-utilisateurs restent, un revendeur qui
-   * refuse le provisionnement ne se voit rien imposer, les consoles de
-   * l'ancien titulaire sont fermées. S'y ajoute le périmètre de la clé, des
-   * deux côtés : le serveur doit être chez elle, et le destinataire aussi — ou
+   * le revendeur hébergeur reste, un revendeur qui refuse le provisionnement
+   * ne se voit rien imposer, et ce que l'ancien titulaire avait installé
+   * autour du serveur s'en va — sous-utilisateurs, invitations, rappels
+   * sortants, mots de passe des bases, sessions SFTP et consoles ouvertes.
+   * S'y ajoute le périmètre de la clé, des deux côtés : le serveur doit être chez elle, et le destinataire aussi — ou
    * n'avoir encore aucun serveur, cas du client tout juste créé.
    *
    * Pas d'`Idempotency-Key` : rejouer le même transfert ne fait rien de plus
-   * que le premier.
+   * que le premier, et rend son bilan (`changed: false`).
    */
   @Post("servers/:serverId/owner")
   @RequireScopes("servers.owner")
@@ -438,10 +439,38 @@ export class ApplicationController {
 
     await this.scope.requireServer(request.application.resellerId, serverId);
     await this.scope.requireRecipient(request.application.resellerId, ownerId);
-    await this.adminServers.setOwner(serverId, ownerId);
-    await this.trace(request, "application.server_owner_changed", serverId, { ownerId });
+    // Même trace que `trace()`, mais écrite dans la transaction du
+    // changement : c'est elle qui coupe le journal de l'ancien titulaire.
+    const nettoyage = await this.adminServers.setOwner(serverId, ownerId, {
+      event: "application.server_owner_changed",
+      actorId: null,
+      actorType: "api_key",
+      actorLabel: `application:${request.application.name}`,
+      ip: request.ip ?? null,
+    });
 
-    return { data: { serverId, ownerId } };
+    /*
+     * Le bilan revient à la facturation, qui est seule à le voir au moment du
+     * geste : une base restée sur son ancien mot de passe se signale à son
+     * administrateur, pas dans un journal qu'il ne lit pas. Les comptes dont
+     * la session n'a pu être fermée ne sont que comptés : un invité n'est
+     * pas forcément un client de cette clé.
+     */
+    return {
+      data: {
+        serverId,
+        ownerId,
+        cleanup: {
+          changed: nettoyage.changed,
+          subusersRemoved: nettoyage.subusersRemoved,
+          invitesRemoved: nettoyage.invitesRemoved,
+          webhooksRemoved: nettoyage.webhooksRemoved,
+          databasesRotated: nettoyage.databasesRotated,
+          databasesNotRotated: nettoyage.databasesNotRotated,
+          sessionsNotClosed: nettoyage.sessionsNotClosed.length,
+        },
+      },
+    };
   }
 
   @Delete("servers/:serverId")

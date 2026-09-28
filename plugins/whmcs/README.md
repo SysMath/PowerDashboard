@@ -96,8 +96,13 @@ qui garderait sa console, et le nouveau client ne le verrait pas.
 
 Après un déplacement, ouvrez la fiche du service et cliquez **Donner le serveur
 au client actuel**. Le module retrouve ou crée le compte du client qui porte
-maintenant le service, puis lui donne le serveur ; le panel ferme les consoles
-ouvertes de l'ancien titulaire et laisse les sous-utilisateurs en place.
+maintenant le service, puis lui donne le serveur ; le panel retire les
+sous-utilisateurs, les invitations et les rappels sortants du serveur,
+renouvelle les mots de passe des bases et ferme les sessions SFTP et consoles
+de l'ancien titulaire et des invités. Si une base garde son ancien mot de passe
+(hôte injoignable) ou si le node n'a pas pu fermer une session, le serveur est
+quand même transféré et le bouton affiche ce qui reste à faire au lieu de
+« success ».
 Recliquer ne fait rien de plus.
 
 Il faut la portée `servers.owner`. Une clé créée avant cette version ne l'a

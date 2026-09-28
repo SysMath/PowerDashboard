@@ -327,8 +327,12 @@ function gamedashboard_ReassignOwner(array $params)
             return 'Le panel n\'a pas rendu de compte exploitable.';
         }
 
-        $client->setServerOwner($id, (string) $compte['id']);
-        return 'success';
+        $reponse = $client->setServerOwner($id, (string) $compte['id']);
+
+        // WHMCS n'a que « success » ou un message d'erreur : le transfert a eu
+        // lieu, mais une base restée sur l'ancien mot de passe doit se voir.
+        $avertissement = GameDashboardClient::ownerChangeWarning($reponse);
+        return $avertissement !== '' ? $avertissement : 'success';
     } catch (GameDashboardError $e) {
         return $e->getMessage();
     }

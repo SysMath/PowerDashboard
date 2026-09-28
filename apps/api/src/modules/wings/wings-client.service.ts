@@ -702,6 +702,30 @@ export class WingsClientService {
   }
 
   /**
+   * Retire à un compte tout ce qu'il tient encore ouvert sur un serveur :
+   * sessions SFTP, consoles, jetons déjà émis.
+   *
+   * `POST /api/deauthorize-user` (`router/router_system.go`) : pour chaque
+   * serveur cité, Wings refuse les jetons du compte émis jusqu'ici, ferme les
+   * websockets du serveur (**toutes** : Wings ne sait pas les trier, les
+   * autres se reconnectent) et coupe les sessions SFTP du compte. Seule
+   * route qui touche au SFTP : retirer un accès dans la base refuse les
+   * nouvelles connexions, pas celles déjà ouvertes.
+   *
+   * `user` est l'identifiant du compte, celui que portent le `user_uuid` du
+   * jeton de console et la réponse de l'authentification SFTP.
+   *
+   * **La liste des serveurs n'est jamais vide** : vide, Wings déconnecte le
+   * compte de tous les serveurs du node.
+   */
+  deauthorizeUser(serverId: string, userId: string): Promise<void> {
+    return this.call<void>(serverId, "/api/deauthorize-user", {
+      method: "POST",
+      body: { user: userId, servers: [serverId] },
+    });
+  }
+
+  /**
    * Démarre une sauvegarde.
    *
    * L'identifiant est **fourni par le panel**, pas choisi par le daemon : Wings

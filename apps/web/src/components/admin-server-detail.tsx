@@ -112,6 +112,10 @@ export function AdminServerDetailView({
   const [transferOpen, setTransferOpen] = useState(false);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [ownerId, setOwnerId] = useState("");
+  // Le bandeau du dernier changement de propriétaire, écarté pour cette visite
+  // seulement : il revient tant que le reste n'est pas nettoyé.
+  const [cleanupDismissed, setCleanupDismissed] = useState(false);
+  const leftovers = cleanupDismissed ? null : server.ownerChange;
   /*
    * Les limites, gardées en texte pendant la saisie.
    *
@@ -183,6 +187,21 @@ export function AdminServerDetailView({
       {error ? (
         <AlertBanner variant="danger" title={tc("actionRefused")} dismissible>
           {error}
+        </AlertBanner>
+      ) : null}
+      {leftovers ? (
+        <AlertBanner
+          variant="warning"
+          title={t("ownerCleanupTitle")}
+          dismissible
+          onDismiss={() => setCleanupDismissed(true)}
+        >
+          {leftovers.databasesNotRotated.length > 0 ? (
+            <p>{t("ownerCleanupDatabases", { names: leftovers.databasesNotRotated.join(", ") })}</p>
+          ) : null}
+          {leftovers.sessionsNotClosed > 0 ? (
+            <p>{t("ownerCleanupSessions", { count: leftovers.sessionsNotClosed })}</p>
+          ) : null}
         </AlertBanner>
       ) : null}
 
@@ -655,6 +674,7 @@ export function AdminServerDetailView({
               onClick={() => {
                 const cible = ownerId;
                 setOwnerOpen(false);
+                setCleanupDismissed(false);
                 run(() => setServerOwner(server.id, cible));
               }}
             >

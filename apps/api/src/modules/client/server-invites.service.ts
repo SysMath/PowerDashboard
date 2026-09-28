@@ -17,6 +17,8 @@ import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { MailerService } from "../mail/mailer.service";
 import { BrandingService } from "../reseller/branding.service";
 
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
 /**
  * Inviter quelqu'un qui n'a pas encore de compte.
  *
@@ -313,46 +315,55 @@ export class ServerInvitesService {
       );
     }
 
-    const [cible] = await this.db
-      .select({ ownerId: servers.ownerId })
-      .from(servers)
-      .where(eq(servers.id, invite.serverId))
-      .limit(1);
-    if (!cible) throw new GoneException("Ce serveur n'existe plus.");
-    if (cible.ownerId === userId) {
-      throw new ConflictException("Vous êtes déjà propriétaire de ce serveur.");
-    }
+    /*
+     * Tout se joue sous le verrou de la ligne du serveur, celui que prend le
+     * changement de titulaire (`AdminServerService.setOwner`). Sans lui, une
+     * invitation de l'ancien titulaire acceptée pendant le transfert passait
+     * entre la lecture du titulaire et le retrait des invités : le compte
+     * invité gardait l'accès au serveur du nouveau. Avec lui, soit
+     * l'acceptation passe avant et le transfert la retire, soit le transfert
+     * passe avant et l'invitation n'existe plus.
+     */
+    return this.db.transaction(async (tx) => {
+      const [cible] = await tx
+        .select({ ownerId: servers.ownerId })
+        .from(servers)
+        .where(eq(servers.id, invite.serverId))
+        .for("share")
+        .limit(1);
+      if (!cible) throw new GoneException("Ce serveur n'existe plus.");
+      if (cible.ownerId === userId) {
+        throw new ConflictException("Vous êtes déjà propriétaire de ce serveur.");
+      }
 
-    await this.auteurDetientEncore(invite, cible.ownerId);
+      await this.auteurDetientEncore(invite, cible.ownerId, tx);
 
-    // L'invitation est consommée **avant** l'octroi : si l'insertion échoue,
-    // un lien inutilisable vaut mieux qu'un lien rejouable.
-    const consumed = await this.db
-      .update(serverInvites)
-      .set({ acceptedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-      .where(and(eq(serverInvites.id, invite.id), isNull(serverInvites.acceptedAt)))
-      .returning({ id: serverInvites.id });
-    if (consumed.length === 0) throw new GoneException("Cette invitation a déjà été employée.");
+      // L'invitation est consommée **avant** l'octroi : si l'insertion échoue,
+      // un lien inutilisable vaut mieux qu'un lien rejouable.
+      const consumed = await tx
+        .update(serverInvites)
+        .set({ acceptedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+        .where(and(eq(serverInvites.id, invite.id), isNull(serverInvites.acceptedAt)))
+        .returning({ id: serverInvites.id });
+      if (consumed.length === 0) throw new GoneException("Cette invitation a déjà été employée.");
 
-    const now = new Date().toISOString();
-    const [granted] = await this.db
-      .insert(serverSubusers)
-      .values({
-        serverId: invite.serverId,
-        userId,
-        permissions: invite.permissions as string[],
-        invitedBy: invite.invitedBy,
-        acceptedAt: now,
-      })
-      .onConflictDoNothing()
-      .returning({ id: serverSubusers.id });
+      const now = new Date().toISOString();
+      await tx
+        .insert(serverSubusers)
+        .values({
+          serverId: invite.serverId,
+          userId,
+          permissions: invite.permissions as string[],
+          invitedBy: invite.invitedBy,
+          acceptedAt: now,
+        })
+        .onConflictDoNothing();
 
-    // Pas d'erreur si la personne avait déjà accès : le résultat voulu est
-    // atteint, et « conflit » après avoir consommé le lien laisserait croire
-    // que l'invitation a échoué.
-    if (!granted) return { serverId: invite.serverId };
-
-    return { serverId: invite.serverId };
+      // Pas d'erreur si la personne avait déjà accès : le résultat voulu est
+      // atteint, et « conflit » après avoir consommé le lien laisserait croire
+      // que l'invitation a échoué.
+      return { serverId: invite.serverId };
+    });
   }
 
   /**
@@ -409,6 +420,7 @@ export class ServerInvitesService {
   private async auteurDetientEncore(
     invite: { invitedBy: string | null; permissions: unknown; serverId: string },
     ownerId: string,
+    executor: Database | Transaction = this.db,
   ): Promise<void> {
     if (invite.invitedBy && invite.invitedBy === ownerId) return;
 
@@ -417,7 +429,7 @@ export class ServerInvitesService {
     );
     if (!invite.invitedBy) throw caduque;
 
-    const [auteur] = await this.db
+    const [auteur] = await executor
       .select({ permissions: serverSubusers.permissions })
       .from(serverSubusers)
       .where(

@@ -593,8 +593,13 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
     method: "POST",
     path: "/servers/{server}/owner",
     summary:
-      "Changer le titulaire d'un serveur (corps : ownerId). Les sous-utilisateurs et le revendeur " +
-      "hébergeur restent ; les consoles ouvertes de l'ancien titulaire sont fermées. Une clé de " +
+      "Changer le titulaire d'un serveur (corps : ownerId). Le revendeur hébergeur reste. Les " +
+      "sous-utilisateurs, invitations et rappels sortants du serveur sont retirés, les mots de " +
+      "passe des bases renouvelés, les sessions SFTP et consoles de l'ancien titulaire et des " +
+      "invités fermées, et son journal n'est plus visible que de l'administration. La réponse " +
+      "porte le bilan (cleanup) : databasesNotRotated nomme les bases restées sur leur ancien " +
+      "mot de passe, sessionsNotClosed compte les comptes que le node n'a pu déconnecter ; un rejeu " +
+      "ne refait rien et rend le bilan du changement déjà fait (changed: false). Une clé de " +
       "revendeur ne peut le donner qu'à un compte client non suspendu, entièrement chez elle ou " +
       "encore sans serveur ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs. " +
       "Son propre client suspendu est refusé en 403, avec la raison ; tout autre refus rend 404.",

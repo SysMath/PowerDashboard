@@ -1150,7 +1150,9 @@ export class AdminController {
    * Change le propriétaire d'un serveur.
    *
    * Le rattachement au revendeur ne suit **pas** : il dit qui héberge, pas qui
-   * possède. Un serveur qui change de mains ne change pas de machine.
+   * possède. Un serveur qui change de mains ne change pas de machine. Ce que
+   * l'ancien titulaire avait installé autour s'en va, et le journal dit quoi
+   * (`AdminServerService.setOwner`, qui écrit aussi la ligne du changement).
    */
   @Post("servers/:serverId/owner")
   @UseGuards(AdminWriteGuard)
@@ -1164,19 +1166,25 @@ export class AdminController {
       throw new BadRequestException("Compte destinataire manquant.");
     }
 
-    await this.adminServers.setOwner(serverId, ownerId);
-
-    await this.activityLog.record({
+    // La ligne du journal s'écrit dans la transaction du changement, et le
+    // bilan dans une seconde ligne réservée à l'administration.
+    const nettoyage = await this.adminServers.setOwner(serverId, ownerId, {
       event: "admin.server_owner_changed",
-      serverId,
       actorId: request.user.id,
       actorType: "user",
       actorLabel: request.user.email,
       ip: request.ip ?? null,
-      properties: { ownerId },
     });
 
-    return { data: { updated: serverId } };
+    // Le bilan remonte à l'écran : une base restée sur son ancien mot de
+    // passe, ou une session que Wings n'a pas pu fermer, s'y signale.
+    return {
+      data: {
+        updated: serverId,
+        databasesNotRotated: nettoyage.databasesNotRotated,
+        sessionsNotClosed: nettoyage.sessionsNotClosed.length,
+      },
+    };
   }
 
   /**

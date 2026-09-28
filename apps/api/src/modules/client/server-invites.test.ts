@@ -35,19 +35,19 @@ function service(scenario: {
   auteurPermissions?: string[] | null;
 }) {
   let lecture = 0;
+  const limit = async () => {
+    lecture += 1;
+    if (lecture === 1) return [scenario.invite];
+    if (lecture === 2) return [{ ownerId: scenario.ownerId ?? PROPRIETAIRE }];
+    return scenario.auteurPermissions ? [{ permissions: scenario.auteurPermissions }] : [];
+  };
   const db = {
     select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: async () => {
-            lecture += 1;
-            if (lecture === 1) return [scenario.invite];
-            if (lecture === 2) return [{ ownerId: scenario.ownerId ?? PROPRIETAIRE }];
-            return scenario.auteurPermissions ? [{ permissions: scenario.auteurPermissions }] : [];
-          },
-        }),
-      }),
+      // Le serveur se lit sous verrou (`for share`), le reste sans.
+      from: () => ({ where: () => ({ limit, for: () => ({ limit }) }) }),
     }),
+    // La transaction de l'acceptation passe par la même base simulée.
+    transaction: (travail: (tx: unknown) => Promise<unknown>) => travail(db),
   } as unknown as Database;
 
   return new ServerInvitesService(
