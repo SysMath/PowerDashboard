@@ -15,6 +15,7 @@ tenu, puis pourquoi elle a cessé de tenir.
 | [0005](./0005-machine-muette.md) | La machine injoignable est un état de premier rang | Acceptée |
 | [0006](./0006-depot-sur-ext4.md) | Le dépôt vit sur ext4, pas sur `drvfs` | Acceptée |
 | [0007](./0007-secrets-et-donnees-au-repos.md) | Données personnelles en clair, clé maître en fichier, sans coffre ni poivre : la machine protège le repos | Acceptée |
+| [0008](./0008-pare-feu-nftables.md) | Le pare-feu par serveur est tenu par un agent séparé, dans sa propre table nftables | Proposée |
 
 ## Format
 
