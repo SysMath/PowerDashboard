@@ -222,9 +222,18 @@ export class BackupsService {
     if (backup.isLocked) {
       throw new ConflictException("Cette sauvegarde est verrouillée. Déverrouillez-la d'abord.");
     }
-    // Pendant une restauration, l'archive rendue ne doit pas disparaître : le
-    // compte rendu de fin de Wings trouverait un 404 et le serveur resterait
-    // bloqué (voir `backupDeletionBlocked`).
+    /*
+     * Pendant une restauration, l'archive rendue ne doit pas disparaître : le
+     * compte rendu de fin de Wings trouverait un 404 et le serveur resterait
+     * bloqué (voir `backupDeletionBlocked`).
+     *
+     * La garde lit l'état puis efface, sans verrou : une restauration de la
+     * même archive acceptée entre les deux reste posée sans compte rendu
+     * possible. Il y faut deux gestes simultanés sur la même archive, et le
+     * balayage de six heures lève alors l'état. Verrouiller la ligne du
+     * serveur pendant l'appel au daemon ou au compartiment coûterait plus que
+     * ce cas : écart accepté.
+     */
     const [server] = await this.db
       .select({ state: servers.state })
       .from(servers)
@@ -279,10 +288,11 @@ export class BackupsService {
    * Le serveur passe à l'état `restoring` pendant l'opération (NC-44) : le
    * panel refuse alors le démarrage, le gestionnaire de fichiers et le SFTP
    * (`SftpAuthService`), au lieu de s'en remettre au seul drapeau de Wings.
-   * Trois issues le relâchent : le compte rendu de Wings
+   * Quatre issues le relâchent : le compte rendu de Wings
    * (`POST /backups/:uuid/restore`, envoyé en fin de restauration, réussie ou
-   * non), un refus du daemon ici même, et le redémarrage du daemon
-   * (`resetTransientStates`).
+   * non), un refus du daemon ici même, le redémarrage du daemon
+   * (`resetTransientStates`) et, faute de nouvelles pendant six heures, le
+   * balayage de `RestoreReaperService` (`RESTORE_STALE_MS`).
    */
   async restore(serverId: string, backupId: string, truncate: boolean): Promise<void> {
     const backup = await this.mustFind(serverId, backupId);

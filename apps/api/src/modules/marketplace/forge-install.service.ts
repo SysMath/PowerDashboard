@@ -6,7 +6,7 @@ import {
   serverVariables,
 } from "@gamedashboard/db";
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 import { WingsClientService } from "../wings/wings-client.service";
 import {
@@ -119,7 +119,7 @@ export class ForgeInstallService {
     );
     await this.writeVariables(serverId, variables, wanted);
 
-    let issue: "ok" | "failed" | "interrupted" | "timeout" | "refused";
+    let issue: "ok" | "failed" | "interrupted" | "timeout" | "refused" | "busy";
     try {
       issue = await this.reinstall(serverId);
     } catch (error) {
@@ -139,9 +139,11 @@ export class ForgeInstallService {
     const cause =
       issue === "refused"
         ? "le daemon a refusé de relancer l'installation"
-        : issue === "interrupted"
-          ? "le daemon a redémarré pendant l'installation"
-          : "l'installeur a échoué dans le conteneur d'installation (image sans Java, réseau fermé vers le dépôt…) ; le journal d'installation du serveur en donne la cause";
+        : issue === "busy"
+          ? "le serveur a été pris par une autre opération (suspension, restauration ou transfert)"
+          : issue === "interrupted"
+            ? "le daemon a redémarré pendant l'installation"
+            : "l'installeur a échoué dans le conteneur d'installation (image sans Java, réseau fermé vers le dépôt…) ; le journal d'installation du serveur en donne la cause";
     return {
       notice: `Les fichiers du pack sont posés et suivis, mais ${target.label} n'a pas pu être installé : ${cause}. Le chargeur précédent n'a pas été remplacé. Relancez l'installation de cette version une fois la cause corrigée.`,
       installed: null,
@@ -183,11 +185,13 @@ export class ForgeInstallService {
   /** Relance l'installation de l'egg et en attend l'issue. */
   private async reinstall(
     serverId: string,
-  ): Promise<"ok" | "failed" | "interrupted" | "timeout" | "refused"> {
+  ): Promise<"ok" | "failed" | "interrupted" | "timeout" | "refused" | "busy"> {
     const before = await this.installState(serverId);
     // Posé ici aussi, et pas seulement par l'appelant : c'est ce que l'attente
     // guette, et personne ne doit démarrer le serveur pendant l'installeur.
-    await this.setState(serverId, "installing");
+    // Une suspension ou une restauration arrivée entre-temps garde la main :
+    // l'installeur ne se lance pas par-dessus.
+    if (!(await this.claimInstalling(serverId))) return "busy";
     try {
       // Le daemon apprend les nouvelles variables avant de lancer le script,
       // comme dans le changement d'egg de l'administration.
@@ -204,9 +208,14 @@ export class ForgeInstallService {
       const now = await this.installState(serverId);
       if (now.state === "installing") continue;
       // La suite de l'installation du pack (empreintes, suivi) se fait encore
-      // serveur verrouillé : l'appelant lève l'état à la toute fin.
-      await this.setState(serverId, "installing");
+      // serveur verrouillé : l'appelant lève l'état à la toute fin. Un état
+      // posé par une autre opération depuis la fin de l'installeur reste.
+      await this.claimInstalling(serverId);
       if (now.state === "install_failed") return "failed";
+      // Une suspension, une restauration ou un transfert a pris le serveur
+      // pendant l'installeur : sans compte rendu de fin, ce n'est pas un
+      // redémarrage du daemon, et le message doit le dire.
+      if (now.state !== null && now.installedAt === before.installedAt) return "busy";
       // Remis à zéro sans compte rendu : `resetTransientStates` au redémarrage
       // du daemon, qui n'a pas fini l'installation.
       return now.installedAt !== before.installedAt ? "ok" : "interrupted";
@@ -225,11 +234,27 @@ export class ForgeInstallService {
     return { state: row?.state ?? null, installedAt: row?.installedAt ?? null };
   }
 
-  private async setState(serverId: string, state: "installing"): Promise<void> {
-    await this.db
+  /**
+   * Pose (ou garde) l'état « installation », et rien d'autre.
+   *
+   * Seulement depuis un serveur libre, déjà en installation ou dont
+   * l'installeur vient d'échouer : une suspension, une restauration ou un
+   * transfert décidés pendant l'attente ne sont pas écrasés, comme dans
+   * `EngineService.claimInstalling`. Rend faux si l'état appartient à une autre
+   * opération.
+   */
+  private async claimInstalling(serverId: string): Promise<boolean> {
+    const claimed = await this.db
       .update(servers)
-      .set({ state, updatedAt: new Date().toISOString() })
-      .where(eq(servers.id, serverId));
+      .set({ state: "installing", updatedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(servers.id, serverId),
+          or(isNull(servers.state), inArray(servers.state, ["installing", "install_failed"])),
+        ),
+      )
+      .returning({ id: servers.id });
+    return claimed.length > 0;
   }
 
   /** Les variables de l'egg du serveur, avec leur valeur propre au serveur s'il en a une. */

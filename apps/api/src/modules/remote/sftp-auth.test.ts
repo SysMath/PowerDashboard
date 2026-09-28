@@ -54,7 +54,15 @@ describe("SFTP : état du serveur, limitation, mémoire", () => {
   function proprietaire(state: string | null) {
     return sftp([
       [{ id: SERVER, ownerId: OWNER, state }],
-      [{ id: OWNER, email: "client@exemple.fr", passwordHash, suspendedAt: null }],
+      [
+        {
+          id: OWNER,
+          email: "client@exemple.fr",
+          passwordHash,
+          passwordExpiresAt: null,
+          suspendedAt: null,
+        },
+      ],
     ]);
   }
 

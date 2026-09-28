@@ -29,9 +29,15 @@ export interface BackupReport {
  * seulement sur une 5xx ou une erreur réseau : un panel en mise à jour ou une
  * coupure entre le node et le panel suffisent à le perdre, et le serveur
  * resterait en `restoring` jusqu'au prochain redémarrage du daemon. Six heures
- * laissent passer la restauration d'une grosse archive distante. Lever l'état
- * trop tôt n'expose pas les fichiers : Wings garde son propre drapeau de
- * restauration et refuse le démarrage comme le SFTP tant qu'il restaure.
+ * laissent passer la restauration d'une grosse archive distante.
+ *
+ * Lever l'état trop tôt a un prix, borné mais réel. Wings garde son propre
+ * drapeau de restauration et refuse encore le démarrage et le SFTP, mais pas
+ * le gestionnaire de fichiers, qui rouvre pendant qu'il écrit. Et le panel ne
+ * retient pas quelle archive est rendue : si une seconde restauration est
+ * demandée après la levée, le compte rendu tardif de la première lève son
+ * état à elle. La levée est donc consignée au journal du serveur
+ * (`backup.restore_expired`), pour que l'on sache pourquoi.
  */
 export const RESTORE_STALE_MS = 6 * 60 * 60 * 1000;
 
@@ -164,7 +170,9 @@ export class RemoteBackupService {
    * Relâche les restaurations restées sans compte rendu (`RESTORE_STALE_MS`).
    *
    * L'horloge est `servers.updated_at`, posé par `BackupsService.restore` au
-   * moment où il prend l'état. Rend le nombre de serveurs relâchés.
+   * moment où il prend l'état. Chaque levée est consignée au journal du
+   * serveur, comme les issues rapportées par Wings. Rend le nombre de serveurs
+   * relâchés.
    */
   async expireStaleRestores(now: Date = new Date()): Promise<number> {
     const threshold = new Date(now.getTime() - RESTORE_STALE_MS).toISOString();
@@ -175,6 +183,14 @@ export class RemoteBackupService {
       .returning({ id: servers.id });
     for (const { id } of released) {
       this.logger.warn(`Restauration sur ${id} sans compte rendu depuis six heures : état levé.`);
+      await this.activity.record({
+        event: "backup.restore_expired",
+        serverId: id,
+        actorId: null,
+        actorType: "system",
+        actorLabel: "Panel",
+        properties: { afterMs: RESTORE_STALE_MS },
+      });
     }
     return released.length;
   }

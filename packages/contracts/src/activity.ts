@@ -96,10 +96,12 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "server:sftp.rename": { category: "files", label: "Fichier renommé par SFTP" },
 
   "backup.create": { category: "backups", label: "Sauvegarde lancée" },
-  "backup.restore": { category: "backups", label: "Sauvegarde restaurée" },
-  // Rapportés par le daemon en fin de restauration (NC-44).
+  "backup.restore": { category: "backups", label: "Restauration demandée" },
+  // Issues de la restauration (NC-44) : rapportées par le daemon, ou levée
+  // par le panel au bout de six heures sans nouvelles.
   "backup.restore_completed": { category: "backups", label: "Restauration terminée" },
   "backup.restore_failed": { category: "backups", label: "Restauration échouée" },
+  "backup.restore_expired": { category: "backups", label: "Restauration sans nouvelles" },
   "backup.delete": { category: "backups", label: "Sauvegarde supprimée" },
   "backup.lock": { category: "backups", label: "Verrou de sauvegarde modifié" },
   /**

@@ -1030,13 +1030,25 @@ function resolveFailure(error: unknown): HttpException {
   }
   const silent =
     (error instanceof EditorHttpError && error.status >= 500) ||
-    (error instanceof Error &&
-      (error.name === "TimeoutError" || error.name === "AbortError" || error.name === "TypeError"));
+    (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) ||
+    isNetworkFailure(error);
   return new BadGatewayException(
     silent
       ? "L'éditeur de cette plateforme ne répond pas. Réessayez dans quelques minutes."
       : "L'éditeur de cette plateforme a rendu une réponse inattendue. Installation refusée ; réessayez plus tard.",
   );
+}
+
+/**
+ * Coupure réseau signalée par `fetch` : un `TypeError` « fetch failed » dont la
+ * cause est l'erreur du socket.
+ *
+ * Tout `TypeError` ne l'est pas : un JSON d'une forme inattendue en lève un
+ * aussi (`builds.find is not a function`), et c'est alors une réponse
+ * inattendue, pas un silence.
+ */
+function isNetworkFailure(error: unknown): boolean {
+  return error instanceof TypeError && error.message === "fetch failed";
 }
 
 function describe(error: unknown): string {
