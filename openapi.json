@@ -99,7 +99,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -135,7 +142,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -171,7 +185,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -207,7 +228,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -243,7 +271,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -279,7 +314,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -315,7 +357,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -351,7 +400,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -387,7 +443,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -423,7 +486,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -459,7 +529,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -495,7 +572,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -531,7 +615,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -565,7 +656,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -612,7 +710,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -648,7 +753,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -684,7 +796,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -718,7 +837,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -754,7 +880,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -790,7 +923,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -826,7 +966,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -862,7 +1009,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -896,7 +1050,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -932,7 +1093,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -979,7 +1147,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1015,7 +1190,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1062,7 +1244,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1112,7 +1301,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « console.read »."
+            "description": "Authentifié, mais sans la portée « console.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1171,7 +1367,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « console.read »."
+            "description": "Authentifié, mais sans la portée « console.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1221,7 +1424,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « power.* »."
+            "description": "Authentifié, mais sans la portée « power.* », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1271,7 +1481,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « console.send »."
+            "description": "Authentifié, mais sans la portée « console.send », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1321,7 +1538,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « console.read »."
+            "description": "Authentifié, mais sans la portée « console.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1371,7 +1595,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « players.read »."
+            "description": "Authentifié, mais sans la portée « players.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1419,7 +1650,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « players.manage »."
+            "description": "Authentifié, mais sans la portée « players.manage », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1469,7 +1707,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « console.read »."
+            "description": "Authentifié, mais sans la portée « console.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1528,7 +1773,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.read »."
+            "description": "Authentifié, mais sans la portée « files.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1578,7 +1830,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.read »."
+            "description": "Authentifié, mais sans la portée « files.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1637,7 +1896,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.read »."
+            "description": "Authentifié, mais sans la portée « files.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -1687,7 +1953,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.write »."
+            "description": "Authentifié, mais sans la portée « files.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1737,7 +2010,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.archive »."
+            "description": "Authentifié, mais sans la portée « files.archive », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1787,7 +2067,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.archive »."
+            "description": "Authentifié, mais sans la portée « files.archive », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1837,7 +2124,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.write »."
+            "description": "Authentifié, mais sans la portée « files.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1887,7 +2181,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.write »."
+            "description": "Authentifié, mais sans la portée « files.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1937,7 +2238,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.write »."
+            "description": "Authentifié, mais sans la portée « files.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -1987,7 +2295,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.delete »."
+            "description": "Authentifié, mais sans la portée « files.delete », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2037,7 +2352,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « backups.read »."
+            "description": "Authentifié, mais sans la portée « backups.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2085,7 +2407,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « backups.create »."
+            "description": "Authentifié, mais sans la portée « backups.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2144,7 +2473,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « backups.restore »."
+            "description": "Authentifié, mais sans la portée « backups.restore », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2203,7 +2539,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « backups.delete »."
+            "description": "Authentifié, mais sans la portée « backups.delete », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2253,7 +2596,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « databases.read »."
+            "description": "Authentifié, mais sans la portée « databases.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2301,7 +2651,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « databases.create »."
+            "description": "Authentifié, mais sans la portée « databases.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2360,7 +2717,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « databases.update »."
+            "description": "Authentifié, mais sans la portée « databases.update », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2410,7 +2774,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « schedules.read »."
+            "description": "Authentifié, mais sans la portée « schedules.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2469,7 +2840,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « schedules.update »."
+            "description": "Authentifié, mais sans la portée « schedules.update », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2519,7 +2897,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « subusers.read »."
+            "description": "Authentifié, mais sans la portée « subusers.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2578,7 +2963,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.read »."
+            "description": "Authentifié, mais sans la portée « files.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2628,7 +3020,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « files.write »."
+            "description": "Authentifié, mais sans la portée « files.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2678,7 +3077,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « activity.read »."
+            "description": "Authentifié, mais sans la portée « activity.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2717,7 +3123,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « domains.certificates »."
+            "description": "Authentifié, mais sans la portée « domains.certificates », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2767,7 +3180,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « domains.certificates »."
+            "description": "Authentifié, mais sans la portée « domains.certificates », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2803,7 +3223,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans le droit sur cette ressource."
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2853,7 +3280,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « users.read »."
+            "description": "Authentifié, mais sans la portée « users.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2890,7 +3324,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « users.write »."
+            "description": "Authentifié, mais sans la portée « users.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -2940,7 +3381,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « users.read »."
+            "description": "Authentifié, mais sans la portée « users.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -2988,7 +3436,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « users.write »."
+            "description": "Authentifié, mais sans la portée « users.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3036,7 +3491,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « users.delete »."
+            "description": "Authentifié, mais sans la portée « users.delete », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3075,7 +3537,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « users.sso »."
+            "description": "Authentifié, mais sans la portée « users.sso », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -3125,7 +3594,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « servers.read »."
+            "description": "Authentifié, mais sans la portée « servers.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3133,7 +3609,7 @@
         }
       },
       "post": {
-        "summary": "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte Idempotency-Key.",
+        "summary": "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte Idempotency-Key. Une clé de revendeur ne le donne qu'à un compte client non suspendu, entièrement chez elle ou encore sans serveur ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs.",
         "description": "Clé de plateforme. Portée requise : `servers.create`.",
         "tags": [
           "Serveurs"
@@ -3162,7 +3638,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « servers.create »."
+            "description": "Authentifié, mais sans la portée « servers.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -3212,7 +3695,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « servers.read »."
+            "description": "Authentifié, mais sans la portée « servers.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3260,7 +3750,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « servers.resize »."
+            "description": "Authentifié, mais sans la portée « servers.resize », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3308,10 +3805,74 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « servers.delete »."
+            "description": "Authentifié, mais sans la portée « servers.delete », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/application/servers/{server}/owner": {
+      "post": {
+        "summary": "Changer le titulaire d'un serveur (corps : ownerId). Les sous-utilisateurs et le revendeur hébergeur restent ; les consoles ouvertes de l'ancien titulaire sont fermées. Une clé de revendeur ne peut le donner qu'à un compte client non suspendu, entièrement chez elle ou encore sans serveur ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs. Son propre client suspendu est refusé en 403, avec la raison ; tout autre refus rend 404.",
+        "description": "Clé de plateforme. Portée requise : `servers.owner`.",
+        "tags": [
+          "Serveurs"
+        ],
+        "operationId": "application-post-servers-by-server-owner",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "applicationKey": [
+              "servers.owner"
+            ]
+          }
+        ],
+        "x-gd-scope": "servers.owner",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « servers.owner », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
           }
         }
       }
@@ -3358,7 +3919,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « servers.suspend »."
+            "description": "Authentifié, mais sans la portée « servers.suspend », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Effectué."
@@ -3408,7 +3976,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « resellers.read »."
+            "description": "Authentifié, mais sans la portée « resellers.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3456,7 +4031,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « resellers.write »."
+            "description": "Authentifié, mais sans la portée « resellers.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3495,7 +4077,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « infrastructure.read »."
+            "description": "Authentifié, mais sans la portée « infrastructure.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3534,7 +4123,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « infrastructure.read »."
+            "description": "Authentifié, mais sans la portée « infrastructure.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3573,7 +4169,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « infrastructure.read »."
+            "description": "Authentifié, mais sans la portée « infrastructure.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."
@@ -3612,7 +4215,14 @@
             "description": "Aucune authentification recevable."
           },
           "403": {
-            "description": "Authentifié, mais sans la portée « infrastructure.read »."
+            "description": "Authentifié, mais sans la portée « infrastructure.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "2XX": {
             "description": "Résultat de la lecture."

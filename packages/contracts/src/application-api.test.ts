@@ -4,6 +4,7 @@ import {
   APPLICATION_SCOPES,
   type ApplicationScope,
   ApplicationServerCreate,
+  ApplicationServerOwner,
   ApplicationUserCreate,
   ApplicationUserUpdate,
   hasApplicationScope,
@@ -153,5 +154,31 @@ describe("corps de création de l'API applicative", () => {
     ]) {
       expect(ApplicationServerCreate.safeParse({ ...serveur, ...trop }).success).toBe(false);
     }
+  });
+});
+
+/**
+ * Changement de titulaire : un UUID, rien d'autre.
+ *
+ * L'identifiant part tel quel vers `users.id` : une valeur illisible y devenait
+ * une erreur 500 de PostgreSQL, qu'une boutique prend pour une panne et rejoue.
+ */
+describe("corps du changement de titulaire", () => {
+  it("accepte un identifiant de compte du panel", () => {
+    expect(
+      ApplicationServerOwner.safeParse({ ownerId: "0b0c1a4e-3c57-4c2e-9d36-3f1f5e9f0a11" }).success,
+    ).toBe(true);
+  });
+
+  it("refuse un corps vide, un identifiant illisible ou démesuré", () => {
+    for (const corps of [{}, { ownerId: "" }, { ownerId: "4271" }, { ownerId: "a".repeat(65) }]) {
+      expect(ApplicationServerOwner.safeParse(corps).success, JSON.stringify(corps)).toBe(false);
+    }
+  });
+
+  it("se demande par une portée à part, que le catalogue propose", () => {
+    expect(isApplicationScope("servers.owner")).toBe(true);
+    const accordables = APPLICATION_SCOPE_CATALOGUE.flatMap((g) => g.scopes.map((s) => s.scope));
+    expect(accordables).toContain("servers.owner");
   });
 });

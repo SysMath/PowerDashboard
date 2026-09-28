@@ -179,7 +179,7 @@ class ClientSimule extends GameDashboardClient
     public ?array $parEmail = null;
     public array $portees = [
         'users.read', 'users.write', 'users.sso',
-        'servers.create', 'servers.suspend', 'servers.delete',
+        'servers.create', 'servers.suspend', 'servers.delete', 'servers.owner',
     ];
 
     public function __construct()
@@ -231,6 +231,18 @@ class ClientSimule extends GameDashboardClient
     {
         $this->appels[] = 'suspend:' . $serverId . ':' . ($suspended ? 'oui' : 'non');
         return [];
+    }
+
+    public function setServerOwner(string $serverId, string $ownerId): array
+    {
+        $this->appels[] = "transfere:{$serverId}:{$ownerId}";
+        if ($serverId === 'deja-parti') {
+            throw new GameDashboardNotFound('Serveur introuvable.');
+        }
+        if (!in_array('servers.owner', $this->portees, true)) {
+            throw new GameDashboardError('Le panel a refusé la clé applicative : Portée manquante : servers.owner.');
+        }
+        return ['data' => ['serverId' => $serverId, 'ownerId' => $ownerId]];
     }
 
     public function deleteServer(string $serverId): array
@@ -396,14 +408,62 @@ verifie(
     implode(' | ', $s->appels)
 );
 
-// 9. Changement de titulaire : le compte suit, mais le transfert est annoncé
-//    comme non fait plutôt que faussement réussi.
+// 9. Changement de titulaire : le compte du nouveau client, puis le serveur
+//    lui est donné — et non plus un échec qui renvoyait au geste manuel.
+$s = new ClientSimule();
+[$type, $service] = service($s, ['gamedashboard_server_id' => 'serveur-42']);
+$dto = $type->changeCustomer($service, new Customer);
+verifie(
+    'changement de titulaire : compte du nouveau client, puis transfert du serveur',
+    $dto->success === true
+        && $s->appels === [
+            'chercheParExterne:4271',
+            'chercheParEmail:paul@exemple.fr',
+            'creeCompte:4271:clientxcms-client-4271',
+            'transfere:serveur-42:compte-neuf',
+        ],
+    $dto->message . ' | ' . implode(' | ', $s->appels)
+);
+
+$s = new ClientSimule();
+$s->parExterne = ['id' => 'compte-connu'];
+[$type, $service] = service($s, ['gamedashboard_server_id' => 'serveur-42']);
+$dto = $type->changeCustomer($service, new Customer);
+verifie(
+    'changement vers un client déjà connu : transfert direct, sans création',
+    $dto->success === true
+        && $s->appels === ['chercheParExterne:4271', 'transfere:serveur-42:compte-connu'],
+    implode(' | ', $s->appels)
+);
+
 $s = new ClientSimule();
 [$type, $service] = service($s);
 $dto = $type->changeCustomer($service, new Customer);
 verifie(
-    'changement de titulaire : le compte est créé, et l\'incomplétude est dite',
-    $dto->success === false && str_contains($dto->message, 'la main'),
+    'changement sans serveur livré : le compte est prêt, rien à transférer',
+    $dto->success === true && !in_array('transfere', array_map(
+        static fn (string $a): string => explode(':', $a)[0],
+        $s->appels
+    ), true),
+    $dto->message . ' | ' . implode(' | ', $s->appels)
+);
+
+$s = new ClientSimule();
+$s->portees = array_values(array_diff($s->portees, ['servers.owner']));
+[$type, $service] = service($s, ['gamedashboard_server_id' => 'serveur-42']);
+$dto = $type->changeCustomer($service, new Customer);
+verifie(
+    'clé sans servers.owner : échec qui nomme la portée, jamais un faux succès',
+    $dto->success === false && str_contains($dto->message, 'servers.owner'),
+    $dto->message
+);
+
+$s = new ClientSimule();
+[$type, $service] = service($s, ['gamedashboard_server_id' => 'deja-parti']);
+$dto = $type->changeCustomer($service, new Customer);
+verifie(
+    'serveur absent du panel : échec explicite',
+    $dto->success === false && str_contains($dto->message, 'introuvable'),
     $dto->message
 );
 

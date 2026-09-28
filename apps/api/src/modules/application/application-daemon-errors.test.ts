@@ -2,6 +2,7 @@ import { Logger, ServiceUnavailableException } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ActivityService } from "../activity/activity.service";
 import type { AdminActionsService } from "../admin/admin-actions.service";
+import type { AdminServerService } from "../admin/admin-server.service";
 import type { BillingSsoService } from "../auth/billing-sso.service";
 import type { ServerResizeService } from "../client/server-resize.service";
 import type { BrandingService } from "../reseller/branding.service";
@@ -43,6 +44,7 @@ describe("API applicative : panne du daemon", () => {
       { requireServer: vi.fn(async () => {}) } as unknown as ResellerScopeService,
       {} as BrandingService,
       {} as ServerResizeService,
+      {} as AdminServerService,
     );
     const requete = {
       application: { id: "cle-1", name: "Boutique", resellerId: "rev-1", scopes: [] },

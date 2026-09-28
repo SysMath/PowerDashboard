@@ -106,6 +106,10 @@ import { StaffTwoFactorGuard } from "./staff-2fa.guard";
   // seconde implémentation finirait par les désaccorder.
   exports: [
     AdminActionsService,
+    // Le changement de titulaire aussi : la boutique qui transfère un service
+    // doit passer par le consentement du revendeur et la révocation des
+    // consoles, exactement comme l'administration.
+    AdminServerService,
     // La coquille du panel lit les annonces en cours : elles s'affichent à
     // tout le monde, pas seulement dans l'administration qui les rédige.
     AnnouncementsService,

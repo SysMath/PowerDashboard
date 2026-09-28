@@ -6,8 +6,9 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { isUuid } from "../../common/uuid";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { AuthTokenRepository } from "./auth-token.repository";
 
@@ -81,7 +82,12 @@ export class BillingSsoService {
   ): Promise<BillingSsoLink> {
     const cible =
       criteria.userId !== undefined
-        ? eq(users.id, criteria.userId)
+        ? // Un identifiant illisible ne désigne personne ; la base l'aurait
+          // refusé par une erreur 500. `false` : aucune ligne, donc le 404
+          // ci-dessous, comme pour un compte inconnu.
+          isUuid(criteria.userId)
+          ? eq(users.id, criteria.userId)
+          : sql`false`
         : criteria.externalId !== undefined
           ? eq(users.externalId, criteria.externalId)
           : null;

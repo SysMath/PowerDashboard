@@ -82,14 +82,18 @@ const PORT = 8731;
 $racine = __DIR__;
 
 // Le panel de poche tourne le temps du banc, et s'arrête avec lui.
+// Commande en tableau, sans shell : `proc_terminate` vise alors `php -S`
+// lui-même. Passée en chaîne, elle tuait le shell intermédiaire et laissait
+// le serveur de poche tourner après le banc.
 $serveur = proc_open(
-    'php -S 127.0.0.1:' . PORT . ' ' . escapeshellarg($racine . '/faux-panel.php'),
+    [PHP_BINARY, '-S', '127.0.0.1:' . PORT, $racine . '/faux-panel.php'],
     [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']],
     $tubes
 );
 register_shutdown_function(static function () use ($serveur, $racine) {
     if (is_resource($serveur)) {
         proc_terminate($serveur);
+        proc_close($serveur);
     }
     @unlink($racine . '/.etat.json');
     @unlink($racine . '/.appels.json');
@@ -137,6 +141,9 @@ function gestes(): array
         }
         if ($chemin === '/api/v1/application/servers' && $a['methode'] === 'POST') {
             return 'creeServeur:' . ($a['corps']['ownerId'] ?? '') . ':' . ($a['idempotency'] ?? '');
+        }
+        if (str_ends_with($chemin, '/owner')) {
+            return 'transfere:' . basename(dirname($chemin)) . ':' . ($a['corps']['ownerId'] ?? '');
         }
         if (str_ends_with($chemin, '/suspension')) {
             return 'suspend:' . ($a['corps']['suspended'] ? 'oui' : 'non');
@@ -361,6 +368,67 @@ verifie(
         && str_contains((string) ($retour['vars']['ssoUrl'] ?? ''), 'dosinglesignon=1')
         && str_contains((string) ($retour['vars']['ssoUrl'] ?? ''), 'id=9001'),
     json_encode($retour)
+);
+
+// 13. Le service a changé de client dans WHMCS : le bouton d'administration
+//     donne le serveur au client actuel, créé au besoin.
+scenario();
+$retour = gamedashboard_ReassignOwner(params([
+    'customfields' => [GAMEDASHBOARD_CHAMP_SERVEUR => 'serveur-42'],
+]));
+verifie(
+    'réattribution : compte du client actuel, puis transfert du serveur, et « success »',
+    $retour === 'success'
+        && gestes() === [
+            'chercheParExterne:4271',
+            'chercheParEmail:paul@exemple.fr',
+            'creeCompte:4271:whmcs-client-4271',
+            'transfere:serveur-42:compte-neuf',
+        ],
+    var_export($retour, true) . ' | ' . implode(' | ', gestes())
+);
+verifie(
+    'le bouton est déclaré à WHMCS et vise la bonne fonction',
+    in_array('ReassignOwner', gamedashboard_AdminCustomButtonArray(), true)
+        && function_exists('gamedashboard_ReassignOwner'),
+    json_encode(gamedashboard_AdminCustomButtonArray())
+);
+
+scenario();
+$retour = gamedashboard_ReassignOwner(params());
+verifie(
+    'réattribution sans serveur rattaché : message, jamais « success », aucun appel',
+    $retour !== 'success' && is_string($retour) && $retour !== '' && gestes() === [],
+    var_export($retour, true)
+);
+
+scenario(['scopes' => ['users.read', 'users.write']]);
+$retour = gamedashboard_ReassignOwner(params([
+    'customfields' => [GAMEDASHBOARD_CHAMP_SERVEUR => 'serveur-42'],
+]));
+verifie(
+    'clé sans servers.owner : le refus nomme la portée',
+    is_string($retour) && str_contains($retour, 'servers.owner'),
+    var_export($retour, true)
+);
+verifie(
+    'portée manquante : présentée comme un refus de la clé',
+    is_string($retour) && str_starts_with($retour, 'Le panel a refusé la clé applicative'),
+    var_export($retour, true)
+);
+
+// 14. Un 403 qui tient au compte visé n'est pas un refus de la clé : la
+//     présenter ainsi enverrait vérifier une clé qui fonctionne.
+scenario(['destinataireSuspendu' => true]);
+$retour = gamedashboard_ReassignOwner(params([
+    'customfields' => [GAMEDASHBOARD_CHAMP_SERVEUR => 'serveur-42'],
+]));
+verifie(
+    'client suspendu : le refus du panel, sans accuser la clé',
+    is_string($retour)
+        && str_starts_with($retour, 'Le panel a refusé : Ce compte est suspendu')
+        && !str_contains($retour, 'clé applicative'),
+    var_export($retour, true)
 );
 
 echo $echecs === 0 ? "\nTout passe.\n" : "\n{$echecs} échec(s).\n";

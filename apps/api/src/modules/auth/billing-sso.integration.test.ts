@@ -122,6 +122,17 @@ describe.skipIf(!HAS_DATABASE)("lien de facturation d'un revendeur (intégration
     );
   });
 
+  it("refuse le compte qui n'a encore aucun serveur, quel qu'il soit", async () => {
+    // Un compte sans serveur n'est à personne : sans ce refus, n'importe quelle
+    // clé de revendeur ouvrirait la session du client tout neuf d'un confrère.
+    const revendeur = await compte("reseller");
+    const neuf = await compte();
+
+    await expect(billing.issue({ userId: neuf }, revendeur)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
   it("laisse la clé de la plateforme ouvrir un client servi par plusieurs revendeurs", async () => {
     // La plateforme détient tous les serveurs : aucun périmètre à franchir.
     const client = await compte();
@@ -131,5 +142,12 @@ describe.skipIf(!HAS_DATABASE)("lien de facturation d'un revendeur (intégration
     await expect(billing.issue({ userId: client }, null)).resolves.toMatchObject({
       url: expect.stringMatching(/^https:\/\/panel\.test\/sso\//),
     });
+  });
+  it("un identifiant illisible est un compte inconnu, jamais une erreur 500 de la base", async () => {
+    for (const cle of [null, await compte("reseller")]) {
+      await expect(billing.issue({ userId: "nimporte-quoi" }, cle)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    }
   });
 });

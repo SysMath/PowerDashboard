@@ -55,6 +55,7 @@ réservée à votre équipe et aux personnes qu'un client invite sur son serveur
    | `servers.create` | créer le serveur |
    | `servers.suspend` | suspendre sur impayé |
    | `servers.delete` | supprimer à la résiliation |
+   | `servers.owner` | donner le serveur au client actuel après un déplacement de service |
 
    `users.sso` est séparée de `users.write` à dessein : modifier une fiche et
    **entrer dans le compte** ne sont pas la même autorité. Si vous n'employez
@@ -87,6 +88,21 @@ réservée à votre équipe et aux personnes qu'un client invite sur son serveur
    connexion du panel cessera alors de se présenter comme le chemin de vos
    clients, et les y renverra.
 
+## Changement de client d'un service
+
+WHMCS ne prévient aucun module quand un service est déplacé vers un autre
+client (*Move Product/Service*) : le serveur resterait à l'ancien titulaire,
+qui garderait sa console, et le nouveau client ne le verrait pas.
+
+Après un déplacement, ouvrez la fiche du service et cliquez **Donner le serveur
+au client actuel**. Le module retrouve ou crée le compte du client qui porte
+maintenant le service, puis lui donne le serveur ; le panel ferme les consoles
+ouvertes de l'ancien titulaire et laisse les sous-utilisateurs en place.
+Recliquer ne fait rien de plus.
+
+Il faut la portée `servers.owner`. Une clé créée avant cette version ne l'a
+pas : créez-en une nouvelle, le bouton échoue sinon en nommant la portée.
+
 ## Reprise d'un parc existant
 
 Si vos clients ont déjà un compte sur le panel, le module les **rattache** au
@@ -113,7 +129,7 @@ suspension. Il n'écrit jamais rien chez vous.
 Le module tourne dans un banc (`tests/module-logic.php`) qui le fait dialoguer
 avec un **panel de poche servi en HTTP**. Rien n'y est remplacé : le module et
 son client d'API sont exécutés tels qu'ils sont livrés, en-têtes, encodage JSON,
-codes de statut et clés d'idempotence compris. Douze cas y passent :
+codes de statut et clés d'idempotence compris. Ces cas y passent :
 
 - client inconnu : le compte est créé **avant** le serveur ;
 - reprise de parc : un compte existant est rattaché, jamais dupliqué ;
@@ -129,7 +145,10 @@ codes de statut et clés d'idempotence compris. Douze cas y passent :
 - champ personnalisé absent : la création réussit et le journal le dit ;
 - ouverture de session : le triplet `success` / `redirectTo` / `errorMsg` ;
 - sans domaine, le serveur est nommé par son numéro et jamais « other » ;
-- le bouton de l'espace client pointe vers l'adresse `dosinglesignon=1`.
+- le bouton de l'espace client pointe vers l'adresse `dosinglesignon=1` ;
+- le bouton « Donner le serveur au client actuel » : compte du client actuel,
+  puis transfert du serveur et `'success'` ; sans serveur rattaché, un message
+  et aucun appel ; clé sans `servers.owner`, un refus qui la nomme.
 
 Le client d'API a par ailleurs été exécuté contre un panel **réel**.
 
@@ -160,6 +179,12 @@ Concrètement, une clé de revendeur :
 - ne voit que **ses** clients, c'est-à-dire ceux qui possèdent au moins un
   serveur qu'il héberge ;
 - ne peut ni lire, ni suspendre, ni supprimer le serveur d'un autre ;
+- ne crée ou ne donne un serveur qu'à un compte client entièrement à lui,
+  ou à un compte encore sans serveur ; jamais au client d'un autre, même
+  partagé, ni à un compte suspendu, du personnel, ou encore sans serveur et
+  invité chez un autre (son propre client invité ailleurs reçoit) ;
+- ne modifie la fiche que d'un client entièrement à lui : l'identifiant
+  externe d'un client partagé est celui de l'autre facturation ;
 - ne peut pas ouvrir de session au nom d'un client qui n'est pas le sien ;
 - ne peut pas s'accorder les portées de la plateforme — les enveloppes de
   revente et la configuration d'un node lui sont refusées **à l'émission**,

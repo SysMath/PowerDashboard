@@ -30,6 +30,7 @@ import {
 } from "@nestjs/common";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { isUuid } from "../../common/uuid";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { ResellerQuotaService } from "../reseller/reseller-quota.service";
 import { WebhookEmitterService } from "../webhooks/webhook-emitter.service";
@@ -363,6 +364,9 @@ export class ServerProvisioningService {
   }
 
   private async eggFor(eggId: string) {
+    // Un identifiant illisible n'est pas un jeu : sans ce contrôle, PostgreSQL
+    // refusait la comparaison et la création rendait 500.
+    if (!isUuid(eggId)) throw new BadRequestException("Jeu indisponible.");
     const [row] = await this.db
       .select({
         id: eggs.id,

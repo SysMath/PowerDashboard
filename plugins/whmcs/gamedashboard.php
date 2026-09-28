@@ -284,6 +284,57 @@ function gamedashboard_TerminateAccount(array $params)
 }
 
 /**
+ * Les boutons de la fiche du service, côté administration.
+ *
+ * WHMCS n'appelle aucun module quand un service change de client (« Move
+ * Product/Service ») : le serveur restait au titulaire d'origine, qui gardait
+ * sa console, et le nouveau client ne le voyait pas. Ce bouton rattrape le
+ * déplacement, en un clic, à lancer après chaque transfert.
+ *
+ * Le libellé est la clé, le suffixe de la fonction la valeur : WHMCS appelle
+ * `gamedashboard_<valeur>($params)` et attend `'success'` ou un message.
+ */
+function gamedashboard_AdminCustomButtonArray()
+{
+    return [
+        'Donner le serveur au client actuel' => 'ReassignOwner',
+    ];
+}
+
+/**
+ * Donne le serveur au client qui porte **aujourd'hui** le service dans WHMCS.
+ *
+ * `$params['userid']` est déjà le nouveau client après un déplacement : c'est
+ * lui qu'on retrouve ou crée dans le panel, comme à la commande, puis à qui
+ * l'on donne le serveur. Relancer le bouton ne fait rien de plus.
+ */
+function gamedashboard_ReassignOwner(array $params)
+{
+    try {
+        $id = gamedashboard_server_id($params);
+        if ($id === '') {
+            return 'Aucun serveur GameDashboard n\'est rattaché à ce service.';
+        }
+
+        $idClient = gamedashboard_client_id($params);
+        if ($idClient === '') {
+            return 'Impossible d\'identifier le client dans WHMCS.';
+        }
+
+        $client = gamedashboard_client($params);
+        $compte = gamedashboard_ensure_user($client, $params, $idClient);
+        if (!isset($compte['id'])) {
+            return 'Le panel n\'a pas rendu de compte exploitable.';
+        }
+
+        $client->setServerOwner($id, (string) $compte['id']);
+        return 'success';
+    } catch (GameDashboardError $e) {
+        return $e->getMessage();
+    }
+}
+
+/**
  * L'ouverture de session, telle que WHMCS l'attend.
  *
  * **C'est WHMCS qui redirige**, pas nous : la fonction rend l'URL et il s'en

@@ -17,6 +17,7 @@ import {
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { isUuid } from "../../common/uuid";
 import { WingsClientService } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
 
@@ -211,6 +212,17 @@ export class AdminServerService {
    *   daemon et pour tous les journaux déjà écrits.
    */
   async setOwner(serverId: string, ownerId: string): Promise<void> {
+    /*
+     * Deux identifiants contrôlés avant d'atteindre la base : PostgreSQL
+     * refusait la conversion d'une valeur illisible en UUID, et le refus
+     * devenait une erreur 500. Illisible veut dire inconnu, et se dit comme
+     * tel.
+     */
+    if (!isUuid(ownerId)) {
+      throw new BadRequestException("Compte destinataire inconnu.");
+    }
+    if (!isUuid(serverId)) throw new NotFoundException("Serveur introuvable.");
+
     const [cible] = await this.db
       .select({ id: users.id, role: users.role, access: users.platformAccess })
       .from(users)

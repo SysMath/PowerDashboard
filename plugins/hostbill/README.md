@@ -61,6 +61,16 @@ Si vos clients ont déjà un compte sur le panel, le module les **rattache** au
 lieu d'en créer un second : il cherche d'abord votre identifiant client, puis
 l'adresse e-mail, et n'en crée un que s'il ne trouve rien.
 
+## Changement de client d'un service
+
+Ce module ne transfère pas le serveur quand un service change de client dans
+HostBill : le serveur reste à l'ancien titulaire. Faites alors le geste dans le
+panel, sur la fiche du serveur dans l'administration (changement de
+propriétaire), ou par l'API applicative : `POST
+/api/v1/application/servers/{serveur}/owner` avec `{"ownerId": "…"}` et une clé
+portant `servers.owner`. Dans les deux cas, le panel ferme les consoles
+ouvertes de l'ancien titulaire.
+
 ## Échéances sur l'accueil du panel (facultatif)
 
 Le panel peut aussi **lire** les services de chaque client et leurs échéances,
@@ -121,6 +131,12 @@ Concrètement, une clé de revendeur :
 - ne voit que **ses** clients, c'est-à-dire ceux qui possèdent au moins un
   serveur qu'il héberge ;
 - ne peut ni lire, ni suspendre, ni supprimer le serveur d'un autre ;
+- ne crée ou ne donne un serveur qu'à un compte client entièrement à lui,
+  ou à un compte encore sans serveur ; jamais au client d'un autre, même
+  partagé, ni à un compte suspendu, du personnel, ou encore sans serveur et
+  invité chez un autre (son propre client invité ailleurs reçoit) ;
+- ne modifie la fiche que d'un client entièrement à lui : l'identifiant
+  externe d'un client partagé est celui de l'autre facturation ;
 - ne peut pas ouvrir de session au nom d'un client qui n'est pas le sien ;
 - ne peut pas s'accorder les portées de la plateforme — les enveloppes de
   revente et la configuration d'un node lui sont refusées **à l'émission**,

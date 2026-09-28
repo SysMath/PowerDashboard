@@ -47,6 +47,16 @@ export const APPLICATION_SCOPES = [
    * volée ne doit pas pouvoir remplir un node par ce chemin.
    */
   "servers.resize",
+  /**
+   * Changer le titulaire d'un serveur : le service change de client chez le
+   * facturier, le serveur suit.
+   *
+   * Portée à part : donner un serveur à quelqu'un d'autre, c'est lui en
+   * remettre les fichiers et la console. Une boutique qui ne fait que créer
+   * et suspendre n'a aucune raison de le pouvoir, et une clé déjà émise ne
+   * l'acquiert pas en silence.
+   */
+  "servers.owner",
   "servers.delete",
   /* Revendeurs : enveloppe de ressources et autorisations. */
   "resellers.read",
@@ -141,6 +151,7 @@ export const APPLICATION_SCOPE_CATALOGUE: readonly ApplicationScopeGroup[] = [
       { scope: "servers.create", label: "Créer un serveur" },
       { scope: "servers.suspend", label: "Suspendre et rétablir" },
       { scope: "servers.resize", label: "Changer les limites d'un serveur" },
+      { scope: "servers.owner", label: "Changer le titulaire d'un serveur" },
       { scope: "servers.delete", label: "Supprimer un serveur" },
     ],
   },
@@ -306,3 +317,16 @@ export const ApplicationServerCreate = z.object({
   resources: ResourceRequest.optional(),
 });
 export type ApplicationServerCreate = z.infer<typeof ApplicationServerCreate>;
+
+/**
+ * Changement de titulaire : le compte du panel qui reçoit le serveur.
+ *
+ * Un UUID exigé, et non la seule borne de `PanelId` : l'identifiant part tel
+ * quel dans une comparaison avec `users.id`, et une valeur illisible y
+ * devenait une erreur 500 de PostgreSQL au lieu d'un refus qui dit quoi
+ * corriger.
+ */
+export const ApplicationServerOwner = z.object({
+  ownerId: z.string().uuid("Identifiant de compte invalide."),
+});
+export type ApplicationServerOwner = z.infer<typeof ApplicationServerOwner>;

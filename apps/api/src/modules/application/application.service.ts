@@ -19,6 +19,7 @@ import {
 } from "@nestjs/common";
 import { and, count, eq, isNull, or, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { isUuid } from "../../common/uuid";
 import { CatalogueService } from "../client/catalogue.service";
 import { ServerProvisioningService } from "../client/server-provisioning.service";
 import { WebhookEmitterService } from "../webhooks/webhook-emitter.service";
@@ -102,6 +103,10 @@ export class ApplicationService {
     email?: string;
     externalId?: string;
   }): Promise<ApplicationUser | null> {
+    // Un identifiant illisible ne désigne personne : PostgreSQL l'aurait
+    // refusé par une erreur 500.
+    if (criteria.id !== undefined && !isUuid(criteria.id)) return null;
+
     const where =
       criteria.id !== undefined
         ? eq(users.id, criteria.id)
@@ -249,7 +254,24 @@ export class ApplicationService {
       if (value === "") throw new BadRequestException("Nom vide.");
       values.nameLast = value;
     }
-    if (patch.externalId !== undefined) values.externalId = patch.externalId;
+    if (patch.externalId !== undefined) {
+      /*
+       * Contrôlé ici, comme à la création : l'index unique répondait par une
+       * erreur 500, qui disait surtout qu'une autre facturation emploie cet
+       * identifiant.
+       */
+      if (patch.externalId !== null) {
+        const [collision] = await this.db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.externalId, patch.externalId), sql`${users.id} <> ${userId}`))
+          .limit(1);
+        if (collision) {
+          throw new ConflictException("Un compte est déjà rattaché à cet identifiant externe.");
+        }
+      }
+      values.externalId = patch.externalId;
+    }
 
     const [updated] = await this.db
       .update(users)
@@ -280,6 +302,11 @@ export class ApplicationService {
     serverId?: string;
     resellerId?: string | null;
   }): Promise<ApplicationServer[]> {
+    // Même raison que `findUser` : un identifiant illisible ne filtre sur rien
+    // qui existe, et la base l'aurait refusé par une erreur 500.
+    if (filter.ownerId !== undefined && filter.ownerId !== "" && !isUuid(filter.ownerId)) return [];
+    if (filter.serverId !== undefined && !isUuid(filter.serverId)) return [];
+
     const conditions = [
       filter.ownerId ? eq(servers.ownerId, filter.ownerId) : undefined,
       filter.serverId ? eq(servers.id, filter.serverId) : undefined,
@@ -365,6 +392,10 @@ export class ApplicationService {
      */
     resellerId: string | null = null,
   ): Promise<ApplicationServer> {
+    // Le mot du chemin de création pour un compte inconnu ; la base aurait
+    // rendu une erreur 500 pour une valeur qu'elle ne sait pas convertir.
+    if (!isUuid(input.ownerId)) throw new BadRequestException("Compte destinataire inconnu.");
+
     const placement = await this.resolvePlacement(input, resellerId);
 
     /**

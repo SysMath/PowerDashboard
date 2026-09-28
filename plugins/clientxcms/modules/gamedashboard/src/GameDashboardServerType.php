@@ -198,24 +198,42 @@ class GameDashboardServerType extends AbstractServerType implements ServerTypeIn
      * Le service change de titulaire : le serveur suit.
      *
      * Le nouveau client doit exister dans le panel — on le crée au besoin,
-     * comme à la commande. Sans cela, l'ancien propriétaire garderait l'accès
-     * à un serveur qui ne lui appartient plus.
+     * comme à la commande — puis le serveur lui est donné. Sans ce second
+     * geste, l'ancien titulaire garderait l'accès à un serveur qui ne lui
+     * appartient plus, et le nouveau ne le verrait pas.
+     *
+     * Le panel ferme les consoles ouvertes de l'ancien titulaire et laisse les
+     * sous-utilisateurs en place. Rejouer le changement ne fait rien de plus.
      */
     public function changeCustomer(Service $service, Customer $customer): ServiceStateChangeDTO
     {
         try {
-            $this->ensureUser($this->client($service->server), $customer);
+            $client = $this->client($service->server);
+            $compte = $this->ensureUser($client, $customer);
+            if (!isset($compte['id'])) {
+                return new ServiceStateChangeDTO($service, false, 'Le panel n\'a pas rendu de compte exploitable.');
+            }
 
-            /*
-             * Le transfert côté panel n'est pas encore exposé par l'API
-             * applicative : on le dit plutôt que de rendre un succès qui
-             * laisserait croire que le serveur a changé de mains.
-             */
+            $id = $this->identifiant($service);
+            if ($id === '') {
+                // Aucun serveur n'a encore été livré : il n'y a rien à
+                // transférer, et le compte du nouveau client est prêt pour la
+                // livraison. Un échec bloquerait le changement pour rien.
+                return new ServiceStateChangeDTO(
+                    $service,
+                    true,
+                    'Aucun serveur rattaché : le compte du nouveau client est prêt sur GameDashboard.'
+                );
+            }
+
+            $client->setServerOwner($id, (string) $compte['id']);
+
+            return new ServiceStateChangeDTO($service, true, 'Serveur transféré au nouveau client sur GameDashboard.');
+        } catch (\GameDashboardNotFound $e) {
             return new ServiceStateChangeDTO(
                 $service,
                 false,
-                'Le compte du nouveau client existe désormais sur GameDashboard, mais le serveur doit y être '
-                    . 'réattribué à la main : l\'API ne propose pas encore ce transfert.'
+                'Le serveur ou le compte du nouveau client est introuvable sur GameDashboard : ' . $e->getMessage()
             );
         } catch (\GameDashboardError $e) {
             return new ServiceStateChangeDTO($service, false, $e->getMessage());

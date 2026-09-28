@@ -37,6 +37,7 @@ réservée à votre équipe et aux personnes qu'un client invite sur son serveur
    | `servers.create` | créer le serveur |
    | `servers.suspend` | suspendre sur impayé |
    | `servers.delete` | supprimer à l'expiration |
+   | `servers.owner` | donner le serveur au nouveau client quand un service change de titulaire |
 
    `users.sso` est séparée de `users.write` à dessein : modifier une fiche et
    **entrer dans le compte** ne sont pas la même autorité. Si vous n'employez
@@ -77,12 +78,20 @@ Si vos clients ont déjà un compte sur le panel, le module les **rattache** au
 lieu d'en créer un second : il cherche d'abord votre identifiant client, puis
 l'adresse e-mail, et n'en crée un que s'il ne trouve rien.
 
-## Ce que ce module ne fait pas
+## Changement de titulaire d'un service
 
-**Le changement de titulaire d'un service** crée bien le compte du nouveau
-client dans le panel, mais ne lui réattribue pas le serveur : l'API applicative
-n'expose pas encore ce transfert. Le module rend donc un échec explicite plutôt
-qu'un succès trompeur, et vous fait le geste à la main dans le panel.
+Quand un service change de client dans ClientXCMS, le module retrouve ou crée
+le compte du nouveau client dans le panel, puis **lui donne le serveur**. Le
+panel ferme au passage les consoles ouvertes de l'ancien titulaire ; les
+sous-utilisateurs invités sur le serveur restent. Un service dont le serveur
+n'a pas encore été livré n'a rien à transférer : seul le compte est préparé.
+
+Il faut pour cela la portée `servers.owner`. Une clé créée avant cette version
+ne l'a pas, et les portées d'une clé ne se modifient pas : créez-en une
+nouvelle. Sans elle, le changement échoue en nommant la portée manquante, et
+rien n'est transféré.
+
+## Ce que ce module ne fait pas
 
 Le changement de mot de passe, les options additionnelles et l'import de
 services existants ne sont pas surchargés : ils gardent le comportement par
@@ -104,7 +113,7 @@ suspension. Il n'écrit jamais rien chez vous.
 
 Le module tourne dans un banc (`modules/gamedashboard/tests/module-logic.php`)
 qui redéclare le minimum de classes ClientXCMS dont il dépend, puis exécute le
-module tel qu'il sera livré. Douze cas y passent :
+module tel qu'il sera livré. Seize cas y passent :
 
 - client inconnu : le compte est créé **avant** le serveur ;
 - reprise de parc : un compte existant est rattaché, jamais dupliqué ;
@@ -116,7 +125,10 @@ module tel qu'il sera livré. Douze cas y passent :
   facturable ;
 - test de connexion : verdict juste, portées manquantes nommées ;
 - le lien de connexion est émis pour le **titulaire** du service ;
-- changement de titulaire : l'incomplétude est annoncée.
+- changement de titulaire : compte du nouveau client, puis transfert du
+  serveur ; transfert direct vers un client déjà connu ; rien à transférer
+  sans serveur livré ; clé sans `servers.owner` ou serveur absent du panel :
+  échec explicite, jamais un faux succès.
 
 Le client d'API a par ailleurs été exécuté contre un panel **réel**.
 
@@ -152,6 +164,12 @@ Concrètement, une clé de revendeur :
 - ne voit que **ses** clients, c'est-à-dire ceux qui possèdent au moins un
   serveur qu'il héberge ;
 - ne peut ni lire, ni suspendre, ni supprimer le serveur d'un autre ;
+- ne crée ou ne donne un serveur qu'à un compte client entièrement à lui,
+  ou à un compte encore sans serveur ; jamais au client d'un autre, même
+  partagé, ni à un compte suspendu, du personnel, ou encore sans serveur et
+  invité chez un autre (son propre client invité ailleurs reçoit) ;
+- ne modifie la fiche que d'un client entièrement à lui : l'identifiant
+  externe d'un client partagé est celui de l'autre facturation ;
 - ne peut pas ouvrir de session au nom d'un client qui n'est pas le sien ;
 - ne peut pas s'accorder les portées de la plateforme — les enveloppes de
   revente et la configuration d'un node lui sont refusées **à l'émission**,

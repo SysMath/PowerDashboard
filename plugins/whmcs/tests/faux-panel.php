@@ -115,6 +115,19 @@ if (preg_match('#^/api/v1/application/servers/([^/]+)/suspension$#', $chemin)) {
     repond(200, ['data' => ['suspended' => $corps['suspended'] ?? null]]);
 }
 
+if (preg_match('#^/api/v1/application/servers/([^/]+)/owner$#', $chemin, $m) && $methode === 'POST') {
+    if (!in_array('servers.owner', $etat['scopes'] ?? ['servers.owner'], true)) {
+        repond(403, ['message' => 'Portée manquante : servers.owner.']);
+    }
+    if (($etat['destinataireSuspendu'] ?? false) === true) {
+        repond(403, ['message' => 'Ce compte est suspendu dans le panel : aucun serveur ne lui est livré tant qu\'il n\'est pas réactivé.']);
+    }
+    if ($m[1] === 'deja-parti') {
+        repond(404, ['message' => 'Serveur introuvable.']);
+    }
+    repond(201, ['data' => ['serverId' => $m[1], 'ownerId' => $corps['ownerId'] ?? null]]);
+}
+
 if (preg_match('#^/api/v1/application/servers/([^/]+)$#', $chemin, $m) && $methode === 'DELETE') {
     if ($m[1] === 'deja-parti') {
         repond(404, ['message' => 'Serveur introuvable.']);
