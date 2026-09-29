@@ -612,7 +612,8 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
   {
     method: "POST",
     path: "/servers/{server}/suspension",
-    summary: "Suspendre sur impayé, ou rétablir après régularisation.",
+    summary:
+      "Suspendre sur impayé, ou rétablir après régularisation. La suspension coupe les sessions SFTP et les consoles du titulaire et des sous-utilisateurs ; `sessionsNotClosed` compte les comptes dont le node n'a pas confirmé la fermeture (la suspension est faite quand même).",
     scope: "servers.suspend",
     group: "Serveurs",
   },

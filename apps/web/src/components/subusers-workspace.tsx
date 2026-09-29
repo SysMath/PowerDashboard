@@ -75,6 +75,9 @@ export function SubusersWorkspace({
   const tc = useTranslations("common");
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  // Le node n'a pas confirmé la fermeture de la session SFTP de la personne
+  // retirée : l'accès est retiré, mais une session déjà ouverte a pu rester.
+  const [sessionLeft, setSessionLeft] = useState(false);
   const [toDelete, setToDelete] = useState<Subuser | null>(null);
   const [editing, setEditing] = useState<Subuser | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -83,9 +86,13 @@ export function SubusersWorkspace({
   const [pending, startTransition] = useTransition();
 
   const run = useCallback(
-    (action: () => Promise<{ error: string | null }>, onDone?: () => void) =>
+    (
+      action: () => Promise<{ error: string | null; sessionsNotClosed?: number }>,
+      onDone?: () => void,
+    ) =>
       startTransition(async () => {
         const result = await action();
+        setSessionLeft((result.sessionsNotClosed ?? 0) > 0);
         setError(result.error);
         if (!result.error) {
           onDone?.();
@@ -191,6 +198,16 @@ export function SubusersWorkspace({
       {error ? (
         <AlertBanner variant="danger" title={tc("refused")} dismissible>
           {error}
+        </AlertBanner>
+      ) : null}
+      {sessionLeft ? (
+        <AlertBanner
+          variant="warning"
+          title={t("sessionLeftTitle")}
+          dismissible
+          onDismiss={() => setSessionLeft(false)}
+        >
+          {t("sessionLeftBody")}
         </AlertBanner>
       ) : null}
 

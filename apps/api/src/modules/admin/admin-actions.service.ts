@@ -5,6 +5,7 @@ import {
   type Database,
   eggs,
   nodes,
+  serverSubusers,
   servers,
   users,
 } from "@gamedashboard/db";
@@ -14,6 +15,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { and, count, eq, sql } from "drizzle-orm";
@@ -22,6 +24,7 @@ import { SessionRepository } from "../auth/session.repository";
 import { SubdomainsService } from "../dns/subdomains.service";
 import { S3Service } from "../storage/s3.service";
 import { WebhookEmitterService } from "../webhooks/webhook-emitter.service";
+import { closeSessions } from "../wings/close-sessions";
 import { WingsClientService, WingsUnavailableError } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
 import { isAdminRole } from "./admin.guard";
@@ -31,6 +34,8 @@ const ASSIGNABLE_ROLES = new Set(["user", "support", "admin", "reseller"]);
 
 @Injectable()
 export class AdminActionsService {
+  private readonly logger = new Logger(AdminActionsService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(WingsClientService) private readonly wings: WingsClientService,
@@ -319,8 +324,15 @@ export class AdminActionsService {
    * Le daemon est prévenu par une resynchronisation : c'est lui qui refuse
    * démarrage et console pour un serveur suspendu. Sans cet appel, la base
    * dirait « suspendu » pendant que le serveur continuerait de tourner.
+   *
+   * Rend, pour une suspension, le nombre de comptes dont le node n'a pas pu
+   * fermer les sessions (toujours 0 quand on rétablit).
    */
-  async setServerSuspended(serverId: string, suspended: boolean, reason: string): Promise<void> {
+  async setServerSuspended(
+    serverId: string,
+    suspended: boolean,
+    reason: string,
+  ): Promise<{ sessionsNotClosed: number }> {
     const [updated] = await this.db
       .update(servers)
       .set({
@@ -329,7 +341,7 @@ export class AdminActionsService {
         updatedAt: new Date().toISOString(),
       })
       .where(eq(servers.id, serverId))
-      .returning({ id: servers.id });
+      .returning({ id: servers.id, ownerId: servers.ownerId });
 
     if (!updated) throw new NotFoundException("Serveur introuvable.");
 
@@ -340,9 +352,33 @@ export class AdminActionsService {
     // Les consoles ouvertes sont fermées avec la suspension : un jeton de
     // websocket vit dix minutes, et Wings ne relit pas l'état pour le
     // refuser en cours de route.
+    let sessionsNotClosed = 0;
     if (suspended) {
       const jtis = this.tokens.revocableForServer(serverId);
       await this.wings.denyWebsocketTokens(serverId, jtis).catch(() => undefined);
+
+      /*
+       * **Les sessions SFTP aussi.** Wings refuse les nouvelles connexions à
+       * un serveur suspendu, mais un client SFTP déjà connecté gardait les
+       * fichiers, en lecture comme en écriture, jusqu'à ce qu'il se
+       * déconnecte. `deauthorizeUser` les coupe, pour le titulaire et pour
+       * chaque sous-utilisateur, accepté ou non.
+       *
+       * Un node qui ne répond pas n'annule pas la suspension : elle est
+       * faite en base, et le nombre de comptes restés ouverts est rendu.
+       */
+      const invites = await this.db
+        .select({ userId: serverSubusers.userId })
+        .from(serverSubusers)
+        .where(eq(serverSubusers.serverId, serverId));
+      const restes = await closeSessions(
+        this.wings,
+        serverId,
+        [updated.ownerId, ...invites.map((i) => i.userId)],
+        this.logger,
+        "Suspension",
+      );
+      sessionsNotClosed = restes.length;
     }
 
     /**
@@ -358,6 +394,8 @@ export class AdminActionsService {
       serverId,
       reason: suspended ? reason.trim() || null : null,
     });
+
+    return { sessionsNotClosed };
   }
 
   /**

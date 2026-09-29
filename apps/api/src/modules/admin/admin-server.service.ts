@@ -26,6 +26,7 @@ import { DATABASE } from "../../common/database.provider";
 import { isUuid } from "../../common/uuid";
 import { ActivityService } from "../activity/activity.service";
 import { DatabasesService } from "../client/databases.service";
+import { closeSessions } from "../wings/close-sessions";
 import { WingsClientService } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
 
@@ -457,24 +458,13 @@ export class AdminServerService {
      * des modules de facturation, qui affichait alors une erreur pour un
      * transfert pourtant fait. En parallèle, le pire cas est un seul délai.
      */
-    const [, deconnexions, renouvellements] = await Promise.all([
+    const [, sessionsNotClosed, renouvellements] = await Promise.all([
       this.wings.denyWebsocketTokens(serverId, jtis).catch(() => undefined),
-      Promise.allSettled(evinces.map((userId) => this.wings.deauthorizeUser(serverId, userId))),
+      closeSessions(this.wings, serverId, evinces, this.logger, "Changement de titulaire"),
       Promise.allSettled(
         bases.map((base) => this.databasesService.rotatePassword(serverId, base.id)),
       ),
     ]);
-
-    const sessionsNotClosed: string[] = [];
-    deconnexions.forEach((issue, i) => {
-      const userId = evinces[i] as string;
-      if (issue.status === "fulfilled") return;
-      sessionsNotClosed.push(userId);
-      this.logger.warn(
-        `Changement de titulaire de ${serverId} : les sessions de ${userId} n'ont pas pu ` +
-          `être fermées (${raison(issue.reason)}).`,
-      );
-    });
 
     let databasesRotated = 0;
     const databasesNotRotated: string[] = [];

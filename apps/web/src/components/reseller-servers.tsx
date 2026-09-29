@@ -94,6 +94,9 @@ export function ResellerServers({ servers }: { servers: ResellerServer[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Comptes dont le node n'a pas confirmé la fermeture des sessions à la
+  // suspension : la suspension est faite, mais une session SFTP a pu rester.
+  const [sessionsLeft, setSessionsLeft] = useState(0);
   const [toDelete, setToDelete] = useState<ResellerServer | null>(null);
   /*
    * Le serveur dont on change l'offre, et les deux quantités saisies.
@@ -107,9 +110,10 @@ export function ResellerServers({ servers }: { servers: ResellerServer[] }) {
   const [pending, startTransition] = useTransition();
 
   const run = useCallback(
-    (action: () => Promise<{ error: string | null }>) =>
+    (action: () => Promise<{ error: string | null; sessionsNotClosed?: number }>) =>
       startTransition(async () => {
         const result = await action();
+        setSessionsLeft(result.sessionsNotClosed ?? 0);
         setError(result.error);
         if (!result.error) router.refresh();
       }),
@@ -286,6 +290,16 @@ export function ResellerServers({ servers }: { servers: ResellerServer[] }) {
       {error ? (
         <AlertBanner variant="danger" title={tc("actionRefused")} dismissible>
           {error}
+        </AlertBanner>
+      ) : null}
+      {sessionsLeft > 0 ? (
+        <AlertBanner
+          variant="warning"
+          title={ta("sessionsLeftTitle")}
+          dismissible
+          onDismiss={() => setSessionsLeft(0)}
+        >
+          {ta("sessionsLeftBody", { count: sessionsLeft })}
         </AlertBanner>
       ) : null}
 

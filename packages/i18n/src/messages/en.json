@@ -409,7 +409,9 @@
     "stateInstalling": "Installing",
     "stateInstallFailed": "Install failed",
     "stateRestoring": "Restoring",
-    "stateSuspended": "Suspended"
+    "stateSuspended": "Suspended",
+    "sessionsLeftTitle": "Server suspended, sessions may still be open",
+    "sessionsLeftBody": "The node did not confirm closing the sessions of {count, plural, one {# account} other {# accounts}}. No new connection is possible; an SFTP session already open remains until it disconnects or Wings restarts."
   },
   "adminSettings": {
     "title": "Settings",
@@ -1849,7 +1851,9 @@
     "editTitle": "Edit permissions",
     "editBody": "{name} — open consoles will be closed so the change takes effect.",
     "removeTitle": "Remove this access?",
-    "removeBody": "{name} loses access to this server, and their console closes immediately.",
+    "removeBody": "{name} loses access to this server: their console and SFTP session close immediately.",
+    "sessionLeftTitle": "Access removed, a session may still be open",
+    "sessionLeftBody": "The node did not confirm closing their SFTP session. No new connection is possible; a session already open remains until it disconnects or Wings restarts.",
     "presetCount": "{count, plural, one {# permission} other {# permissions}}"
   },
   "webhooks": {

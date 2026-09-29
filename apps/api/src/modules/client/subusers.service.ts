@@ -6,12 +6,14 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DATABASE } from "../../common/database.provider";
 import { NotificationsService } from "../notifications/notifications.service";
+import { closeSessions } from "../wings/close-sessions";
 import { WingsClientService } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
 import { type ServerInvite, ServerInvitesService } from "./server-invites.service";
@@ -53,6 +55,8 @@ export interface ClientSubuser {
  */
 @Injectable()
 export class SubusersService {
+  private readonly logger = new Logger(SubusersService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(WingsClientService) private readonly wings: WingsClientService,
@@ -282,11 +286,29 @@ export class SubusersService {
     return updated;
   }
 
-  /** Retire l'accès, et ferme les consoles ouvertes avec. */
-  async remove(serverId: string, subuserId: string): Promise<void> {
+  /**
+   * Retire l'accès, et ferme ce que la personne tient encore ouvert.
+   *
+   * Les consoles, par la révocation de ses jetons. **Sa session SFTP aussi**,
+   * par `deauthorizeUser` : la base refuse désormais toute connexion, mais un
+   * client SFTP déjà connecté gardait les fichiers du serveur jusqu'à ce
+   * qu'il se déconnecte de lui-même.
+   *
+   * Un node qui ne répond pas n'empêche pas le retrait : la réponse dit
+   * seulement que la session n'a pas pu être fermée.
+   */
+  async remove(serverId: string, subuserId: string): Promise<{ sessionClosed: boolean }> {
     const existing = await this.mustFind(serverId, subuserId);
     await this.db.delete(serverSubusers).where(eq(serverSubusers.id, subuserId));
     await this.revoke(serverId, existing.userId);
+    const restes = await closeSessions(
+      this.wings,
+      serverId,
+      [existing.userId],
+      this.logger,
+      "Retrait d'un sous-utilisateur",
+    );
+    return { sessionClosed: restes.length === 0 };
   }
 
   /**

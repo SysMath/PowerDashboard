@@ -1260,14 +1260,14 @@ export class AdminController {
     const { suspended, reason } = (body ?? {}) as { suspended?: unknown; reason?: unknown };
     if (typeof suspended !== "boolean") throw new BadRequestException("État manquant.");
     const motif = typeof reason === "string" ? reason : "";
-    await this.actions.setServerSuspended(serverId, suspended, motif);
+    const { sessionsNotClosed } = await this.actions.setServerSuspended(serverId, suspended, motif);
     await this.trace(
       request,
       suspended ? "admin.server_suspended" : "admin.server_resumed",
-      { reason: suspended ? motif.trim() || null : null },
+      suspended ? { reason: motif.trim() || null, sessionsNotClosed } : { reason: null },
       serverId,
     );
-    return { data: { serverId, suspended } };
+    return { data: { serverId, suspended, sessionsNotClosed } };
   }
 
   @Delete("servers/:serverId")

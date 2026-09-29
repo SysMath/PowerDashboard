@@ -192,7 +192,7 @@ describe("lignes du journal d'administration", () => {
   it("rattache la suspension au serveur, et la suppression à personne", async () => {
     const { instance, trace } = controller({
       actions: {
-        setServerSuspended: async () => undefined,
+        setServerSuspended: async () => ({ sessionsNotClosed: 0 }),
         deleteServer: async () => ({ name: "Survie", ownerId: "client" }),
       },
     });
@@ -204,7 +204,7 @@ describe("lignes du journal d'administration", () => {
       expect.objectContaining({
         event: "admin.server_suspended",
         serverId: "srv",
-        properties: { reason: "Impayé" },
+        properties: { reason: "Impayé", sessionsNotClosed: 0 },
       }),
       expect.objectContaining({ event: "admin.server_resumed", serverId: "srv" }),
       // Le serveur n'existe plus : l'y rattacher ferait échouer l'écriture.
