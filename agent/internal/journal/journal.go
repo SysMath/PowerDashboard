@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"unicode/utf8"
 
 	_ "modernc.org/sqlite"
 )
@@ -26,7 +27,20 @@ import (
 const (
 	DureeMax  = 30 * 24 * time.Hour
 	TailleMax = 50 << 20
+	// Longueurs gardées, en caractères, comme celles que le panel range
+	// (`NODE_AGENT_DETAIL_MAX`, `NODE_AGENT_EVENT_MAX`) : tronquées ici, une
+	// erreur bavarde ne gonfle ni la base ni le relevé.
+	DetailMax    = 2000
+	EvenementMax = 64
 )
+
+// tronquer coupe à `n` caractères, sans casser un caractère multioctet.
+func tronquer(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	return string([]rune(s)[:n])
+}
 
 type Niveau string
 
@@ -105,6 +119,8 @@ func (j *Journal) Ecrire(ctx context.Context, e Entree) error {
 	if e.Horodatage.IsZero() {
 		e.Horodatage = time.Now()
 	}
+	e.Evenement = tronquer(e.Evenement, EvenementMax)
+	e.Detail = tronquer(e.Detail, DetailMax)
 	_, err := j.db.ExecContext(ctx,
 		`INSERT INTO journal (horodatage, niveau, fonction, evenement, serveur, detail) VALUES (?, ?, ?, ?, ?, ?)`,
 		e.Horodatage.UTC().Format(time.RFC3339Nano), e.Niveau, e.Fonction, e.Evenement, e.Serveur, e.Detail)

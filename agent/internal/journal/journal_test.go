@@ -3,8 +3,10 @@ package journal
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func ouvrir(t *testing.T) *Journal {
@@ -94,5 +96,26 @@ func TestValeursPersistantes(t *testing.T) {
 	defer j.Fermer()
 	if v, _ := j.Valeur(ctx, "cle"); v != "v1" {
 		t.Fatalf("valeur : %q", v)
+	}
+}
+
+// Un lot de LotJournal entrées au plus long doit tenir sous le mégaoctet que
+// le panel accepte : tronquées à l'écriture, jamais à l'envoi.
+func TestLongueursBornees(t *testing.T) {
+	ctx := context.Background()
+	j := ouvrir(t)
+	long := strings.Repeat("é", DetailMax+500)
+	if err := j.Ecrire(ctx, Entree{Niveau: Erreur, Fonction: "instantanes", Evenement: long, Detail: long}); err != nil {
+		t.Fatal(err)
+	}
+	lot, err := j.AEnvoyer(ctx, 1)
+	if err != nil || len(lot) != 1 {
+		t.Fatalf("lot : %v %v", lot, err)
+	}
+	if n := utf8.RuneCountInString(lot[0].Detail); n != DetailMax || !utf8.ValidString(lot[0].Detail) {
+		t.Fatalf("détail de %d caractères", n)
+	}
+	if n := utf8.RuneCountInString(lot[0].Evenement); n != EvenementMax {
+		t.Fatalf("événement de %d caractères", n)
 	}
 }

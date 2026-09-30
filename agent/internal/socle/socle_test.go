@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,5 +52,30 @@ func TestAnnonceEtAccuseBorne(t *testing.T) {
 	reste, _ := j.AEnvoyer(context.Background(), 10)
 	if len(reste) != 1 || reste[0].Evenement != "apres" {
 		t.Fatalf("une entrée écrite après l'envoi ne doit pas être effacée : %v", reste)
+	}
+}
+
+// Le pire lot tient sous le mégaoctet que Fastify accepte par défaut pour un
+// corps JSON, même quand l'échappement gonfle chaque caractère.
+func TestLotSousLeMegaoctet(t *testing.T) {
+	for _, motif := range []string{"é", "<", "😀"} {
+		long := strings.Repeat(motif, journal.DetailMax)
+		ev := strings.Repeat("e", journal.EvenementMax)
+		entrees := make([]journal.Entree, LotJournal)
+		for i := range entrees {
+			entrees[i] = journal.Entree{ID: int64(i + 1), Horodatage: time.Now(), Niveau: journal.Erreur,
+				Fonction: "instantanes", Evenement: ev, Serveur: "aaaaaaaa-1111-2222-3333-444444444444", Detail: long}
+		}
+		lot := borner(entrees)
+		if len(lot) == 0 {
+			t.Fatalf("%q : lot vide", motif)
+		}
+		corps, err := json.Marshal(Annonce{Version: "1.0.0", Fonction: "instantanes", Fonctions: []string{"instantanes"}, Journal: lot})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(corps) >= 1<<20 {
+			t.Fatalf("%q : lot de %d octets", motif, len(corps))
+		}
 	}
 }

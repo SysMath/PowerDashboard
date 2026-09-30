@@ -9,6 +9,7 @@ package socle
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"time"
 
@@ -18,8 +19,33 @@ import (
 
 const CheminAnnonce = "/api/node-agent/heartbeat"
 
-// Nombre d'entrées de journal envoyées par relevé.
-const LotJournal = 500
+// Nombre d'entrées de journal envoyées par relevé. Avec les longueurs bornées
+// par le journal (2 000 caractères de détail), un lot reste sous le mégaoctet
+// que le panel accepte pour un corps JSON : un lot refusé serait renvoyé à
+// chaque relevé et bloquerait toutes les entrées suivantes.
+const LotJournal = 200
+
+// OctetsMaxLot borne le lot en octets, quel que soit le texte des entrées :
+// l'échappement JSON peut sextupler un caractère (`<` devient `\u003c`).
+const OctetsMaxLot = 512 << 10
+
+// borner garde les premières entrées tant que le lot tient dans OctetsMaxLot,
+// et toujours au moins une : une entrée n'excède jamais quelques dizaines de
+// kilo-octets (voir journal.DetailMax).
+func borner(entrees []journal.Entree) []journal.Entree {
+	total := 0
+	for i, e := range entrees {
+		b, err := json.Marshal(e)
+		if err != nil {
+			return entrees[:i]
+		}
+		total += len(b) + 1
+		if total > OctetsMaxLot && i > 0 {
+			return entrees[:i]
+		}
+	}
+	return entrees
+}
 
 // Annonce est le signe de vie de l'agent : sa version, la fonction de ce
 // processus, les fonctions actives dans config.yml (le panel n'offre que
@@ -88,6 +114,7 @@ func (b *Boucle) Annoncer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	entrees = borner(entrees)
 	trou, err := b.Journal.Trou(ctx)
 	if err != nil {
 		return err
