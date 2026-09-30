@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/SysMath/PowerDashboard/agent/internal/journal"
@@ -79,12 +80,28 @@ type Boucle struct {
 	Log        *slog.Logger
 }
 
-// Tourner relève tout de suite, puis à chaque intervalle, jusqu'à l'arrêt.
+// Tourner relève et annonce tout de suite, puis à chaque intervalle, jusqu'à
+// l'arrêt. **Deux boucles** : un relevé peut durer (une archive S3, une
+// restauration par vraie copie sur ZFS), et l'annonce est le signe de vie de
+// la fonction. Dans la même boucle, le panel tenait la fonction pour muette
+// au bout de deux minutes de travail et refusait toute écriture jusqu'à la
+// fin.
 func (b *Boucle) Tourner(ctx context.Context) {
-	minuterie := time.NewTicker(b.Intervalle)
+	var fini sync.WaitGroup
+	fini.Add(1)
+	go func() {
+		defer fini.Done()
+		chaque(ctx, b.Intervalle, b.TourAnnonce)
+	}()
+	chaque(ctx, b.Intervalle, b.TourReleve)
+	fini.Wait()
+}
+
+func chaque(ctx context.Context, intervalle time.Duration, f func(context.Context)) {
+	minuterie := time.NewTicker(intervalle)
 	defer minuterie.Stop()
 	for {
-		b.Tour(ctx)
+		f(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -93,16 +110,27 @@ func (b *Boucle) Tourner(ctx context.Context) {
 	}
 }
 
-// Tour fait un relevé du module puis une annonce. Aucune erreur ne l'arrête.
+// Tour fait un relevé du module puis une annonce, l'un après l'autre.
+// Aucune erreur ne l'arrête.
 func (b *Boucle) Tour(ctx context.Context) {
-	if _, err := b.Journal.Purger(ctx, time.Now()); err != nil {
-		b.Log.Error("purge du journal", "erreur", err)
-	}
+	b.TourReleve(ctx)
+	b.TourAnnonce(ctx)
+}
+
+// TourReleve fait un relevé du module ; un échec est écrit au journal.
+func (b *Boucle) TourReleve(ctx context.Context) {
 	if err := b.Module.Releve(ctx); err != nil {
 		b.Log.Warn("relevé", "fonction", b.Fonction, "erreur", err)
 		_ = b.Journal.Ecrire(ctx, journal.Entree{
 			Niveau: journal.Alerte, Fonction: b.Fonction, Evenement: "releve_echec", Detail: err.Error(),
 		})
+	}
+}
+
+// TourAnnonce purge le journal puis annonce la fonction au panel.
+func (b *Boucle) TourAnnonce(ctx context.Context) {
+	if _, err := b.Journal.Purger(ctx, time.Now()); err != nil {
+		b.Log.Error("purge du journal", "erreur", err)
 	}
 	if err := b.Annoncer(ctx); err != nil {
 		b.Log.Warn("annonce au panel", "erreur", err)

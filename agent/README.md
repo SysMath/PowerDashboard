@@ -51,7 +51,7 @@ Toutes les routes sont sous `/api/node-agent/`, avec
 
 | Route | Rôle |
 |---|---|
-| `POST /api/node-agent/heartbeat` | version, fonction, fonctions actives, lot du journal (200 entrées et 512 Kio au plus) ; réponse `{journal_accuse}` |
+| `POST /api/node-agent/heartbeat` | version, fonction, fonctions actives, lot du journal (200 entrées et 512 Kio au plus) ; réponse `{journal_accuse}`. Envoyée dans sa propre boucle, même pendant un long ordre : c'est le signe de vie de la fonction |
 | `GET /api/node-agent/snapshots` | réglages du node, instantanés gardés, ordres (`prendre`, `restaurer`, `detruire`, `archiver`) |
 | `POST /api/node-agent/snapshots/report` | système, espace, instantanés et serveurs contenus, résultat des ordres |
 | `GET /api/node-agent/snapshots/backups/<id>?size=` | liens signés du dépôt S3 (même réponse que pour Wings) |
