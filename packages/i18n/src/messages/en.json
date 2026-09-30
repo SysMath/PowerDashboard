@@ -1989,6 +1989,7 @@
     "ownerCleanupTitle": "Server transferred, cleanup incomplete",
     "ownerCleanupDatabases": "The password of these databases could not be rotated, the previous owner still knows it: {names}. Rotate it from the server's Databases page once the host is reachable.",
     "ownerCleanupSessions": "The node did not confirm closing the sessions of {count, plural, one {# account} other {# accounts}}: an SFTP session already open may remain until it disconnects or Wings restarts.",
+    "ownerCleanupMissing": "The cleanup report was not recorded (or the cleanup is still running): nothing says which databases still have the previous owner's password. Check the API logs, or rotate the passwords from the server's Databases page.",
     "changeOwnerPlaceholder": "Pick an account…",
     "shortId": "Short id",
     "owner": "Owner",

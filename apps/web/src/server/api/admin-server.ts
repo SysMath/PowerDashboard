@@ -55,6 +55,8 @@ export interface OwnerChangeLeftovers {
   at: string;
   databasesNotRotated: string[];
   sessionsNotClosed: number;
+  /** Le bilan du changement n'a pas été consigné : rien ne dit ce qui reste. */
+  cleanupMissing: boolean;
 }
 
 export async function fetchAdminServer(serverId: string): Promise<AdminServerDetail> {

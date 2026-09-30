@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import { type Database, serverInvites, serverSubusers, servers } from "@gamedashboard/db";
+import { type Database, serverSubusers, servers, users } from "@gamedashboard/db";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
@@ -9,33 +8,33 @@ import {
   type ThrowawayDatabase,
 } from "../../test/throwaway-database";
 import { AdminServerService } from "../admin/admin-server.service";
-import type { PlatformSettingsService } from "../admin/platform-settings.service";
-import type { MailerService } from "../mail/mailer.service";
-import type { BrandingService } from "../reseller/branding.service";
+import type { NotificationsService } from "../notifications/notifications.service";
 import type { WingsClientService } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
 import type { DatabasesService } from "./databases.service";
-import { ServerInvitesService } from "./server-invites.service";
+import type { ServerInvitesService } from "./server-invites.service";
+import { SubusersService } from "./subusers.service";
 
 /**
- * Une invitation acceptée pendant un changement de titulaire ne survit pas.
+ * Un invité ajouté pendant un changement de titulaire ne survit pas.
  *
- * `accept` consommait l'invitation, puis créait l'accès, sans rien verrouiller.
- * Un second compte que l'ancien titulaire s'était invité, accepté entre la
- * lecture du titulaire et le retrait des invités par le transfert, gardait
- * l'accès au serveur du nouveau : exactement ce que « tout nettoyer » visait.
- * L'acceptation prend désormais le verrou du serveur que prend le transfert.
+ * `invite` contrôlait les droits de l'auteur, puis insérait l'accès, hors de
+ * tout verrou. L'ancien titulaire qui passait le contrôle juste avant le
+ * transfert insérait son second compte juste après le retrait des invités :
+ * ce compte gardait l'accès au serveur du nouveau. L'ajout prend désormais le
+ * verrou du serveur que prend le transfert, et relit les droits sous lui.
  */
-describe.skipIf(!HAS_DATABASE)("invitation acceptée pendant un transfert (intégration)", () => {
+describe.skipIf(!HAS_DATABASE)("invité ajouté pendant un transfert (intégration)", () => {
   let throwaway: ThrowawayDatabase;
   let db: Database;
-  let invitations: ServerInvitesService;
+  let invites: SubusersService;
   let serverId: string;
   let ancien: string;
   let second: string;
   let nouveau: string;
+  let adresse: string;
 
-  const JETON = "jeton-d-invitation-assez-long";
+  const notifications = { notify: vi.fn(async () => undefined) };
 
   beforeAll(async () => {
     throwaway = await createThrowawayDatabase();
@@ -52,25 +51,21 @@ describe.skipIf(!HAS_DATABASE)("invitation acceptée pendant un transfert (inté
         `truncate table activity_logs, servers, allocations, eggs, nests, nodes, locations, users cascade`,
       ),
     );
-    invitations = new ServerInvitesService(
+    notifications.notify.mockClear();
+    invites = new SubusersService(
       db,
-      {} as MailerService,
-      {} as PlatformSettingsService,
-      {} as BrandingService,
+      {} as WingsClientService,
+      new WingsTokenService(db),
+      notifications as unknown as NotificationsService,
+      {} as ServerInvitesService,
     );
     ancien = await seedUser(db);
     second = await seedUser(db);
     nouveau = await seedUser(db);
+    const [ligne] = await db.select({ email: users.email }).from(users).where(eq(users.id, second));
+    adresse = ligne?.email ?? "";
     const nodeId = await seedNode(db, { locationId: await seedLocation(db) });
     serverId = await seedServer(db, { nodeId, ownerId: ancien });
-    await db.insert(serverInvites).values({
-      serverId,
-      email: "second@exemple.fr",
-      tokenHash: createHash("sha256").update(JETON).digest("hex"),
-      permissions: ["files.read"],
-      invitedBy: ancien,
-      expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
-    });
   });
 
   async function enAttenteDeVerrou(): Promise<number> {
@@ -82,7 +77,11 @@ describe.skipIf(!HAS_DATABASE)("invitation acceptée pendant un transfert (inté
     return lignes[0]?.n ?? 0;
   }
 
-  it("attend la fin d'un transfert en cours avant de rien consommer, puis le trouve fait", async () => {
+  async function acces(): Promise<unknown[]> {
+    return db.select().from(serverSubusers).where(eq(serverSubusers.serverId, serverId));
+  }
+
+  it("attend la fin d'un transfert en cours avant d'insérer, puis refuse l'ancien titulaire", async () => {
     let liberer: () => void = () => undefined;
     const retenue = new Promise<void>((resolve) => {
       liberer = resolve;
@@ -100,39 +99,33 @@ describe.skipIf(!HAS_DATABASE)("invitation acceptée pendant un transfert (inté
     });
     await verrouille;
 
-    const acceptation = invitations.accept(JETON, second, "second@exemple.fr");
-    acceptation.catch(() => undefined);
-    // Sans le verrou, l'acceptation passait ici, avec l'ancien titulaire.
+    const ajout = invites.invite(serverId, ancien, adresse, ["files.read"]);
+    ajout.catch(() => undefined);
+    // Sans le verrou, l'accès était déjà là, accordé par l'ancien titulaire.
     await vi.waitFor(async () => expect(await enAttenteDeVerrou()).toBeGreaterThan(0));
-    const [invitation] = await db
-      .select({ acceptedAt: serverInvites.acceptedAt })
-      .from(serverInvites)
-      .where(eq(serverInvites.serverId, serverId));
-    expect(invitation?.acceptedAt).toBeNull();
+    expect(await acces()).toEqual([]);
     liberer();
     await transfert;
 
-    // Le transfert fait, l'invitation de l'ancien titulaire n'engage plus personne.
-    await expect(acceptation).rejects.toThrow("n'est plus valable");
-    expect(
-      await db.select().from(serverSubusers).where(eq(serverSubusers.serverId, serverId)),
-    ).toEqual([]);
+    // Le transfert fait, l'ancien titulaire n'accorde plus rien.
+    await expect(ajout).rejects.toThrow("que vous n'avez pas");
+    expect(await acces()).toEqual([]);
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
-  it("lancés ensemble, l'acceptation et le transfert ne laissent aucun accès", async () => {
-    const wings = {
-      denyWebsocketTokens: vi.fn(async () => undefined),
-      deauthorizeUser: vi.fn(async () => undefined),
-    };
+  it("lancés ensemble, l'ajout et le transfert ne laissent aucun accès", async () => {
     const service = new AdminServerService(
       db,
-      wings as unknown as WingsClientService,
+      {
+        denyWebsocketTokens: vi.fn(async () => undefined),
+        deauthorizeUser: vi.fn(async () => undefined),
+      } as unknown as WingsClientService,
       new WingsTokenService(db),
       { rotatePassword: vi.fn() } as unknown as DatabasesService,
     );
 
     await Promise.allSettled([
-      invitations.accept(JETON, second, "second@exemple.fr"),
+      invites.invite(serverId, ancien, adresse, ["files.read"]),
       service.setOwner(serverId, nouveau, {
         event: "admin.server_owner_changed",
         actorId: null,
@@ -142,10 +135,14 @@ describe.skipIf(!HAS_DATABASE)("invitation acceptée pendant un transfert (inté
       }),
     ]);
 
-    // Quel que soit l'ordre, le second compte de l'ancien titulaire n'a pas
-    // d'accès au serveur du nouveau.
-    expect(
-      await db.select().from(serverSubusers).where(eq(serverSubusers.serverId, serverId)),
-    ).toEqual([]);
+    expect(await acces()).toEqual([]);
+  });
+
+  it("hors transfert, le titulaire ajoute toujours son invité", async () => {
+    const cree = await invites.invite(serverId, ancien, adresse, ["files.read"]);
+
+    expect(cree).toMatchObject({ userId: second });
+    expect(await acces()).toHaveLength(1);
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
   });
 });

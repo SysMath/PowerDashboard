@@ -1989,6 +1989,7 @@
     "ownerCleanupTitle": "Serveur transféré, nettoyage incomplet",
     "ownerCleanupDatabases": "Le mot de passe de ces bases n'a pas pu être renouvelé, l'ancien propriétaire le connaît encore : {names}. Renouvelez-le depuis la page Bases de données du serveur une fois l'hôte joignable.",
     "ownerCleanupSessions": "Le node n'a pas confirmé la fermeture des sessions de {count, plural, one {# compte} other {# comptes}} : une session SFTP déjà ouverte a pu rester jusqu'à sa déconnexion ou au redémarrage de Wings.",
+    "ownerCleanupMissing": "Le bilan du nettoyage n'a pas été consigné (ou le nettoyage est encore en cours) : rien ne dit quelles bases gardent le mot de passe de l'ancien propriétaire. Vérifiez les journaux de l'API, ou renouvelez les mots de passe depuis la page Bases de données du serveur.",
     "changeOwnerPlaceholder": "Choisir un compte…",
     "shortId": "Identifiant court",
     "owner": "Propriétaire",

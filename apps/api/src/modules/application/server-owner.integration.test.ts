@@ -15,7 +15,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
 import {
@@ -132,13 +132,9 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
       new ResellerScopeService(db),
       {} as BrandingService,
       {} as ServerResizeService,
-      new AdminServerService(
-        db,
-        wings as unknown as WingsClientService,
-        tokens,
-        { rotatePassword: rotation } as unknown as DatabasesService,
-        activity as unknown as ActivityService,
-      ),
+      new AdminServerService(db, wings as unknown as WingsClientService, tokens, {
+        rotatePassword: rotation,
+      } as unknown as DatabasesService),
     );
 
     revendeur = await seedUser(db);
@@ -181,25 +177,39 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
         properties: activityLogs.properties,
       })
       .from(activityLogs)
-      .where(eq(activityLogs.serverId, serveur));
+      .where(
+        and(
+          eq(activityLogs.serverId, serveur),
+          ne(activityLogs.event, "server.owner_change_cleanup"),
+        ),
+      );
     expect(lignes).toEqual([
       {
         event: "application.server_owner_changed",
         actorType: "api_key",
         actorLabel: "application:Boutique",
-        properties: { ownerId: nouveau },
+        properties: { ownerId: nouveau, cleanupFollows: true },
       },
     ]);
     // Le bilan, à part, pour l'administration.
-    expect(activity.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event: "server.owner_change_cleanup",
-        serverId: serveur,
-        actorType: "api_key",
-        actorLabel: "application:Boutique",
-        properties: expect.objectContaining({ ownerId: nouveau, previousOwnerId: ancien }),
-      }),
-    );
+    const [bilan] = await db
+      .select({
+        actorType: activityLogs.actorType,
+        actorLabel: activityLogs.actorLabel,
+        properties: activityLogs.properties,
+      })
+      .from(activityLogs)
+      .where(
+        and(
+          eq(activityLogs.serverId, serveur),
+          eq(activityLogs.event, "server.owner_change_cleanup"),
+        ),
+      );
+    expect(bilan).toMatchObject({
+      actorType: "api_key",
+      actorLabel: "application:Boutique",
+      properties: { ownerId: nouveau, previousOwnerId: ancien },
+    });
   });
 
   it("le nouveau titulaire ne lit plus le journal de l'ancien, par ce chemin aussi", async () => {
@@ -235,9 +245,6 @@ describe.skipIf(!HAS_DATABASE)("POST /application/servers/:id/owner (intégratio
       passwordEnc: "x",
     });
     rotation.mockRejectedValueOnce(new Error("hôte injoignable"));
-    // Le bilan passe par le vrai journal : c'est lui que relit le rejeu.
-    const journal = new ActivityService(db);
-    activity.record.mockImplementation((input) => journal.record(input as never));
 
     await controleur.setServerOwner(requete(null), serveur, { ownerId: nouveau });
     const rejeu = await controleur.setServerOwner(requete(null), serveur, { ownerId: nouveau });

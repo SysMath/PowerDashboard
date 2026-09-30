@@ -196,6 +196,7 @@ export function AdminServerDetailView({
           dismissible
           onDismiss={() => setCleanupDismissed(true)}
         >
+          {leftovers.cleanupMissing ? <p>{t("ownerCleanupMissing")}</p> : null}
           {leftovers.databasesNotRotated.length > 0 ? (
             <p>{t("ownerCleanupDatabases", { names: leftovers.databasesNotRotated.join(", ") })}</p>
           ) : null}
