@@ -1,6 +1,7 @@
 name: CodeQL
 
-# Analyse statique du TypeScript et des workflows, publiée dans l'onglet
+# Analyse statique du TypeScript, de l'agent de node (Go) et des workflows,
+# publiée dans l'onglet
 # Security › Code scanning du dépôt.
 #
 # Remplace la « configuration par défaut » de GitHub, qui ne tourne que sur
@@ -91,6 +92,14 @@ jobs:
       - name: Conteneur Linux
         run: bash infra/ci/linux.sh ouvrir --codeql
 
+      # L'agent de node (agent/, ADR 0008, 0009) se compile pour être analysé :
+      # la chaîne Go de l'image épinglée, recopiée dans le volume du job, que
+      # codeql.sh sort du dépôt avant toute extraction.
+      - name: Chaîne Go
+        run: |
+          source infra/ci/outils.env
+          bash infra/ci/linux.sh outil "$IMAGE_GO" cp -a /usr/local/go /w/.chaine-go
+
       - name: Analyser
         run: bash infra/ci/linux.sh lancer 'bash infra/ci/codeql.sh codeql-resultats'
 
@@ -104,6 +113,12 @@ jobs:
         with:
           sarif_file: codeql-resultats/javascript.sarif
           category: /language:javascript
+
+      - name: Téléverser (Go)
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: codeql-resultats/go.sarif
+          category: /language:go
 
       - name: Téléverser (workflows)
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
