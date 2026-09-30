@@ -10,7 +10,11 @@ import { ActivityService } from "./activity.service";
  * - `application.key_rejected` : une clé applicative présentée et refusée ;
  * - `node.token_rejected` : un jeton de daemon présenté et refusé.
  */
-export type DenialEvent = "access.denied" | "application.key_rejected" | "node.token_rejected";
+export type DenialEvent =
+  | "access.denied"
+  | "application.key_rejected"
+  | "node.token_rejected"
+  | "node.agent_token_rejected";
 
 export interface Denial {
   event: DenialEvent;

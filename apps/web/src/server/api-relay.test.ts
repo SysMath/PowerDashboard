@@ -35,6 +35,7 @@ describe("relayablePath", () => {
     expect(relayablePath("/api/remote/sftp/auth")).toBe(true);
     expect(relayablePath("/api/application/nodes/3/configuration")).toBe(true);
     expect(relayablePath("/api/v1/application/users")).toBe(true);
+    expect(relayablePath("/api/node-agent/heartbeat")).toBe(true);
     expect(relayablePath("/api/v1/openapi.json")).toBe(true);
     expect(relayablePath("/api/v1/status")).toBe(true);
   });

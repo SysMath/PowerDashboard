@@ -407,6 +407,13 @@
       "when": 1790601498447,
       "tag": "0057_reseller_customers",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1790777541719,
+      "tag": "0058_node_agents",
+      "breakpoints": true
     }
   ]
 }

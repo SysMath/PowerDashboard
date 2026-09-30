@@ -213,6 +213,7 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "access.denied": { category: "access", label: "Accès refusé" },
   "application.key_rejected": { category: "access", label: "Clé applicative refusée" },
   "node.token_rejected": { category: "access", label: "Jeton de node refusé" },
+  "node.agent_token_rejected": { category: "access", label: "Jeton d'agent de node refusé" },
 
   /**
    * Gestes d'administration de la plateforme.
@@ -436,6 +437,15 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   // Nommés par une condition, ils échappaient au contrôle de couverture et
   // s'affichaient sous leur identifiant brut.
   "node.token_rotated": { category: "access", label: "Jeton d'un node renouvelé" },
+  // Agent de node (ADR 0008) : sa mise en service, son retrait, et son
+  // journal local, rangé ici au nom du node.
+  "node.agent_configured": { category: "access", label: "Agent de node configuré" },
+  "node.agent_revoked": { category: "access", label: "Agent de node retiré" },
+  "node.agent_journal": { category: "settings", label: "Journal de l'agent de node" },
+  "node.agent_journal_gap": {
+    category: "settings",
+    label: "Journal de l'agent : entrées perdues sur la machine (30 jours ou 50 Mo)",
+  },
   "node.token_rotation_failed": {
     category: "access",
     label: "Renouvellement du jeton d'un node : daemon injoignable, rien changé",

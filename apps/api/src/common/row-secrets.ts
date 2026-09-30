@@ -22,6 +22,7 @@ import { decryptSecret, encryptSecret } from "@gamedashboard/auth";
  */
 export const SECRET_COLUMNS = [
   "nodes.daemon_token_enc",
+  "node_agents.token_enc",
   "database_hosts.password_enc",
   "databases.password_enc",
   "user_credentials_totp.secret_enc",
