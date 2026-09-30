@@ -67,6 +67,16 @@ describe("GameDashboardClient", () => {
     expect(String(appel.mock.calls[0]?.[0])).toBe("https://panel.example/api/v1/client/servers");
   });
 
+  it("retire les barres finales en temps linéaire", () => {
+    // `replace(/\/+$/, "")` repartait de chaque barre : quadratique (CodeQL).
+    const debut = performance.now();
+    client(
+      espion(() => fausseReponse({ data: [] })),
+      `https://p${"/".repeat(100_000)}x`,
+    );
+    expect(performance.now() - debut).toBeLessThan(200);
+  });
+
   it("n'annonce un type de contenu que lorsqu'il y a un corps", async () => {
     /*
      * **Le piège qui coûte le plus de temps.** Fastify refuse par un 400

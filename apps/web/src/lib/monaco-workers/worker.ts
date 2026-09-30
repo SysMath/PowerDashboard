@@ -21,18 +21,32 @@
  * installe le suivant, qui reçoit le second.
  */
 
-const SERVICES: Record<string, () => Promise<unknown>> = {
-  "monaco-json": () => import("monaco-editor/languages/features/json/json.worker"),
-  "monaco-css": () => import("monaco-editor/languages/features/css/css.worker"),
-  "monaco-html": () => import("monaco-editor/languages/features/html/html.worker"),
-  "monaco-ts": () => import("monaco-editor/languages/features/typescript/ts.worker"),
-};
+/*
+ * Un `switch` et non une table indexée par le nom : `SERVICES[self.name]`
+ * lisait, pour un nom comme `constructor`, une propriété héritée
+ * d'`Object.prototype`, qu'on appelait ensuite (alerte CodeQL « appel de
+ * méthode non validé »).
+ */
+function charger(nom: string): Promise<unknown> {
+  switch (nom) {
+    case "monaco-json":
+      return import("monaco-editor/languages/features/json/json.worker");
+    case "monaco-css":
+      return import("monaco-editor/languages/features/css/css.worker");
+    case "monaco-html":
+      return import("monaco-editor/languages/features/html/html.worker");
+    case "monaco-ts":
+      return import("monaco-editor/languages/features/typescript/ts.worker");
+    default:
+      return import("monaco-editor/editor/editor.worker");
+  }
+}
 
 const enAttente: MessageEvent[] = [];
 self.onmessage = (message: MessageEvent) => {
   enAttente.push(message);
 };
 
-void (SERVICES[self.name] ?? (() => import("monaco-editor/editor/editor.worker")))().then(() => {
+void charger(self.name).then(() => {
   for (const message of enAttente) self.onmessage?.call(self, message);
 });

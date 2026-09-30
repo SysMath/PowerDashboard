@@ -55,4 +55,11 @@ describe("adaptStatements", () => {
     const melange = `ALTER TYPE "role" ADD VALUE 'x';\nUPDATE "users" SET "role" = 'x';`;
     expect(adaptStatements([melange], 90622)).toEqual({ outside: [], inside: [melange] });
   });
+
+  it("écarte une instruction démesurée sans passer par la regex quadratique", () => {
+    const longue = `ALTER TYPE ${" ".repeat(100_000)}x`;
+    const debut = performance.now();
+    expect(adaptStatements([longue], 90622)).toEqual({ outside: [], inside: [longue] });
+    expect(performance.now() - debut).toBeLessThan(200);
+  });
 });

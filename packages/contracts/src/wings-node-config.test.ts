@@ -129,6 +129,12 @@ describe("ligne de commande", () => {
     expect(command).toContain("--panel-url https://panel.example.fr ");
   });
 
+  it("retire les barres finales en temps linéaire", () => {
+    const debut = performance.now();
+    wingsConfigureCommand({ panelOrigin: `https://p${"/".repeat(100_000)}x`, nodeId: NODE.id });
+    expect(performance.now() - debut).toBeLessThan(200);
+  });
+
   it("nomme la clé applicative plutôt que de laisser un trou", () => {
     const command = wingsConfigureCommand({ panelOrigin: NODE.panelOrigin, nodeId: NODE.id });
     expect(command).toContain("--token <clé applicative>");

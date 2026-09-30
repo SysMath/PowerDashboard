@@ -137,6 +137,13 @@ export function buildWingsNodeConfiguration(
   };
 }
 
+/** L'origine sans ses barres finales, en temps linéaire (pas de regex `\/+$`). */
+function sansBarresFinales(origine: string): string {
+  let fin = origine.length;
+  while (fin > 0 && origine[fin - 1] === "/") fin--;
+  return origine.slice(0, fin);
+}
+
 /**
  * La ligne de commande à recopier sur la machine.
  *
@@ -152,7 +159,7 @@ export function wingsConfigureCommand(input: {
 }): string {
   return [
     "wings configure",
-    `--panel-url ${input.panelOrigin.replace(/\/+$/, "")}`,
+    `--panel-url ${sansBarresFinales(input.panelOrigin)}`,
     `--token ${input.token ?? "<clé applicative>"}`,
     // Toujours en option : l'invite interactive refuse un UUID.
     `--node ${input.nodeId}`,
