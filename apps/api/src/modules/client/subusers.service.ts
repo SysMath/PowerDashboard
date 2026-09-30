@@ -18,6 +18,8 @@ import { WingsClientService } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
 import { type ServerInvite, ServerInvitesService } from "./server-invites.service";
 
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
 /**
  * Seconde vue de `users`, pour nommer celui qui invite sans se confondre avec
  * l'invité — les deux sont des comptes, et la même table les porte.
@@ -134,23 +136,38 @@ export class SubusersService {
       return { pendingInvite: invite };
     }
 
-    const [owner] = await this.db
-      .select({ ownerId: servers.ownerId })
-      .from(servers)
-      .where(eq(servers.id, serverId))
-      .limit(1);
+    /*
+     * L'accès naît sous le verrou de la ligne du serveur, celui que prend le
+     * changement de titulaire (`AdminServerService.setOwner`), et les droits
+     * de l'auteur y sont relus. Sans lui, l'ancien titulaire qui passait le
+     * contrôle juste avant le transfert insérait son invité juste après : ce
+     * second compte gardait l'accès au serveur du nouveau. Même motif que
+     * `ServerInvitesService.accept`.
+     */
+    const row = await this.db.transaction(async (tx) => {
+      const [owner] = await tx
+        .select({ ownerId: servers.ownerId })
+        .from(servers)
+        .where(eq(servers.id, serverId))
+        .for("share")
+        .limit(1);
+      if (!owner) throw new NotFoundException("Serveur introuvable.");
 
-    // Le propriétaire a déjà tout : en faire un sous-utilisateur créerait deux
-    // sources de droits pour la même personne, dont l'une pourrait le restreindre.
-    if (owner?.ownerId === invitee.id) {
-      throw new ConflictException("Cette personne est propriétaire du serveur.");
-    }
+      // Le propriétaire a déjà tout : en faire un sous-utilisateur créerait deux
+      // sources de droits pour la même personne, dont l'une pourrait le restreindre.
+      if (owner.ownerId === invitee.id) {
+        throw new ConflictException("Cette personne est propriétaire du serveur.");
+      }
 
-    const [row] = await this.db
-      .insert(serverSubusers)
-      .values({ serverId, userId: invitee.id, permissions: granted, invitedBy: actorId })
-      .onConflictDoNothing()
-      .returning();
+      await this.grantable(serverId, actorId, granted, tx);
+
+      const [inserted] = await tx
+        .insert(serverSubusers)
+        .values({ serverId, userId: invitee.id, permissions: granted, invitedBy: actorId })
+        .onConflictDoNothing()
+        .returning();
+      return inserted;
+    });
 
     if (!row) throw new ConflictException("Cette personne a déjà accès à ce serveur.");
 
@@ -328,6 +345,7 @@ export class SubusersService {
     serverId: string,
     actorId: string,
     requested: string[],
+    executor: Database | Transaction = this.db,
   ): Promise<string[]> {
     const unknown = requested.filter((p) => !SERVER_PERMISSIONS.includes(p as ServerPermission));
     if (unknown.length > 0) {
@@ -340,7 +358,7 @@ export class SubusersService {
       throw new BadRequestException("Choisissez au moins une permission, ou retirez l'accès.");
     }
 
-    const [owner] = await this.db
+    const [owner] = await executor
       .select({ ownerId: servers.ownerId })
       .from(servers)
       .where(eq(servers.id, serverId))
@@ -348,7 +366,7 @@ export class SubusersService {
     if (!owner) throw new NotFoundException("Serveur introuvable.");
     if (owner.ownerId === actorId) return [...new Set(requested)];
 
-    const [actor] = await this.db
+    const [actor] = await executor
       .select({ permissions: serverSubusers.permissions })
       .from(serverSubusers)
       .where(and(eq(serverSubusers.serverId, serverId), eq(serverSubusers.userId, actorId)))

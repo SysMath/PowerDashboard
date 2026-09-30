@@ -10,7 +10,7 @@ import {
   webhooks,
 } from "@gamedashboard/db";
 import { and, eq, sql } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
 import {
   createThrowawayDatabase,
@@ -102,7 +102,6 @@ describe.skipIf(!HAS_DATABASE)("AdminServerService.setOwner (intégration)", () 
       wings as unknown as WingsClientService,
       tokens,
       bases as unknown as DatabasesService,
-      activite,
     );
 
     ancien = await seedUser(db);
@@ -122,6 +121,10 @@ describe.skipIf(!HAS_DATABASE)("AdminServerService.setOwner (intégration)", () 
       .from(servers)
       .where(eq(servers.id, serverId));
     expect(row?.ownerId).toBe(nouveau);
+  });
+
+  afterEach(() => {
+    if (vi.isMockFunction(db.insert)) vi.mocked(db.insert).mockRestore();
   });
 
   /** Une base MySQL du serveur, sur un hôte déclaré. */
@@ -351,14 +354,93 @@ describe.skipIf(!HAS_DATABASE)("AdminServerService.setOwner (intégration)", () 
     });
   }
 
+  /**
+   * Le bilan du nettoyage ne s'écrit plus : toute insertion dans le journal
+   * hors transaction échoue (la ligne du changement, elle, passe par `tx`).
+   * Rend l'espion du journal d'erreurs du service.
+   */
+  function bilanEnPanne(): ReturnType<typeof vi.fn> {
+    const inserer = db.insert.bind(db);
+    vi.spyOn(db, "insert").mockImplementation(((table: unknown) =>
+      table === activityLogs
+        ? { values: () => Promise.reject(new Error("journal saturé")) }
+        : inserer(table as never)) as never);
+    const erreur = vi.fn();
+    (service as unknown as { logger: { error: unknown } }).logger.error = erreur;
+    return erreur;
+  }
+
+  describe("bilan non consigné", () => {
+    it("n'est pas avalé : retenté, puis écrit en erreur avec le bilan entier", async () => {
+      const creatif = await base("creatif");
+      bases.rotatePassword.mockImplementation(async (_s: string, id: string) => {
+        if (id === creatif) throw new Error("hôte injoignable");
+        return "nouveau";
+      });
+      const erreur = bilanEnPanne();
+
+      const bilan = await service.setOwner(serverId, nouveau, par);
+
+      // Le transfert est fait, et la réponse porte le bilan.
+      expect(bilan).toMatchObject({ changed: true, databasesNotRotated: ["creatif"] });
+      const essais = vi.mocked(db.insert).mock.calls.filter(([table]) => table === activityLogs);
+      expect(essais).toHaveLength(2);
+      expect(erreur).toHaveBeenCalledTimes(1);
+      const message = String(erreur.mock.calls[0]?.[0]);
+      expect(message).toContain(serverId);
+      expect(message).toContain("journal saturé");
+      expect(message).toContain(`"previousOwnerId":"${ancien}"`);
+      expect(message).toContain('"databasesNotRotated":["creatif"]');
+    });
+
+    it("la fiche d'administration dit que le bilan manque", async () => {
+      bilanEnPanne();
+      await service.setOwner(serverId, nouveau, par);
+      vi.mocked(db.insert).mockRestore();
+
+      const fiche = await service.detail(serverId);
+      expect(fiche.ownerChange).toMatchObject({
+        cleanupMissing: true,
+        databasesNotRotated: [],
+        sessionsNotClosed: 0,
+      });
+    });
+
+    it("un bilan écrit au second essai ne laisse rien à signaler", async () => {
+      const inserer = db.insert.bind(db);
+      let refus = 1;
+      vi.spyOn(db, "insert").mockImplementation(((table: unknown) =>
+        table === activityLogs && refus-- > 0
+          ? { values: () => Promise.reject(new Error("coupure")) }
+          : inserer(table as never)) as never);
+
+      await service.setOwner(serverId, nouveau, par);
+      vi.mocked(db.insert).mockRestore();
+
+      expect((await service.detail(serverId)).ownerChange).toBeNull();
+    });
+
+    it("un changement d'avant, qui n'annonçait pas de bilan, ne se signale pas", async () => {
+      await db.update(servers).set({ ownerId: nouveau }).where(eq(servers.id, serverId));
+      await db.insert(activityLogs).values({
+        event: "admin.server_owner_changed",
+        serverId,
+        actorId: null,
+        actorType: "user",
+        actorLabel: "admin@gamedashboard.test",
+        ip: null,
+        properties: { ownerId: nouveau },
+        at: new Date().toISOString(),
+      });
+
+      expect((await service.detail(serverId)).ownerChange).toBeNull();
+    });
+  });
+
   describe("coupure du journal", () => {
-    it("est écrite avec le changement : un journal en panne ensuite ne rend pas l'historique", async () => {
+    it("est écrite avec le changement : un bilan qui ne s'écrit pas ne rend pas l'historique", async () => {
       await gesteDeLAncien();
-      // Toute écriture par `record` échoue désormais, et `record` l'avale.
-      vi.spyOn(activite as unknown as { insert(): Promise<void> }, "insert").mockRejectedValue(
-        new Error("journal saturé"),
-      );
-      activite.logger.error = vi.fn();
+      bilanEnPanne();
 
       await service.setOwner(serverId, nouveau, par);
 
@@ -449,7 +531,7 @@ describe.skipIf(!HAS_DATABASE)("AdminServerService.setOwner (intégration)", () 
 
     const client = await activite.forServer(serverId, { revealIp: true });
     expect(client.items).toHaveLength(1);
-    expect(client.items[0]?.properties).toEqual({ ownerId: nouveau });
+    expect(client.items[0]?.properties).toEqual({ ownerId: nouveau, cleanupFollows: true });
     expect(JSON.stringify(client.items)).not.toContain(invite);
     expect(JSON.stringify(client.items)).not.toContain(ancien);
 

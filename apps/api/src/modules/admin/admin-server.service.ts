@@ -24,7 +24,6 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 import { isUuid } from "../../common/uuid";
-import { ActivityService } from "../activity/activity.service";
 import { DatabasesService } from "../client/databases.service";
 import { closeSessions } from "../wings/close-sessions";
 import { WingsClientService } from "../wings/wings-client.service";
@@ -90,6 +89,8 @@ export interface OwnerChangeLeftovers {
   at: string;
   databasesNotRotated: string[];
   sessionsNotClosed: number;
+  /** Le bilan du changement n'a pas été consigné : rien ne dit ce qui reste. */
+  cleanupMissing: boolean;
 }
 
 export interface AdminServerVariable {
@@ -144,7 +145,6 @@ export class AdminServerService {
     @Inject(WingsClientService) private readonly wings: WingsClientService,
     @Inject(WingsTokenService) private readonly tokens: WingsTokenService,
     @Inject(DatabasesService) private readonly databasesService: DatabasesService,
-    @Inject(ActivityService) private readonly activity: ActivityService,
   ) {}
 
   async detail(serverId: string): Promise<AdminServerDetail> {
@@ -374,7 +374,9 @@ export class AdminServerService {
         actorType: auteur.actorType,
         actorLabel: auteur.actorLabel,
         ip: auteur.ip,
-        properties: { ownerId },
+        // Annonce le bilan qui suit : sans lui, la fiche d'administration
+        // sait qu'il manque.
+        properties: { ownerId, cleanupFollows: true },
         at: now,
       });
 
@@ -491,7 +493,7 @@ export class AdminServerService {
       sessionsNotClosed,
     };
 
-    await this.activity.record({
+    await this.consignerBilan({
       event: "server.owner_change_cleanup",
       serverId,
       actorId: auteur.actorId,
@@ -499,9 +501,37 @@ export class AdminServerService {
       actorLabel: auteur.actorLabel,
       ip: auteur.ip,
       properties: { ownerId, previousOwnerId: bilan.ancien, ...nettoyage },
+      at: new Date().toISOString(),
     });
 
     return nettoyage;
+  }
+
+  /**
+   * Écrit le bilan du nettoyage, sans avaler l'échec.
+   *
+   * `ActivityService.record` n'échoue jamais : une ligne manquante passait
+   * inaperçue, et avec elle le bandeau de la fiche et le bilan d'un rejeu,
+   * alors qu'une base gardait peut-être l'ancien mot de passe. Le transfert
+   * est fait à ce stade, et la réponse porte le bilan : l'annuler serait
+   * pire. L'écriture est donc retentée une fois, puis l'échec part en erreur
+   * dans les journaux du processus, **avec le bilan entier**, et la fiche
+   * d'administration signale qu'il manque (`ownerChangeLeftovers`).
+   */
+  private async consignerBilan(ligne: typeof activityLogs.$inferInsert): Promise<void> {
+    for (let essai = 1; ; essai++) {
+      try {
+        await this.db.insert(activityLogs).values(ligne);
+        return;
+      } catch (error) {
+        if (essai < 2) continue;
+        this.logger.error(
+          `Changement de titulaire de ${ligne.serverId} : bilan non consigné (${raison(error)}). ` +
+            `Bilan : ${JSON.stringify(ligne.properties)}`,
+        );
+        return;
+      }
+    }
   }
 
   /**
@@ -563,7 +593,19 @@ export class AdminServerService {
    */
   private async ownerChangeLeftovers(serverId: string): Promise<OwnerChangeLeftovers | null> {
     const dernier = await this.lastCleanup(serverId);
-    if (!dernier) return null;
+    if (!dernier) {
+      // Un changement qui annonçait son bilan et ne l'a pas : son écriture a
+      // échoué (ou le nettoyage est encore en cours). Rien ne dit alors quelle
+      // base garde son ancien mot de passe : l'administration doit le savoir.
+      const changement = await this.lastChange(serverId);
+      if (!changement?.cleanupFollows) return null;
+      return {
+        at: changement.at,
+        databasesNotRotated: [],
+        sessionsNotClosed: 0,
+        cleanupMissing: true,
+      };
+    }
 
     let databasesNotRotated: string[] = [];
     if (dernier.databasesNotRotated.length > 0) {
@@ -581,7 +623,27 @@ export class AdminServerService {
     }
     const sessionsNotClosed = dernier.sessionsNotClosed.length;
     if (databasesNotRotated.length === 0 && sessionsNotClosed === 0) return null;
-    return { at: dernier.at, databasesNotRotated, sessionsNotClosed };
+    return { at: dernier.at, databasesNotRotated, sessionsNotClosed, cleanupMissing: false };
+  }
+
+  /** La dernière ligne de changement de titulaire du serveur. */
+  private async lastChange(
+    serverId: string,
+  ): Promise<{ at: string; cleanupFollows: boolean } | null> {
+    const [ligne] = await this.db
+      .select({ properties: activityLogs.properties, at: activityLogs.at })
+      .from(activityLogs)
+      .where(
+        and(
+          eq(activityLogs.serverId, serverId),
+          inArray(activityLogs.event, [...SERVER_OWNER_CHANGE_EVENTS]),
+        ),
+      )
+      .orderBy(desc(activityLogs.at))
+      .limit(1);
+    if (!ligne) return null;
+    const p = (ligne.properties ?? {}) as Record<string, unknown>;
+    return { at: ligne.at, cleanupFollows: p.cleanupFollows === true };
   }
 
   /**
