@@ -701,38 +701,28 @@ Marque blanche : un revendeur peut surcharger `--gd-accent-*`, logo, nom, favico
 - Bases de données, sous-utilisateurs avec presets, planificateur, allocations, variables de démarrage, réinstallation, transfert entre nodes.
 - Notifications in-app + email. Activité et audit.
 - Admin complet (nodes, eggs, users, servers, settings, branding).
-- API application complète et documentée (create/suspend/unsuspend/terminate/resize) pour qu'un système de facturation externe puisse provisionner des serveurs, sans que ce système fasse partie du projet.
+- API application complète et documentée (create/suspend/unsuspend/terminate/resize, changement de titulaire) pour qu'un système de facturation externe puisse provisionner des serveurs, sans que ce système fasse partie du projet.
 - FR/EN, thème clair/sombre/système, responsive mobile, PWA installable.
 
 ### 10.2 v1.5
-- Marketplace (Modrinth, CurseForge, SpigotMC) avec gestion de versions et mises à jour.
-- Health checks par jeu + page status + alertes Discord/email.
+
+**Livrée en entier** (septembre 2026). Chaque point cite le module où il se lit.
+
+- **Marketplace** (Modrinth, CurseForge, SpigotMC par Spiget) avec gestion de versions et mises à jour — **livré** (`apps/api/src/modules/marketplace`). Choix d'une version précise, y compris antérieure ; liste des extensions installées avec « Tout mettre à jour » ; veille quotidienne des mises à jour (notification `marketplace.update_available`) ; dépendances obligatoires posées avant l'extension, refus avant tout téléchargement si l'une manque. **Modpacks CurseForge** complets sur Minecraft Java (manifeste, mods côté serveur seulement, overrides, datapacks) : installation en tâche de fond suivie en base (`server_engines`, `server_engine_installs`), chargeur Fabric posé par le panel, Forge et NeoForge par l'egg Minecraft Java unifié, que le panel règle puis réinstalle par Wings (écran « Moteur », `GET|POST /servers/{server}/engine…`).
+- **Health checks par jeu + page status + alertes Discord/email** — **livré**. Sondes du worker (`apps/api/src/modules/scheduler/game-probe.service.ts`) : Server List Ping de Minecraft, Steam A2S (Rust, ARK, CS, Garry's Mod, 7 Days to Die, Valheim…) et FiveM/RedM, déclarées par la clé d'egg `game_query` ou reconnues à l'egg (`probe-plan.ts`) ; réponses bornées. Trois sondes ratées d'affilée préviennent le propriétaire (panel, e-mail, webhooks), le retour annonce la durée de la coupure ; une adresse Discord reçoit un message mis en forme. Machine perdue ou rétablie : administrateurs et revendeur prévenus, pannes consignées (`node_outages`). Page `/status` : disponibilité sur 90 jours par composant, incidents.
 - Console avancée : recherche, filtres, liens, autocomplete, historique persistant — **livré** (`packages/ui/src/components/console*.tsx`, `lib/console-text.ts`). Rendu HTML gardé plutôt que xterm (décision de Matheo : filtrer et chercher reviennent à choisir les lignes rendues, CSP à nonce intacte). Couleurs ANSI en seize classes closes, filtres Tout / Serveur / Système et Erreurs / Avertissements / Infos, recherche littérale surlignée, liens `http(s)` seulement. Autocomplétion tirée des commandes déclarées par l'egg (`eggs.console_commands`, clé `console_commands` ignorée par Pterodactyl, `GET /servers/{server}/commands`) et de l'historique. Historique des commandes **dans le navigateur**, effacé à la déconnexion : l'API ne garde pas les arguments (ASVS NC-13). L'historique de sortie reste celui de Wings (`send logs`).
-- Vue joueurs (liste, kick/ban via commandes d'egg déclaratives).
-- Marque blanche revendeurs (domaine custom, logo, couleurs, emails).
-- **Facturation WHMCS et ClientXCms**, à côté de HostBill — **livré** (`apps/api/src/modules/billing` : façade `BillingService`, un `BillingProvider` par système, choisi par `billing.provider`). Même contrat pour
-  les trois : le panel **lit** les services et leurs échéances pour les montrer
-  au client, et n'écrit rien — c'est le tiers qui pilote le panel par l'API
-  applicative.
-
-  À trois, la conséquence n'est plus un réglage de plus mais une **interface
-  commune** : un type `BillingProvider` rendant la liste des services d'un
-  client, et une implémentation par système. `hostbill.*` devient
-  `billing.provider` + `billing.apiUrl` / `billing.apiId` / `billing.apiKey` /
-  `billing.clientUrl`, avec reprise des clés existantes — sans quoi chaque
-  système ajouté dupliquerait le bloc de réglages, l'appel et l'écran.
-
-  L'accueil ne doit alors plus nommer HostBill mais « la facturation reliée » :
-  le bandeau d'accueil et le lien « Relier HostBill » sont écrits en dur
-  aujourd'hui et seront à reprendre à ce moment-là.
+- **Vue joueurs** (liste, kick/ban via commandes d'egg déclaratives) — **livré**. Page « Joueurs » du serveur : joueurs lus dans la dernière sonde de jeu, actions (expulser, bannir, gracier, liste blanche, opérateurs) tapées dans la console d'après `eggs.player_commands` (repli sur Minecraft). Permissions `players.read` et `players.manage`, op/deop exigent aussi `console.send` ; `GET|POST /servers/{server}/players`.
+- **Marque blanche revendeurs** (domaine custom, logo, couleurs, emails) — **livré** (`apps/api/src/modules/reseller`). Domaine propre prouvé par TXT puis servi par nginx avec son certificat (page d'attente neutre avant lui, mises à niveau filtrées comme sur le panel) ; logo et favicon envoyés par fichier (`brand_images` en base, PNG, JPEG, WebP ou ICO, jamais de SVG) ; courriels au nom de la marque avec l'adresse de réponse du revendeur, l'expéditeur SMTP restant celui de la plateforme (SPF, DKIM) ; clés d'accès et cérémonies SSO sur le domaine vérifié du revendeur (`user_passkeys.rp_id`).
+- **Facturation WHMCS et ClientXCms**, à côté de HostBill — **livré** (`apps/api/src/modules/billing` : façade `BillingService`, un `BillingProvider` par système, choisi par `billing.provider`, réglages `billing.*` qui reprennent les anciennes clés `hostbill.*`). Même contrat pour les trois : le panel **lit** les services et leurs échéances pour les montrer au client, et n'écrit rien. **La facturation n'est jamais gérée par le panel** : c'est le facturier tiers qui décide et qui pilote le panel par l'API applicative (§10.1). Les écrans parlent de « la facturation reliée », sans nommer un système ; essai de liaison dans les réglages.
 
 ### 10.3 v2
-- Firewall par serveur (nftables sur le node).
-- Snapshots de volumes (btrfs/zfs) pour backups instantanés.
-- Sous-domaines automatiques (`monserveur.gamedashboard.gg` via Cloudflare API, enregistrements SRV).
-- Métriques de consommation exportables (pour un système de facturation externe).
-- Module VPS (via Proxmox API) réutilisant le même AppShell et les mêmes composants.
-- App mobile React Native partageant `@gamedashboard/contracts` et `@gamedashboard/sdk`.
+
+- **Sous-domaines automatiques** (`monserveur.gamedashboard.gg` via Cloudflare API, enregistrements SRV) — **livré** (`apps/api/src/modules/dns`, [guide](./docs/sous-domaines.md)). Le client choisit un libellé dans l'écran Réseau ; le panel publie A, AAAA ou CNAME selon l'adresse publique, et un SRV `_minecraft._tcp` pour Minecraft Java, dans la zone réglée par l'administration. Les enregistrements suivent le port principal et le transfert, disparaissent avec le serveur ; un balayage toutes les cinq minutes rattrape les échecs. Seuls les enregistrements posés par le panel sont touchés, un nom que la zone porte déjà est refusé, aucune adresse privée n'est publiée. Fournisseur derrière `DnsProvider`, jeton chiffré lié à sa ligne.
+- **Métriques de consommation exportables** (pour un système de facturation externe) — **livré** (`apps/api/src/modules/consumption`). Résumé journalier de `server_metrics` par serveur (`server_consumption_days`, gardé treize mois, recalculé chaque heure). Export CSV ou JSONL depuis l'administration, l'espace revendeur et l'écran d'un serveur ; JSON paginé par l'API applicative (`GET /consumption`, portée `consumption.read`, bornée au parc d'une clé de revendeur). Le panel fournit les chiffres ; ce qu'on en facture reste l'affaire du facturier.
+- **Firewall par serveur** (nftables sur le node) — **proposé, sans code** : [ADR 0008](./docs/adr/0008-pare-feu-nftables.md). Un agent facultatif sur chaque node tire du panel les règles de ses serveurs, les valide et les pose dans sa propre table nftables, avant le DNAT de Docker, sans toucher Wings ni les tables de Docker. Rien ne s'écrit avant que Matheo accepte l'ADR et tranche ses questions ouvertes.
+- **Snapshots de volumes** (btrfs/zfs) pour backups instantanés — **proposé, sans code** : [ADR 0009](./docs/adr/0009-instantanes-de-volumes.md). Instantanés du système de fichiers entier des serveurs d'un node, pris et restaurés par l'agent de l'ADR 0008 ; la restauration recopie le seul dossier du serveur arrêté, Wings n'est pas modifié. Les sauvegardes locales et S3 restent la seule copie hors de la machine. En attente des réponses de Matheo.
+- Module VPS (via Proxmox API) réutilisant le même AppShell et les mêmes composants — à concevoir.
+- App mobile React Native partageant `@gamedashboard/contracts` et `@gamedashboard/sdk` — à concevoir.
 
 ---
 
@@ -789,10 +779,12 @@ GameDashboard/
 | **4 : Sécurité & compte** | 2 sem. | 2FA TOTP, passkeys, sessions, clés API/SSH, alertes connexion, audit immuable, CSP, rate-limit, pentest interne |
 | **5 : Admin & API application** | 3 sem. | Admin complet, API application documentée (provisioning externe), webhooks sortants, script de migration Pterodactyl |
 | **6 : Polish & bêta** | 2 sem. | i18n complet, responsive, PWA, accessibilité (WCAG AA), perf (Lighthouse > 90), doc utilisateur, bêta fermée |
-| **v1.5** | +4 sem. | Marketplace, health checks, status page, console avancée, marque blanche |
-| **v2** | itératif | Firewall, snapshots, DNS auto, VPS, mobile |
+| **v1.5** | +4 sem. | Marketplace, health checks, status page, console avancée, marque blanche, facturation multi-fournisseur. **Livrée** |
+| **v2** | itératif | DNS auto et export de la consommation **livrés** ; firewall et snapshots **proposés** (ADR 0008, 0009) ; VPS, mobile à concevoir |
 
 **Total v1 : environ 19 semaines.** Chaque phase se termine par une démo, une revue sécurité et une mise à jour de ce plan.
+
+**État à fin septembre 2026** : les phases 0 à 6 et la v1.5 sont dans `main` (§10.1, §10.2) ; la v2 avance point par point (§10.3). Restent hors du code : les bancs de contrat sur la machine de Matheo et le pentest externe (§0.5 du [rapport ASVS](./docs/securite/rapport-asvs-l2.md)).
 
 ### 12.2 Stratégie de tests
 
