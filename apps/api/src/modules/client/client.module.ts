@@ -8,6 +8,8 @@ import { ConsumptionModule } from "../consumption/consumption.module";
 import { DnsModule } from "../dns/dns.module";
 import { MailerService } from "../mail/mailer.service";
 import { MarketplaceModule } from "../marketplace/marketplace.module";
+import { NodeAgentRepository } from "../node-agent/node-agent.repository";
+import { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { ResellerModule } from "../reseller/reseller.module";
 import { StorageModule } from "../storage/storage.module";
@@ -112,6 +114,11 @@ import { SubusersService } from "./subusers.service";
     ServerResizeService,
     // Pour le défaut du tueur de mémoire, décidé par la plateforme.
     PlatformSettingsService,
+    // Fournis ici et non importés : le module de l'agent importe
+    // l'administration, qui importe ce module. Sans état, deux instances ne
+    // divergent pas.
+    NodeAgentRepository,
+    NodeCapabilitiesService,
     // L'écran des notifications doit pouvoir dire si le courriel partira :
     // proposer une case qui n'enverra rien fait attendre des messages qui ne
     // viendront jamais.

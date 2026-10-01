@@ -92,6 +92,13 @@ export function BackupsWorkspace({ serverId, initial }: { serverId: string; init
               {row.original.isLocked ? (
                 <Lock className="size-3.5 shrink-0 text-warning-ink" aria-label={t("locked")} />
               ) : null}
+              {/* Tirée d'un instantané (ADR 0009) : prise d'un seul coup,
+                  sans fichier modifié pendant l'archivage. */}
+              {row.original.source === "snapshot" ? (
+                <Badge variant="accent" title={t("consistentHint")}>
+                  {t("consistent")}
+                </Badge>
+              ) : null}
             </p>
             <p className="text-xs text-muted">
               {/* Une sauvegarde en cours n'a pas encore de taille connue : « — »

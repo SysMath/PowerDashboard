@@ -7,6 +7,7 @@ import {
   NodeAgentHeartbeat,
   type NodeAgentSnapshot,
   nodeAgentConfigurationPath,
+  nodeAgentConfigureCommand,
   nodeAgentStatus,
   nodeCapabilities,
   normalizeAgentJournalEntry,
@@ -33,6 +34,21 @@ describe("routes de l'agent", () => {
     expect(NODE_AGENT_PREFIX).toBe("/api/node-agent");
     expect(nodeAgentConfigurationPath("abc")).toBe(
       `${WINGS_CONFIGURE_PREFIX}/nodes/abc/agent-configuration`,
+    );
+  });
+
+  it("écrit la commande de mise en service comme celle de Wings", () => {
+    const command = nodeAgentConfigureCommand({
+      panelOrigin: "https://panel.exemple.fr/",
+      nodeId: "0f5e8a1c",
+      token: "gd_cle",
+      activer: "instantanes",
+    });
+    expect(command).toBe(
+      "gamedashboard-agent configure --panel-url https://panel.exemple.fr --token gd_cle --node 0f5e8a1c --activer instantanes",
+    );
+    expect(nodeAgentConfigureCommand({ panelOrigin: "https://p", nodeId: "n" })).toBe(
+      "gamedashboard-agent configure --panel-url https://p --token <clé applicative> --node n",
     );
   });
 

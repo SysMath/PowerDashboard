@@ -10,6 +10,7 @@ import {
   fetchNodeTaxonomy,
 } from "@/server/api/admin";
 import { fetchAdminNodeDetail, fetchNodeAllocations } from "@/server/api/admin-node";
+import { fetchNodeAgent, fetchNodeSnapshots } from "@/server/api/admin-snapshots";
 
 export const generateMetadata = pageTitle("nodeAdmin", "sheetMetaTitle");
 
@@ -27,14 +28,17 @@ export default async function AdminNodeSheetPage({
   searchParams: Promise<{ section?: string }>;
 }) {
   const [{ id }, { section }] = await Promise.all([params, searchParams]);
-  const [detail, allocations, nodes, users, taxonomy, locations] = await Promise.all([
-    fetchAdminNodeDetail(id),
-    fetchNodeAllocations(id),
-    fetchAdminNodes(),
-    fetchAdminUsers(),
-    fetchNodeTaxonomy(),
-    fetchLocations(),
-  ]);
+  const [detail, allocations, nodes, users, taxonomy, locations, agent, snapshots] =
+    await Promise.all([
+      fetchAdminNodeDetail(id),
+      fetchNodeAllocations(id),
+      fetchAdminNodes(),
+      fetchAdminUsers(),
+      fetchNodeTaxonomy(),
+      fetchLocations(),
+      fetchNodeAgent(id),
+      fetchNodeSnapshots(id),
+    ]);
 
   const row = nodes.find((node) => node.id === id);
   if (!row) notFound();
@@ -57,6 +61,9 @@ export default async function AdminNodeSheetPage({
       taxonomy={taxonomy}
       locations={locations}
       initialSection={section}
+      agent={agent}
+      // Fonction coupée pour la plateforme : rien à régler ici.
+      snapshots={snapshots?.capability.state === "platform_disabled" ? null : snapshots}
       // Lue sur le serveur, jamais reconstruite depuis le navigateur : la
       // commande affichée écrira cette adresse dans la configuration du daemon.
       panelOrigin={process.env.PANEL_ORIGIN ?? "http://localhost:3000"}

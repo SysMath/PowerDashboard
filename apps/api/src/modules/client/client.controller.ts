@@ -19,6 +19,7 @@ import { ImpersonationReadOnlyGuard } from "../auth/impersonation.guard";
 import type { AuthenticatedRequest } from "../auth/session.guard";
 import { SessionGuard } from "../auth/session.guard";
 import { BillingService } from "../billing/billing.service";
+import { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
 import { ResellerQuotaService } from "../reseller/reseller-quota.service";
 import { CatalogueService } from "./catalogue.service";
 import { ClientNodesService } from "./client-nodes.service";
@@ -74,6 +75,8 @@ export class ClientController {
     // connaît le propriétaire, le sous-utilisateur, le personnel et le
     // revendeur qui héberge.
     @Inject(ServerAccessService) private readonly access: ServerAccessService,
+    // Ce que la machine du serveur offre par son agent (ADR 0008, 0009).
+    @Inject(NodeCapabilitiesService) private readonly capabilities: NodeCapabilitiesService,
   ) {}
 
   /**
@@ -252,7 +255,7 @@ export class ClientController {
   async server(
     @Req() request: ClientRequest,
     @Param("id") id: string,
-  ): Promise<{ data: ClientServer }> {
+  ): Promise<{ data: ClientServer & { snapshots: boolean } }> {
     // Lève 404 pour un inconnu — même réponse que « n'existe pas », pour qu'on
     // ne puisse pas énumérer les serveurs des autres.
     await this.access.require(
@@ -263,7 +266,12 @@ export class ClientController {
 
     const server = await this.servers.byId(id, request.user.id);
     if (!server) throw new NotFoundException("Serveur introuvable.");
-    return { data: server };
+    // L'onglet « Instantanés » n'existe que là où la machine les offre : une
+    // entrée ailleurs mènerait à un écran qui ne peut que répondre 404.
+    const nodeId = await this.servers.nodeOf(id);
+    const snapshots =
+      nodeId !== null && (await this.capabilities.forNode(nodeId)).instantanes.offered;
+    return { data: { ...server, snapshots } };
   }
 
   /**

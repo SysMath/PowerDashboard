@@ -32,6 +32,26 @@ export function nodeAgentConfigurationPath(nodeId: string): string {
   return `${WINGS_CONFIGURE_PREFIX}/nodes/${nodeId}/agent-configuration`;
 }
 
+/**
+ * La ligne à recopier sur la machine, pendant de `wingsConfigureCommand` :
+ * même clé d'amorçage, même `--node` toujours en option. `--activer` met en
+ * marche la fonction voulue dans le même geste.
+ */
+export function nodeAgentConfigureCommand(input: {
+  panelOrigin: string;
+  nodeId: string;
+  token?: string;
+  activer?: NodeAgentFunction;
+}): string {
+  return [
+    "gamedashboard-agent configure",
+    `--panel-url ${input.panelOrigin.replace(/\/+$/, "")}`,
+    `--token ${input.token ?? "<clé applicative>"}`,
+    `--node ${input.nodeId}`,
+    ...(input.activer ? [`--activer ${input.activer}`] : []),
+  ].join(" ");
+}
+
 /** Réponse de la route de configuration, sans enveloppe, comme pour Wings. */
 export interface NodeAgentConfiguration {
   uuid: string;

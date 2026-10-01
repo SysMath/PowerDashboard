@@ -1,16 +1,15 @@
-import { type Database, eggs, servers } from "@gamedashboard/db";
-import { NotFoundException } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
+import type { Database } from "@gamedashboard/db";
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
 import {
   createThrowawayDatabase,
   HAS_DATABASE,
-  NO_DATABASE_REASON,
   type ThrowawayDatabase,
 } from "../../test/throwaway-database";
 import type { DenialLogService } from "../activity/denial-log.service";
 import type { AuthenticatedRequest } from "../auth/session.guard";
+import type { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
 import { ClientController } from "./client.controller";
 import { ClientServersService } from "./client-servers.service";
 import { ServerAccessService } from "./server-access.service";
@@ -18,16 +17,19 @@ import { ServerAccessService } from "./server-access.service";
 const silence = { record: async () => {} } as unknown as DenialLogService;
 
 /**
- * Les commandes que l'egg propose à la console (PLAN §10.2), lues par la
- * route `GET servers/:id/commands` contre une vraie base.
+ * La fiche d'un serveur dit si sa machine offre les instantanés (ADR 0009) :
+ * c'est ce qui fait apparaître l'onglet, et il ne doit l'être que là où
+ * l'API servira ses routes.
  */
-describe.skipIf(!HAS_DATABASE)("commandes de console d'un serveur (intégration)", () => {
+describe.skipIf(!HAS_DATABASE)("fiche serveur et instantanés (intégration)", () => {
   let throwaway: ThrowawayDatabase;
   let db: Database;
   let controller: ClientController;
   let ownerId: string;
-  let strangerId: string;
   let serverId: string;
+  let nodeId: string;
+  let offeredOn: string | null;
+  const asked: string[] = [];
 
   const requete = (id: string) =>
     ({ user: { id }, scopes: null }) as unknown as AuthenticatedRequest;
@@ -36,6 +38,12 @@ describe.skipIf(!HAS_DATABASE)("commandes de console d'un serveur (intégration)
     throwaway = await createThrowawayDatabase();
     db = throwaway.db;
     const unused = {} as never;
+    const capabilities = {
+      forNode: async (id: string) => {
+        asked.push(id);
+        return { instantanes: { offered: id === offeredOn } };
+      },
+    } as unknown as NodeCapabilitiesService;
     controller = new ClientController(
       new ClientServersService(db),
       unused,
@@ -46,7 +54,7 @@ describe.skipIf(!HAS_DATABASE)("commandes de console d'un serveur (intégration)
       unused,
       unused,
       new ServerAccessService(db, silence),
-      unused,
+      capabilities,
     );
   }, 60_000);
 
@@ -60,37 +68,23 @@ describe.skipIf(!HAS_DATABASE)("commandes de console d'un serveur (intégration)
         "truncate table server_subusers, servers, allocations, eggs, nests, nodes, locations, users cascade",
       ),
     );
+    asked.length = 0;
     const locationId = await seedLocation(db);
     ownerId = await seedUser(db);
-    strangerId = await seedUser(db);
-    const nodeId = await seedNode(db, { locationId });
+    nodeId = await seedNode(db, { locationId });
     serverId = await seedServer(db, { nodeId, ownerId });
   });
 
-  it("rend les commandes déclarées par l'egg, dans leur ordre", async () => {
-    const [row] = await db
-      .select({ eggId: servers.eggId })
-      .from(servers)
-      .where(eq(servers.id, serverId));
-    await db
-      .update(eggs)
-      .set({ consoleCommands: ["say <message>", "list"] })
-      .where(eq(eggs.id, row?.eggId as string));
-
-    const { data } = await controller.consoleCommands(requete(ownerId), serverId);
-    expect(data.commands).toEqual(["say <message>", "list"]);
+  it("porte l'onglet quand la machine du serveur offre la fonction", async () => {
+    offeredOn = nodeId;
+    const { data } = await controller.server(requete(ownerId), serverId);
+    expect(data.snapshots).toBe(true);
+    expect(asked).toEqual([nodeId]);
   });
 
-  it("rend une liste vide pour un egg qui n'en déclare pas", async () => {
-    const { data } = await controller.consoleCommands(requete(ownerId), serverId);
-    expect(data.commands).toEqual([]);
-  });
-
-  it("répond 404 à qui n'a pas accès au serveur, comme pour sa fiche", async () => {
-    await expect(controller.consoleCommands(requete(strangerId), serverId)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+  it("ne le porte pas ailleurs", async () => {
+    offeredOn = null;
+    const { data } = await controller.server(requete(ownerId), serverId);
+    expect(data.snapshots).toBe(false);
   });
 });
-
-if (!HAS_DATABASE) console.warn(NO_DATABASE_REASON);

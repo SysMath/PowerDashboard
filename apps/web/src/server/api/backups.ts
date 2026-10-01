@@ -13,6 +13,8 @@ export interface Backup {
   isLocked: boolean;
   createdAt: string;
   completedAt: string | null;
+  /** `snapshot` : archivée par l'agent depuis un instantané, donc cohérente. */
+  source?: "wings" | "snapshot";
 }
 
 export interface BackupList {

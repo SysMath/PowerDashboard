@@ -10,7 +10,7 @@ import {
   NotFoundException,
   Param,
   ParseUUIDPipe,
-  Put,
+  Post,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -49,8 +49,11 @@ export class AdminSnapshotsController {
     return { data: await this.policies.defaults() };
   }
 
-  @Put("snapshots/defaults")
+  // POST, comme les autres réglages de l'administration : l'interface
+  // n'envoie que POST et DELETE (`apiSend`).
+  @Post("snapshots/defaults")
   @UseGuards(AdminWriteGuard)
+  @HttpCode(200)
   async saveDefaults(@Req() request: AdminRequest, @Body() body: unknown) {
     const before = await this.policies.defaults();
     const after = await this.policies.saveDefaults(body);
@@ -72,8 +75,9 @@ export class AdminSnapshotsController {
   }
 
   /** `{ policy }` pour des réglages propres, `{ policy: null }` pour suivre les défauts. */
-  @Put("nodes/:nodeId/snapshots/policy")
+  @Post("nodes/:nodeId/snapshots/policy")
   @UseGuards(AdminWriteGuard)
+  @HttpCode(200)
   async savePolicy(
     @Req() request: AdminRequest,
     @Param("nodeId", NODE_ID) nodeId: string,

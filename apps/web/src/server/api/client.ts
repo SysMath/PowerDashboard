@@ -246,6 +246,11 @@ export interface ClientServer {
   players: number | null;
   maxPlayers: number | null;
   isOwner: boolean;
+  /**
+   * La machine offre les instantanés (ADR 0009). Rendu par le détail d'un
+   * serveur seulement, jamais par la liste.
+   */
+  snapshots?: boolean;
 }
 
 /**
