@@ -71,6 +71,7 @@ const EXPIRED = "L'agent de node n'a pas rendu compte de cet ordre à temps.";
 const NOT_STOPPED = "Le serveur ne s'est pas arrêté à temps : restauration abandonnée.";
 
 type Pause = (ms: number) => Promise<void>;
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const pauseReelle: Pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type FinishedOrder = typeof snapshotOrders.$inferSelect & {
@@ -204,6 +205,7 @@ export class SnapshotsService {
   async applyReport(nodeId: string, report: AgentSnapshotReport): Promise<void> {
     const now = new Date().toISOString();
     const finished: FinishedOrder[] = [];
+    const released: FinishedOrder[] = [];
     await this.db.transaction(async (tx) => {
       const status = {
         filesystem: report.systeme === "" ? null : report.systeme,
@@ -273,11 +275,13 @@ export class SnapshotsService {
           )
           .returning();
         if (order) {
-          finished.push({
+          const done = {
             ...order,
             safety: result.instantane ?? null,
             uploadStarted: result.depot_commence === true,
-          });
+          };
+          finished.push(done);
+          if (await this.releaseRestore(tx, done)) released.push(done);
         }
         // Un instantané pris pour quelqu'un porte sa cause et son demandeur.
         if (order?.cause && result.instantane) {
@@ -299,10 +303,8 @@ export class SnapshotsService {
         }
       }
     });
-    for (const order of finished) {
-      await this.settleRestore(order);
-      await this.settleArchive(nodeId, order);
-    }
+    for (const order of released) await this.logRestore(order);
+    for (const order of finished) await this.settleArchive(nodeId, order);
   }
 
   /**
@@ -311,49 +313,55 @@ export class SnapshotsService {
    */
   async expireOrders(nodeId: string): Promise<void> {
     const now = new Date();
-    const closed = await this.db
-      .update(snapshotOrders)
-      .set({
-        state: "failed",
-        error: EXPIRED,
-        completedAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-      })
-      .where(
-        and(
-          eq(snapshotOrders.nodeId, nodeId),
-          or(
-            and(
-              eq(snapshotOrders.state, "pending"),
-              notInArray(snapshotOrders.kind, LONG_ORDERS),
-              lt(
-                snapshotOrders.createdAt,
-                new Date(now.getTime() - ORDER_TIMEOUT_MS).toISOString(),
+    const released: FinishedOrder[] = [];
+    const closed = await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .update(snapshotOrders)
+        .set({
+          state: "failed",
+          error: EXPIRED,
+          completedAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        })
+        .where(
+          and(
+            eq(snapshotOrders.nodeId, nodeId),
+            or(
+              and(
+                eq(snapshotOrders.state, "pending"),
+                notInArray(snapshotOrders.kind, LONG_ORDERS),
+                lt(
+                  snapshotOrders.createdAt,
+                  new Date(now.getTime() - ORDER_TIMEOUT_MS).toISOString(),
+                ),
               ),
-            ),
-            and(
-              eq(snapshotOrders.state, "pending"),
-              inArray(snapshotOrders.kind, LONG_ORDERS),
-              lt(
-                snapshotOrders.createdAt,
-                new Date(now.getTime() - LONG_ORDER_TIMEOUT_MS).toISOString(),
+              and(
+                eq(snapshotOrders.state, "pending"),
+                inArray(snapshotOrders.kind, LONG_ORDERS),
+                lt(
+                  snapshotOrders.createdAt,
+                  new Date(now.getTime() - LONG_ORDER_TIMEOUT_MS).toISOString(),
+                ),
               ),
-            ),
-            and(
-              eq(snapshotOrders.state, "waiting"),
-              lt(
-                snapshotOrders.createdAt,
-                new Date(now.getTime() - WAITING_TIMEOUT_MS).toISOString(),
+              and(
+                eq(snapshotOrders.state, "waiting"),
+                lt(
+                  snapshotOrders.createdAt,
+                  new Date(now.getTime() - WAITING_TIMEOUT_MS).toISOString(),
+                ),
               ),
             ),
           ),
-        ),
-      )
-      .returning();
-    for (const order of closed) {
-      await this.settleRestore({ ...order, safety: null });
-      await this.settleArchive(nodeId, { ...order, safety: null });
-    }
+        )
+        .returning();
+      for (const order of rows) {
+        const done = { ...order, safety: null };
+        if (await this.releaseRestore(tx, done)) released.push(done);
+      }
+      return rows;
+    });
+    for (const order of released) await this.logRestore(order);
+    for (const order of closed) await this.settleArchive(nodeId, { ...order, safety: null });
   }
 
   /**
@@ -438,14 +446,24 @@ export class SnapshotsService {
    * rendu (état `restoring` levé, et lui seul) et l'issue va au journal du
    * serveur. Une fois seulement, quand l'état est effectivement levé.
    */
-  private async settleRestore(order: FinishedOrder): Promise<void> {
-    if (order.kind !== "restaurer" || !order.serverId) return;
-    const released = await this.db
+  /**
+   * Rend le serveur d'une restauration close, **dans la transaction qui clôt
+   * l'ordre** : un panel arrêté entre les deux laissait le serveur en
+   * `restoring` pour toujours, aucun balayage ne revenant sur un ordre clos.
+   * Vrai si le serveur a été rendu, et le journal est alors à écrire.
+   */
+  private async releaseRestore(tx: Transaction, order: FinishedOrder): Promise<boolean> {
+    if (order.kind !== "restaurer" || !order.serverId) return false;
+    const released = await tx
       .update(servers)
       .set({ state: null, updatedAt: new Date().toISOString() })
       .where(and(eq(servers.id, order.serverId), eq(servers.state, "restoring")))
       .returning({ id: servers.id });
-    if (released.length === 0) return;
+    return released.length > 0;
+  }
+
+  private async logRestore(order: FinishedOrder): Promise<void> {
+    if (!order.serverId) return;
     const ok = order.state === "done";
     await this.activity.record({
       event: ok ? "snapshot.restore_completed" : "snapshot.restore_failed",
@@ -817,12 +835,17 @@ export class SnapshotsService {
 
   private async failWaiting(orderId: string, error: string): Promise<void> {
     const now = new Date().toISOString();
-    const [order] = await this.db
-      .update(snapshotOrders)
-      .set({ state: "failed", error, completedAt: now, updatedAt: now })
-      .where(and(eq(snapshotOrders.id, orderId), eq(snapshotOrders.state, "waiting")))
-      .returning();
-    if (order) await this.settleRestore({ ...order, safety: null });
+    const released = await this.db.transaction(async (tx) => {
+      const [order] = await tx
+        .update(snapshotOrders)
+        .set({ state: "failed", error, completedAt: now, updatedAt: now })
+        .where(and(eq(snapshotOrders.id, orderId), eq(snapshotOrders.state, "waiting")))
+        .returning();
+      if (!order) return null;
+      const done = { ...order, safety: null };
+      return (await this.releaseRestore(tx, done)) ? done : null;
+    });
+    if (released) await this.logRestore(released);
   }
 
   /**

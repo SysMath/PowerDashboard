@@ -5,6 +5,7 @@ import {
   WINGS_CONFIGURE_PREFIX,
   wingsConfigureCommand,
   wingsNodeConfigurationPath,
+  withoutTrailingSlashes,
 } from "./wings-node-config";
 
 const NODE = {
@@ -127,6 +128,19 @@ describe("ligne de commande", () => {
       nodeId: NODE.id,
     });
     expect(command).toContain("--panel-url https://panel.example.fr ");
+  });
+
+  it("retire toutes les barres finales, en temps linéaire", () => {
+    expect(withoutTrailingSlashes("https://p.fr///")).toBe("https://p.fr");
+    expect(withoutTrailingSlashes("https://p.fr")).toBe("https://p.fr");
+    expect(withoutTrailingSlashes("///")).toBe("");
+    expect(withoutTrailingSlashes("")).toBe("");
+    // Le cas qui rendait `/\/+$/` quadratique (CodeQL js/polynomial-redos) :
+    // une longue suite de barres que suit un autre caractère.
+    const piege = `${"/".repeat(200_000)}x`;
+    const debut = performance.now();
+    expect(withoutTrailingSlashes(piege)).toBe(piege);
+    expect(performance.now() - debut).toBeLessThan(200);
   });
 
   it("nomme la clé applicative plutôt que de laisser un trou", () => {

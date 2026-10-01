@@ -140,7 +140,7 @@ export function SnapshotsWorkspace({
               {snapshot.pinned ? (
                 <DropdownItem
                   icon={<PinOff />}
-                  disabled={pending}
+                  disabled={pending || bloc !== null}
                   onSelect={() => run(() => unpinSnapshot(serverId, snapshot.name))}
                 >
                   {t("unpin")}
@@ -148,7 +148,7 @@ export function SnapshotsWorkspace({
               ) : (
                 <DropdownItem
                   icon={<Pin />}
-                  disabled={pending || pinsFull}
+                  disabled={pending || pinsFull || bloc !== null}
                   onSelect={() => setToPin(snapshot)}
                 >
                   {t("pin")}
@@ -159,7 +159,7 @@ export function SnapshotsWorkspace({
         },
       },
     ],
-    [serverId, pending, canWrite, pinsFull, meta.status.suspended, run, t, tc],
+    [serverId, pending, canWrite, pinsFull, bloc, meta.status.suspended, run, t, tc],
   );
 
   const takeDisabled = !canWrite || !meta.manualAllowed || meta.pending || !!meta.nextManualAt;

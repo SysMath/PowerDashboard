@@ -81,6 +81,9 @@ export class ClientSnapshotsController {
     const input = SnapshotPinInput.safeParse(body ?? {});
     if (!input.success) throw new BadRequestException("Libellé invalide (80 caractères au plus).");
     await this.access.require(principalOf(request), id, "snapshots.create");
+    // Comme prendre et restaurer : rien sur un serveur suspendu, en
+    // installation ou en restauration.
+    await this.access.requireOperable(id);
     const label = input.data.label ? input.data.label : null;
     await this.snapshots.pin(id, name, label, request.user.id);
     await this.log(request, id, "snapshot.pin", { name, label });
@@ -111,6 +114,7 @@ export class ClientSnapshotsController {
   async unpin(@Req() request: ClientRequest, @Param("id") id: string, @Param("name") raw: string) {
     const name = snapshotName(raw);
     await this.access.require(principalOf(request), id, "snapshots.create");
+    await this.access.requireOperable(id);
     await this.snapshots.unpin(id, name);
     await this.log(request, id, "snapshot.unpin", { name });
     return { data: { name, pinned: false } };

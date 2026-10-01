@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { NODE_HEARTBEAT_LOST_MS } from "./node";
-import { WINGS_CONFIGURE_PREFIX } from "./wings-node-config";
+import { WINGS_CONFIGURE_PREFIX, withoutTrailingSlashes } from "./wings-node-config";
 
 /**
  * Agent de node (ADR 0008, ADR 0009) : le contrat entre le panel et
@@ -45,7 +45,7 @@ export function nodeAgentConfigureCommand(input: {
 }): string {
   return [
     "gamedashboard-agent configure",
-    `--panel-url ${input.panelOrigin.replace(/\/+$/, "")}`,
+    `--panel-url ${withoutTrailingSlashes(input.panelOrigin)}`,
     `--token ${input.token ?? "<clé applicative>"}`,
     `--node ${input.nodeId}`,
     ...(input.activer ? [`--activer ${input.activer}`] : []),

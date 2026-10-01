@@ -138,6 +138,19 @@ export function buildWingsNodeConfiguration(
 }
 
 /**
+ * Retire les barres obliques finales d'une adresse.
+ *
+ * Sans expression régulière : `/\/+$/` est quadratique sur une longue suite
+ * de barres qui ne finit pas la chaîne (CodeQL `js/polynomial-redos`), et
+ * l'adresse vient d'une variable d'environnement.
+ */
+export function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
+/**
  * La ligne de commande à recopier sur la machine.
  *
  * Le jeton demandé est une **clé applicative**, pas le jeton du daemon : c'est
@@ -152,7 +165,7 @@ export function wingsConfigureCommand(input: {
 }): string {
   return [
     "wings configure",
-    `--panel-url ${input.panelOrigin.replace(/\/+$/, "")}`,
+    `--panel-url ${withoutTrailingSlashes(input.panelOrigin)}`,
     `--token ${input.token ?? "<clé applicative>"}`,
     // Toujours en option : l'invite interactive refuse un UUID.
     `--node ${input.nodeId}`,
