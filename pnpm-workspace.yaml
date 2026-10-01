@@ -34,6 +34,12 @@ overrides:
   # tirent la dernière majeure publiée et décrivent des API absentes de Node 24.
   "@types/node": "^24.13.6"
 
+  # monaco-editor 0.57.0, sa dernière version, épingle dompurify à 3.4.15
+  # exactement (GHSA-p98j-92pf-mc4p, corrigé en 3.4.16) : le lockfile seul ne
+  # peut pas monter au-dessus d'une version exacte. À retirer quand
+  # monaco-editor publiera une version qui tire 3.4.16 ou plus.
+  "monaco-editor>dompurify": "^3.4.16"
+
 # Aucune dépendance transitive tirée d'une source hors du registre (dépôt git,
 # archive par URL) : seule une dépendance directe, écrite ici, peut le faire.
 blockExoticSubdeps: true
