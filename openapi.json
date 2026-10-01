@@ -52,6 +52,9 @@
       "name": "Infrastructure"
     },
     {
+      "name": "Instantanés"
+    },
+    {
       "name": "Mise en service"
     },
     {
@@ -2627,6 +2630,248 @@
           },
           "403": {
             "description": "Authentifié, mais sans la portée « backups.delete », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/snapshots": {
+      "get": {
+        "summary": "Lister les instantanés du serveur sur son node (nom, date, cause, expiration, épingle) et l'état de la fonction (meta : système de fichiers, espace libre, écritures acceptées, épingles, prochaine demande manuelle possible). 404 si aucun agent du node n'offre les instantanés.",
+        "description": "Clé personnelle. Portée requise : `snapshots.read`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-get-servers-by-server-snapshots",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.read"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.read",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      },
+      "post": {
+        "summary": "Demander un instantané manuel. Répond 202 avec l'ordre : l'agent du node le prend à son relevé suivant, et une demande déjà en attente est rendue telle quelle. Refusé (409) si l'agent ne répond plus, si la fonction ou les demandes manuelles sont coupées sur ce node ou si l'espace libre manque, (429) avant la fin du délai entre deux demandes.",
+        "description": "Clé personnelle. Portée requise : `snapshots.create`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-post-servers-by-server-snapshots",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.create"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.create",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/snapshots/{snapshot}/pin": {
+      "post": {
+        "summary": "Épingler un instantané : { label? }. La rotation ne le détruit plus, jusqu'à la durée maximale du node. Refusé (409) au-delà de la limite d'épingles du serveur.",
+        "description": "Clé personnelle. Portée requise : `snapshots.create`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-post-servers-by-server-snapshots-by-snapshot-pin",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "description": "Valeur de « snapshot ».",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.create"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.create",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Désépingler un instantané : la rotation le reprend.",
+        "description": "Clé personnelle. Portée requise : `snapshots.create`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-delete-servers-by-server-snapshots-by-snapshot-pin",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "description": "Valeur de « snapshot ».",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.create"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.create",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.create », ou refusé pour la ressource visée : la cause est dans le corps.",
             "content": {
               "application/json": {
                 "schema": {

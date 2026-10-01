@@ -211,6 +211,37 @@ export const CLIENT_ROUTES: ApiRoute[] = [
   },
   {
     method: "GET",
+    path: "/servers/{server}/snapshots",
+    summary:
+      "Lister les instantanés du serveur sur son node (nom, date, cause, expiration, épingle) et l'état de la fonction (meta : système de fichiers, espace libre, écritures acceptées, épingles, prochaine demande manuelle possible). 404 si aucun agent du node n'offre les instantanés.",
+    scope: "snapshots.read",
+    group: "Instantanés",
+  },
+  {
+    method: "POST",
+    path: "/servers/{server}/snapshots",
+    summary:
+      "Demander un instantané manuel. Répond 202 avec l'ordre : l'agent du node le prend à son relevé suivant, et une demande déjà en attente est rendue telle quelle. Refusé (409) si l'agent ne répond plus, si la fonction ou les demandes manuelles sont coupées sur ce node ou si l'espace libre manque, (429) avant la fin du délai entre deux demandes.",
+    scope: "snapshots.create",
+    group: "Instantanés",
+  },
+  {
+    method: "POST",
+    path: "/servers/{server}/snapshots/{snapshot}/pin",
+    summary:
+      "Épingler un instantané : { label? }. La rotation ne le détruit plus, jusqu'à la durée maximale du node. Refusé (409) au-delà de la limite d'épingles du serveur.",
+    scope: "snapshots.create",
+    group: "Instantanés",
+  },
+  {
+    method: "DELETE",
+    path: "/servers/{server}/snapshots/{snapshot}/pin",
+    summary: "Désépingler un instantané : la rotation le reprend.",
+    scope: "snapshots.create",
+    group: "Instantanés",
+  },
+  {
+    method: "GET",
     path: "/servers/{server}/databases",
     summary: "Lister les bases de données du serveur.",
     scope: "databases.read",

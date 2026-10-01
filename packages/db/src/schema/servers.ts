@@ -98,6 +98,12 @@ export const servers = pgTable(
     externalId: varchar("external_id", { length: 255 }),
 
     backupLimit: integer("backup_limit").notNull().default(0),
+    /**
+     * Instantanés épinglés permis (ADR 0009). Nul : la valeur par défaut du
+     * node (`defaultPinLimit` de ses réglages d'instantanés). Posée par
+     * l'administration ou l'API applicative, comme `backup_limit`.
+     */
+    snapshotLimit: integer("snapshot_limit"),
     databaseLimit: integer("database_limit").notNull().default(0),
     allocationLimit: integer("allocation_limit").notNull().default(0),
 

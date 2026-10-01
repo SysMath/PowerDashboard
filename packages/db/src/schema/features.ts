@@ -311,3 +311,114 @@ export const serverEngineInstalls = pgTable("server_engine_installs", {
   startedAt: moment("started_at").notNull(),
   finishedAt: moment("finished_at"),
 });
+
+/**
+ * Instantanés de volumes (ADR 0009) : réglages et état de la fonction sur un
+ * node. Une ligne par node qui a déjà parlé ou été réglé.
+ */
+export const nodeSnapshots = pgTable("node_snapshots", {
+  nodeId: uuid("node_id")
+    .primaryKey()
+    .references(() => nodes.id, { onDelete: "cascade" }),
+  /** `SnapshotPolicy` ; nul : les valeurs par défaut de la plateforme. */
+  policy: jsonb("policy"),
+  /** `btrfs`, `zfs`, ou nul quand l'agent ne peut pas en prendre. */
+  filesystem: varchar("filesystem", { length: 8 }),
+  /** La raison, dite par l'agent, quand il ne peut pas en prendre. */
+  reason: text("reason"),
+  totalBytes: bigint("total_bytes", { mode: "number" }),
+  freeBytes: bigint("free_bytes", { mode: "number" }),
+  /** Sous le seuil d'espace libre : l'agent ne prend plus rien. */
+  suspended: boolean("suspended").notNull().default(false),
+  reportedAt: moment("reported_at"),
+  ...timestamps,
+});
+
+/**
+ * Registre des instantanés d'un node, tenu d'après les rapports de l'agent.
+ *
+ * L'agent fait foi : un nom qu'il ne rapporte plus est marqué disparu
+ * (`gone_at`), jamais supprimé, pour que le journal garde de quoi le nommer.
+ */
+export const volumeSnapshots = pgTable(
+  "volume_snapshots",
+  {
+    id: id(),
+    nodeId: uuid("node_id")
+      .notNull()
+      .references(() => nodes.id, { onDelete: "cascade" }),
+    /** `gd-AAAAMMJJTHHMMSS.mmmZ`, tiré par l'agent. */
+    name: varchar("name", { length: 32 }).notNull(),
+    takenAt: moment("taken_at").notNull(),
+    /** `auto`, `manual` ou `safety`. */
+    cause: varchar("cause", { length: 10 }).notNull().default("auto"),
+    /** Serveurs (identifiants Wings) présents dans l'instantané. */
+    servers: uuid("servers").array().notNull().default([]),
+    /** Nul quand le système ne le dit pas (btrfs sans quotas). */
+    bytes: bigint("bytes", { mode: "number" }),
+    /** Le serveur pour lequel il a été demandé (manuel, de sûreté). */
+    serverId: uuid("server_id").references(() => servers.id, { onDelete: "set null" }),
+    requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
+    goneAt: moment("gone_at"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("volume_snapshot_node_name_unique").on(table.nodeId, table.name),
+    index("volume_snapshot_node_taken_idx").on(table.nodeId, table.takenAt),
+  ],
+);
+
+/** Un épinglage : l'instantané échappe à la rotation, jamais à la durée maximale. */
+export const volumeSnapshotPins = pgTable(
+  "volume_snapshot_pins",
+  {
+    snapshotId: uuid("snapshot_id")
+      .notNull()
+      .references(() => volumeSnapshots.id, { onDelete: "cascade" }),
+    serverId: uuid("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    label: varchar("label", { length: 80 }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("volume_snapshot_pin_unique").on(table.snapshotId, table.serverId),
+    index("volume_snapshot_pin_server_idx").on(table.serverId),
+  ],
+);
+
+/**
+ * Ordres donnés à l'agent, tirés par lui au relevé suivant.
+ *
+ * Des données, jamais des commandes : un type fermé, un serveur, un nom
+ * d'instantané. `pending` tant que l'agent n'a pas rendu compte ; un ordre
+ * resté sans réponse est clos en échec (`SnapshotOrdersService`).
+ */
+export const snapshotOrders = pgTable(
+  "snapshot_orders",
+  {
+    id: id(),
+    nodeId: uuid("node_id")
+      .notNull()
+      .references(() => nodes.id, { onDelete: "cascade" }),
+    /** `prendre`, `restaurer`, `detruire` ou `archiver`. */
+    kind: varchar("kind", { length: 12 }).notNull(),
+    /** Cause de l'instantané qu'une prise produira (`manual`, `safety`). */
+    cause: varchar("cause", { length: 10 }),
+    serverId: uuid("server_id").references(() => servers.id, { onDelete: "cascade" }),
+    snapshotName: varchar("snapshot_name", { length: 32 }),
+    /** `pending`, `done` ou `failed`. */
+    state: varchar("state", { length: 10 }).notNull().default("pending"),
+    /** Instantané pris ou réutilisé, rendu par l'agent. */
+    result: varchar("result", { length: 32 }),
+    error: text("error"),
+    requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
+    completedAt: moment("completed_at"),
+    ...timestamps,
+  },
+  (table) => [
+    index("snapshot_order_node_state_idx").on(table.nodeId, table.state),
+    index("snapshot_order_server_idx").on(table.serverId, table.createdAt),
+  ],
+);

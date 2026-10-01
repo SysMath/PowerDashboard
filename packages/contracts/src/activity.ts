@@ -104,6 +104,10 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "backup.restore_expired": { category: "backups", label: "Restauration sans nouvelles" },
   "backup.delete": { category: "backups", label: "Sauvegarde supprimée" },
   "backup.lock": { category: "backups", label: "Verrou de sauvegarde modifié" },
+  // Instantanés de volumes (ADR 0009).
+  "snapshot.create": { category: "backups", label: "Instantané demandé" },
+  "snapshot.pin": { category: "backups", label: "Instantané épinglé" },
+  "snapshot.unpin": { category: "backups", label: "Instantané désépinglé" },
   /**
    * Emporter une archive, c'est emporter tout le serveur — fichiers de
    * configuration, mots de passe RCON et clés d'API compris. La route le
@@ -290,6 +294,15 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "admin.server_suspended": { category: "power", label: "Serveur suspendu par l'administration" },
   "admin.server_resumed": { category: "power", label: "Serveur rétabli par l'administration" },
   "admin.server_deleted": { category: "settings", label: "Serveur supprimé par l'administration" },
+  "admin.snapshot_defaults_updated": {
+    category: "settings",
+    label: "Réglages par défaut des instantanés modifiés",
+  },
+  "admin.snapshot_policy_updated": {
+    category: "settings",
+    label: "Réglages des instantanés d'un node modifiés",
+  },
+  "admin.snapshot_destroyed": { category: "backups", label: "Instantané détruit" },
   "admin.node_category_created": { category: "settings", label: "Catégorie de nodes créée" },
   "admin.node_category_removed": { category: "settings", label: "Catégorie de nodes supprimée" },
   "admin.node_subcategory_created": {

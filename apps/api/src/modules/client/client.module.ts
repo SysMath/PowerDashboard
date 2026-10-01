@@ -137,6 +137,9 @@ import { SubusersService } from "./subusers.service";
     // Pour le changement de titulaire : les mots de passe des bases changent
     // avec lui, par le même chemin que le bouton du client.
     DatabasesService,
+    // Le contrôle d'accès d'un serveur, pour les routes client des fonctions
+    // de l'agent de node (instantanés) : une seule règle des permissions.
+    ServerAccessService,
   ],
 })
 export class ClientModule {}

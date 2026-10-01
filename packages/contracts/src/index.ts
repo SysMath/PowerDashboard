@@ -38,6 +38,7 @@ export * from "./pterodactyl-egg";
 export * from "./realtime";
 export * from "./server";
 export * from "./server-reachability";
+export * from "./snapshots";
 export * from "./sso";
 export * from "./status";
 export * from "./subdomain";

@@ -9,6 +9,7 @@ import { NodeAgentModule } from "./modules/node-agent/node-agent.module";
 import { RemoteModule } from "./modules/remote/remote.module";
 import { ResellerModule } from "./modules/reseller/reseller.module";
 import { SchedulerModule } from "./modules/scheduler/scheduler.module";
+import { SnapshotsModule } from "./modules/snapshots/snapshots.module";
 import { StatusModule } from "./modules/status/status.module";
 import { UpdatesModule } from "./modules/updates/updates.module";
 
@@ -29,6 +30,8 @@ import { UpdatesModule } from "./modules/updates/updates.module";
     // Agent de node facultatif (ADR 0008, 0009) : ses routes de machine et
     // sa fiche d'administration.
     NodeAgentModule,
+    // Instantanés de volumes, première fonction de l'agent (ADR 0009).
+    SnapshotsModule,
     SchedulerModule,
     // Page de statut : lecture publique sans compte, rédaction réservée.
     StatusModule,

@@ -28,6 +28,7 @@ import { NodeCapabilitiesService } from "./node-capabilities.service";
     NodeCapabilitiesService,
     PlatformSettingsService,
   ],
-  exports: [NodeAgentRepository, NodeCapabilitiesService],
+  // La garde sort pour les routes de machine des fonctions (instantanés…).
+  exports: [NodeAgentRepository, NodeAgentTokenGuard, NodeCapabilitiesService],
 })
 export class NodeAgentModule {}

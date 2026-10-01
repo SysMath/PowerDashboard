@@ -414,6 +414,13 @@
       "when": 1790777541719,
       "tag": "0058_node_agents",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790779767155,
+      "tag": "0059_volume_snapshots",
+      "breakpoints": true
     }
   ]
 }
