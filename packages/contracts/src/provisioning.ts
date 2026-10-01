@@ -319,6 +319,12 @@ export interface ResourceRequest {
   allocations: number;
   backups: number;
   databases: number;
+  /**
+   * Instantanés épinglés au plus (ADR 0009) ; absent ou `null`, la limite
+   * par défaut du node. Hors de `RESOURCE_BOUNDS` : ce n'est pas une
+   * ressource de la machine, et un facturier qui ne l'envoie pas reste valable.
+   */
+  snapshots?: number | null;
 }
 
 export type ResourceProblem =

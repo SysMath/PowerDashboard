@@ -24,6 +24,8 @@ export interface ResizeInput {
   allocations?: number;
   backups?: number;
   databases?: number;
+  /** `null` rend la limite par défaut du node (ADR 0009). */
+  snapshots?: number | null;
 }
 
 /**
@@ -82,6 +84,7 @@ export class ServerResizeService {
         allocationLimit: servers.allocationLimit,
         backupLimit: servers.backupLimit,
         databaseLimit: servers.databaseLimit,
+        snapshotLimit: servers.snapshotLimit,
       })
       .from(servers)
       .where(eq(servers.id, serverId))
@@ -114,6 +117,7 @@ export class ServerResizeService {
       allocations: row.allocationLimit,
       backups: row.backupLimit,
       databases: row.databaseLimit,
+      snapshots: row.snapshotLimit,
     };
 
     const suivant: ResourceRequest = {
@@ -124,6 +128,8 @@ export class ServerResizeService {
       allocations: input.allocations ?? actuel.allocations,
       backups: input.backups ?? actuel.backups,
       databases: input.databases ?? actuel.databases,
+      // `null` a un sens ici (la limite du node) : seule l'absence ne touche pas.
+      snapshots: input.snapshots === undefined ? actuel.snapshots : input.snapshots,
     };
 
     const problems = checkResources(suivant);
@@ -189,6 +195,7 @@ export class ServerResizeService {
           allocationLimit: suivant.allocations,
           backupLimit: suivant.backups,
           databaseLimit: suivant.databases,
+          snapshotLimit: suivant.snapshots ?? null,
           updatedAt: new Date().toISOString(),
         })
         .where(eq(servers.id, serverId));

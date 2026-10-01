@@ -24,6 +24,7 @@ import type { S3Service } from "../storage/s3.service";
 import type { WingsClientService } from "../wings/wings-client.service";
 import type { WingsTokenService } from "../wings/wings-token.service";
 import { AllocationsService } from "./allocations.service";
+import { BackupRestoreHooks } from "./backup-restore-hooks";
 import { BackupsService } from "./backups.service";
 import { DatabasesService } from "./databases.service";
 import type { MysqlProvisionerService } from "./mysql-provisioner.service";
@@ -93,7 +94,7 @@ describe.skipIf(!HAS_DATABASE)("objets d'un serveur étranger (IDOR)", () => {
     const w = wings as unknown as WingsClientService;
     const t = tokens as unknown as WingsTokenService;
     services = {
-      backups: new BackupsService(db, w, t, s3 as unknown as S3Service),
+      backups: new BackupsService(db, w, t, s3 as unknown as S3Service, new BackupRestoreHooks()),
       databases: new DatabasesService(db, mysql as unknown as MysqlProvisionerService),
       schedules: new SchedulesService(db),
       allocations: new AllocationsService(db, w, sousDomainesInertes()),

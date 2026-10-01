@@ -246,6 +246,8 @@ export class ServerProvisioningService {
         oomKiller,
         backupLimit: plan.backups,
         databaseLimit: plan.databases,
+        // Nul : la limite par défaut du node (ADR 0009).
+        snapshotLimit: input.resources?.snapshots ?? null,
         allocationLimit: plan.allocations,
         // L'état de gestion dit ce que le panel attend : l'installation est en
         // cours, et c'est Wings qui la clôturera sur

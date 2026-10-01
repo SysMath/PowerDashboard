@@ -2514,7 +2514,7 @@
     },
     "/api/v1/client/servers/{server}/backups/{backup}/restore": {
       "post": {
-        "summary": "Restaurer une sauvegarde sur le serveur. Le serveur reste fermé (démarrage, fichiers, SFTP) jusqu'au compte rendu du daemon ; refusé (409) sur un serveur déjà occupé ou pour une sauvegarde en cours ou ratée.",
+        "summary": "Restaurer une sauvegarde sur le serveur. Le serveur reste fermé (démarrage, fichiers, SFTP) jusqu'au compte rendu du daemon ; refusé (409) sur un serveur déjà occupé ou pour une sauvegarde en cours ou ratée. Sur un node qui prend des instantanés, un instantané de sûreté est pris d'abord (40 s d'attente au plus).",
         "description": "Clé personnelle. Portée requise : `backups.restore`.",
         "tags": [
           "Sauvegardes"
@@ -2882,6 +2882,72 @@
           },
           "2XX": {
             "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/snapshots/{snapshot}/restore": {
+      "post": {
+        "summary": "Restaurer le serveur depuis un instantané. Répond 202 : le serveur passe en restauration (démarrage, fichiers, SFTP refusés), s'arrête, puis l'agent prend un instantané de sûreté et recopie le dossier ; le serveur reste arrêté. Abandonné et rendu s'il ne s'arrête pas en 3 min. Refusé (409) sur un serveur occupé, quand l'agent se tait ou sous le seuil d'espace libre.",
+        "description": "Clé personnelle. Portée requise : `snapshots.restore`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-post-servers-by-server-snapshots-by-snapshot-restore",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "description": "Valeur de « snapshot ».",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.restore"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.restore",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.restore », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
           }
         }
       }
@@ -3941,7 +4007,7 @@
         }
       },
       "post": {
-        "summary": "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte Idempotency-Key. Une clé de revendeur ne le donne qu'à un compte client non suspendu, entièrement chez elle, ou encore sans serveur et créé par sa propre clé (POST /users) ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs.",
+        "summary": "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte Idempotency-Key. Une clé de revendeur ne le donne qu'à un compte client non suspendu, entièrement chez elle, ou encore sans serveur et créé par sa propre clé (POST /users) ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs. resources.snapshots (facultatif) fixe le nombre d'instantanés épinglés, la limite du node sinon.",
         "description": "Clé de plateforme. Portée requise : `servers.create`.",
         "tags": [
           "Serveurs"
@@ -4042,7 +4108,7 @@
         }
       },
       "patch": {
-        "summary": "Changer les limites d'un serveur (mémoire, disque, CPU, swap, allocations, sauvegardes, bases). Seuls les champs envoyés changent.",
+        "summary": "Changer les limites d'un serveur (mémoire, disque, CPU, swap, allocations, sauvegardes, bases, instantanés épinglés). Seuls les champs envoyés changent ; snapshots: null rend la limite par défaut du node.",
         "description": "Clé de plateforme. Portée requise : `servers.resize`.",
         "tags": [
           "Serveurs"

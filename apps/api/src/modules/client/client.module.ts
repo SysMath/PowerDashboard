@@ -17,6 +17,7 @@ import { AccountController } from "./account.controller";
 import { AccountPreferencesService } from "./account-preferences.service";
 import { AllocationsService } from "./allocations.service";
 import { ApiKeysService } from "./api-keys.service";
+import { BackupRestoreHooks } from "./backup-restore-hooks";
 import { BackupsService } from "./backups.service";
 import { CatalogueService } from "./catalogue.service";
 import { ClientController } from "./client.controller";
@@ -94,6 +95,7 @@ import { SubusersService } from "./subusers.service";
     // Les rappels sortants que le client déclare sur son serveur.
     ServerWebhooksService,
     BackupsService,
+    BackupRestoreHooks,
     DatabasesService,
     MysqlProvisionerService,
     AllocationsService,
@@ -134,6 +136,8 @@ import { SubusersService } from "./subusers.service";
     // regardée.
     ServerResizeService,
     BackupsService,
+    // Le module des instantanés s'y inscrit (sûreté avant une restauration).
+    BackupRestoreHooks,
     // Pour le changement de titulaire : les mots de passe des bases changent
     // avec lui, par le même chemin que le bouton du client.
     DatabasesService,

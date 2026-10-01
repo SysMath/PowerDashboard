@@ -154,4 +154,26 @@ describe.skipIf(!HAS_DATABASE)("ServerResizeService — enveloppe sous verrou", 
       .where(eq(servers.id, premier ?? ""));
     expect(row?.memoryMb).toBe(1024);
   });
+
+  it("pose la limite d'instantanés épinglés, et la rend au node avec null", async () => {
+    const [premier = ""] = parc;
+    const redim = service(new ResellerQuotaService(db));
+    const limite = async () =>
+      (
+        await db.select({ l: servers.snapshotLimit }).from(servers).where(eq(servers.id, premier))
+      )[0]?.l;
+
+    const apres = await redim.resize({ id: revendeur, role: "reseller" }, premier, {
+      snapshots: 7,
+    });
+    expect(apres.snapshots).toBe(7);
+    expect(await limite()).toBe(7);
+
+    // Un autre champ seul ne touche pas à la limite.
+    await redim.resize({ id: revendeur, role: "reseller" }, premier, { backups: 2 });
+    expect(await limite()).toBe(7);
+
+    await redim.resize({ id: revendeur, role: "reseller" }, premier, { snapshots: null });
+    expect(await limite()).toBeNull();
+  });
 });

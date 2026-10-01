@@ -87,6 +87,26 @@ export class ClientSnapshotsController {
     return { data: { name, pinned: true } };
   }
 
+  /**
+   * Restaure le serveur depuis cet instantané : 202 aussitôt, le serveur
+   * s'arrête, l'agent prend un instantané de sûreté puis recopie. Le
+   * serveur reste arrêté ensuite.
+   */
+  @Post(":name/restore")
+  @HttpCode(202)
+  async restore(
+    @Req() request: ClientRequest,
+    @Param("id") id: string,
+    @Param("name") raw: string,
+  ) {
+    const name = snapshotName(raw);
+    await this.access.require(principalOf(request), id, "snapshots.restore");
+    await this.access.requireOperable(id);
+    const receipt = await this.snapshots.restore(id, name, request.user.id);
+    await this.log(request, id, "snapshot.restore", { name, orderId: receipt.orderId });
+    return { data: receipt };
+  }
+
   @Delete(":name/pin")
   async unpin(@Req() request: ClientRequest, @Param("id") id: string, @Param("name") raw: string) {
     const name = snapshotName(raw);

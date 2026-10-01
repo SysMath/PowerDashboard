@@ -4,6 +4,7 @@ import {
   checkQuota,
   type QuotaDimension,
   RESOURCE_BOUNDS,
+  type ResourceKey,
   type ResourceRequest,
 } from "@gamedashboard/contracts";
 import { AlertBanner, FormField, formatMb, Input } from "@gamedashboard/ui";
@@ -92,7 +93,8 @@ export function ResourceFields({
   const overQuota = (dimension: QuotaDimension) =>
     quotaProblems.some((problem) => problem.dimension === dimension);
 
-  const field = (key: keyof ResourceRequest, label: string, hint: string, error?: string) => (
+  // Les ressources bornées de la machine ; la limite d'instantanés se règle ailleurs.
+  const field = (key: ResourceKey, label: string, hint: string, error?: string) => (
     <FormField label={label} description={hint} error={error}>
       {(id) => (
         <Input

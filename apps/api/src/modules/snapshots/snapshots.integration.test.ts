@@ -4,6 +4,7 @@ import {
   AgentSnapshotReport as ReportSchema,
 } from "@gamedashboard/contracts";
 import {
+  activityLogs,
   type Database,
   nodeAgents,
   servers,
@@ -13,16 +14,18 @@ import {
 } from "@gamedashboard/db";
 import { ConflictException, HttpException, NotFoundException } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedLocation, seedNode, seedServer, seedUser } from "../../test/fixtures";
 import {
   createThrowawayDatabase,
   HAS_DATABASE,
   type ThrowawayDatabase,
 } from "../../test/throwaway-database";
+import { ActivityService } from "../activity/activity.service";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { NodeAgentRepository } from "../node-agent/node-agent.repository";
 import { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
+import type { WingsClientService } from "../wings/wings-client.service";
 import { SnapshotPolicyService } from "./snapshot-policy.service";
 import { ORDER_TIMEOUT_MS, SnapshotsService } from "./snapshots.service";
 
@@ -47,6 +50,12 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
   let serverId: string;
   let otherServerId: string;
   let ownerId: string;
+  /** L'état que Wings rend pour le serveur ; `stop` est seulement noté. */
+  let wingsState = "offline";
+  const wings = {
+    power: vi.fn(async () => undefined),
+    resources: vi.fn(async () => ({ state: wingsState })),
+  };
 
   beforeAll(async () => {
     throwaway = await createThrowawayDatabase();
@@ -54,7 +63,14 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
     agents = new NodeAgentRepository(db);
     policies = new SnapshotPolicyService(db);
     const capabilities = new NodeCapabilitiesService(agents, new PlatformSettingsService(db));
-    service = new SnapshotsService(db, policies, capabilities);
+    service = new SnapshotsService(
+      db,
+      policies,
+      capabilities,
+      wings as unknown as WingsClientService,
+      new ActivityService(db),
+    );
+    service.pause = (ms) => new Promise((resolve) => setTimeout(resolve, Math.min(ms, 5)));
   }, 60_000);
 
   afterAll(async () => {
@@ -64,7 +80,7 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
   beforeEach(async () => {
     await db.execute(
       sql.raw(
-        "truncate table settings, snapshot_orders, volume_snapshot_pins, volume_snapshots, node_snapshots, node_agents, servers, allocations, eggs, nests, nodes, locations, users cascade",
+        "truncate table activity_logs, settings, snapshot_orders, volume_snapshot_pins, volume_snapshots, node_snapshots, node_agents, servers, allocations, eggs, nests, nodes, locations, users cascade",
       ),
     );
     nodeId = await seedNode(db, { locationId: await seedLocation(db) });
@@ -72,7 +88,39 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
     serverId = await seedServer(db, { nodeId, ownerId });
     otherServerId = await seedServer(db, { nodeId, ownerId });
     await agent();
+    wingsState = "offline";
+    wings.power.mockClear();
+    service.stopTimeoutMs = 60_000;
+    service.safetyWaitMs = 10_000;
   });
+
+  async function ordre(kind: string) {
+    const [row] = await db.select().from(snapshotOrders).where(eq(snapshotOrders.kind, kind));
+    return row;
+  }
+
+  /** Attend qu'une tâche de fond du service ait écrit ce que le test lit. */
+  async function attendre<T>(lire: () => Promise<T>, ok: (v: T) => boolean): Promise<T> {
+    for (let i = 0; i < 400; i++) {
+      const v = await lire();
+      if (ok(v)) return v;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    throw new Error("attente dépassée");
+  }
+
+  async function etatServeur(id = serverId) {
+    const [row] = await db.select({ state: servers.state }).from(servers).where(eq(servers.id, id));
+    return row?.state ?? null;
+  }
+
+  async function evenements() {
+    const rows = await db
+      .select({ event: activityLogs.event, properties: activityLogs.properties })
+      .from(activityLogs)
+      .where(eq(activityLogs.serverId, serverId));
+    return rows;
+  }
 
   /** Un agent qui parle, fonction « instantanes » active. */
   async function agent(seenMsAgo = 5_000, functions = ["instantanes"]) {
@@ -293,5 +341,137 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
     const etat = await service.agentState(nodeId);
     expect(etat.gardes).toEqual([]);
     expect(etat.ordres).toEqual([{ id: receipt.orderId, type: "detruire", instantane: T1 }]);
+  });
+
+  it("restaure : serveur fermé, arrêt attendu, ordre à l'agent, puis serveur rendu", async () => {
+    await service.applyReport(nodeId, rapport());
+    wingsState = "running";
+    const { orderId } = await service.restore(serverId, T1, ownerId);
+    expect(await etatServeur()).toBe("restoring");
+    expect(wings.power).toHaveBeenCalledWith(serverId, "stop");
+    // Tant que Wings ne le donne pas arrêté, l'agent ne reçoit rien.
+    expect((await service.agentState(nodeId)).ordres).toEqual([]);
+
+    wingsState = "offline";
+    const etat = await attendre(
+      () => service.agentState(nodeId),
+      (e) => e.ordres.length > 0,
+    );
+    expect(etat.ordres).toEqual([
+      { id: orderId, type: "restaurer", serveur: serverId, instantane: T1 },
+    ]);
+
+    // L'agent rend compte : sûreté T3 prise, recopie faite.
+    await service.applyReport(
+      nodeId,
+      rapport({
+        instantanes: [
+          { nom: T1, pris_le: "2026-09-30T12:00:00Z", serveurs: [serverId] },
+          { nom: T3, pris_le: "2026-09-30T14:00:00Z", serveurs: [serverId] },
+        ],
+        ordres: [{ id: orderId, etat: "reussi", instantane: T3 }],
+      }),
+    );
+    expect(await etatServeur()).toBeNull();
+    const [surete] = await db
+      .select({ cause: volumeSnapshots.cause })
+      .from(volumeSnapshots)
+      .where(eq(volumeSnapshots.name, T3));
+    expect(surete?.cause).toBe("safety");
+    expect((await evenements()).map((e) => e.event)).toEqual(["snapshot.restore_completed"]);
+    // Rejoué, le compte rendu n'ajoute rien.
+    await service.applyReport(nodeId, rapport({ ordres: [{ id: orderId, etat: "reussi" }] }));
+    expect(await evenements()).toHaveLength(1);
+  });
+
+  it("abandonne et rend le serveur s'il ne s'arrête pas", async () => {
+    await service.applyReport(nodeId, rapport());
+    wingsState = "running";
+    service.stopTimeoutMs = 0;
+    const { orderId } = await service.restore(serverId, T1, ownerId);
+    const order = await attendre(
+      () => ordre("restaurer"),
+      (o) => o?.state === "failed",
+    );
+    expect(order?.id).toBe(orderId);
+    expect(order?.error).toMatch(/pas arrêté/);
+    expect(await etatServeur()).toBeNull();
+    expect((await service.agentState(nodeId)).ordres).toEqual([]);
+    expect((await evenements()).map((e) => e.event)).toEqual(["snapshot.restore_failed"]);
+  });
+
+  it("refuse une restauration sur un serveur occupé ou depuis un instantané étranger", async () => {
+    await service.applyReport(nodeId, rapport());
+    await expect(service.restore(otherServerId, T2, ownerId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(await etatServeur(otherServerId)).toBeNull();
+
+    await db.update(servers).set({ state: "installing" }).where(eq(servers.id, serverId));
+    await expect(service.restore(serverId, T1, ownerId)).rejects.toBeInstanceOf(ConflictException);
+    expect(await etatServeur()).toBe("installing");
+    expect(await ordre("restaurer")).toBeUndefined();
+    expect(wings.power).not.toHaveBeenCalled();
+  });
+
+  it("rend le serveur quand une restauration reste en attente de l'arrêt (panel redémarré)", async () => {
+    await service.applyReport(nodeId, rapport());
+    await db.update(servers).set({ state: "restoring" }).where(eq(servers.id, serverId));
+    await db.insert(snapshotOrders).values({
+      nodeId,
+      kind: "restaurer",
+      cause: "safety",
+      serverId,
+      snapshotName: T1,
+      state: "waiting",
+      createdAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+    });
+    await service.expireOrders(nodeId);
+    expect((await ordre("restaurer"))?.state).toBe("failed");
+    expect(await etatServeur()).toBeNull();
+  });
+
+  it("prend un instantané de sûreté avant une restauration de sauvegarde", async () => {
+    await service.applyReport(nodeId, rapport());
+    const backupId = "5f0c2a8e-8d7b-4a0e-9b1c-2d3e4f5a6b7c";
+    const attente = service.safetyBeforeBackupRestore(serverId, backupId);
+    // L'agent tire l'ordre et rend compte.
+    const etat = await attendre(
+      () => service.agentState(nodeId),
+      (e) => e.ordres.length > 0,
+    );
+    const id = etat.ordres[0]?.id as string;
+    expect(etat.ordres).toEqual([{ id, type: "prendre", serveur: serverId }]);
+    await service.applyReport(
+      nodeId,
+      rapport({
+        instantanes: [{ nom: T3, pris_le: "2026-09-30T14:00:00Z", serveurs: [serverId] }],
+        ordres: [{ id, etat: "reussi", instantane: T3 }],
+      }),
+    );
+    expect(await attente).toBe(T3);
+    const [surete] = await db
+      .select({ cause: volumeSnapshots.cause })
+      .from(volumeSnapshots)
+      .where(eq(volumeSnapshots.name, T3));
+    expect(surete?.cause).toBe("safety");
+    expect(await evenements()).toEqual([
+      { event: "backup.restore_safety", properties: { backupId, name: T3 } },
+    ]);
+  });
+
+  it("ne retient pas la restauration de sauvegarde quand l'agent tarde ou manque", async () => {
+    await service.applyReport(nodeId, rapport());
+    const backupId = "5f0c2a8e-8d7b-4a0e-9b1c-2d3e4f5a6b7c";
+    service.safetyWaitMs = 0;
+    expect(await service.safetyBeforeBackupRestore(serverId, backupId)).toBeNull();
+    // L'ordre est retiré : pris pendant la restauration, il ne garderait rien.
+    expect((await ordre("prendre"))?.state).toBe("failed");
+    expect((await evenements())[0]?.event).toBe("backup.restore_safety");
+
+    await db.delete(nodeAgents).where(eq(nodeAgents.nodeId, nodeId));
+    await db.delete(snapshotOrders);
+    expect(await service.safetyBeforeBackupRestore(serverId, backupId)).toBeNull();
+    expect(await ordre("prendre")).toBeUndefined();
   });
 });

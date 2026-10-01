@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ServerLimitsPatch } from "./server";
 import {
   AgentSnapshotReport,
   agentSettingsFromPolicy,
@@ -110,5 +111,16 @@ describe("AgentSnapshotReport", () => {
       ordres: [{ id: UUID, etat: "reussi", instantane: "pool/data@gd" }],
     });
     expect(rapport.success).toBe(false);
+  });
+});
+
+describe("limite d'instantanés d'un serveur", () => {
+  it("se pose, se rend au node par null, et reste bornée", () => {
+    expect(ServerLimitsPatch.safeParse({ snapshots: 5 }).success).toBe(true);
+    expect(ServerLimitsPatch.parse({ snapshots: null })).toEqual({ snapshots: null });
+    expect(
+      ServerLimitsPatch.safeParse({ snapshots: SNAPSHOT_BOUNDS.pinLimitMax + 1 }).success,
+    ).toBe(false);
+    expect(ServerLimitsPatch.safeParse({ snapshots: -1 }).success).toBe(false);
   });
 });

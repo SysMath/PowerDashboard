@@ -27,9 +27,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, asc, desc, eq, gt, inArray, isNull, lt, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, notInArray, or, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { ActivityService } from "../activity/activity.service";
 import { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
+import { WingsClientService } from "../wings/wings-client.service";
 import { SnapshotPolicyService } from "./snapshot-policy.service";
 
 /** Un ordre sans compte rendu au-delà est clos en échec : l'agent s'est tu. */
@@ -37,7 +39,31 @@ export const ORDER_TIMEOUT_MS = 30 * 60_000;
 /** Au plus, par relevé, pour tenir dans les bornes de l'agent (`OrdresMax`). */
 const ORDERS_PER_STATE = 100;
 
+/**
+ * Délai laissé à Wings pour arrêter le serveur avant une restauration. Au-delà,
+ * la restauration est abandonnée et le serveur rendu (ADR 0009) : jamais de
+ * `kill` pour forcer, ce serait perdre ce que le jeu n'a pas encore écrit.
+ */
+export const RESTORE_STOP_TIMEOUT_MS = 3 * 60_000;
+/** Un ordre « en attente de l'arrêt » resté là : le panel a redémarré entre-temps. */
+const WAITING_TIMEOUT_MS = RESTORE_STOP_TIMEOUT_MS + 2 * 60_000;
+const STOP_POLL_MS = 2_000;
+
+/**
+ * Attente de l'instantané de sûreté avant une restauration de sauvegarde :
+ * deux relevés de l'agent (15 s chacun) et de la marge. Au-delà, la
+ * restauration part sans lui, et le journal du serveur le dit.
+ */
+export const BACKUP_SAFETY_WAIT_MS = 40_000;
+const SAFETY_POLL_MS = 1_000;
+
 const EXPIRED = "L'agent de node n'a pas rendu compte de cet ordre à temps.";
+const NOT_STOPPED = "Le serveur ne s'est pas arrêté à temps : restauration abandonnée.";
+
+type Pause = (ms: number) => Promise<void>;
+const pauseReelle: Pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type FinishedOrder = typeof snapshotOrders.$inferSelect & { safety: string | null };
 
 export interface OrderReceipt {
   orderId: string;
@@ -60,7 +86,14 @@ export class SnapshotsService {
     @Inject(DATABASE) private readonly db: Database,
     @Inject(SnapshotPolicyService) private readonly policies: SnapshotPolicyService,
     @Inject(NodeCapabilitiesService) private readonly capabilities: NodeCapabilitiesService,
+    @Inject(WingsClientService) private readonly wings: WingsClientService,
+    @Inject(ActivityService) private readonly activity: ActivityService,
   ) {}
+
+  /** Remplacés dans les tests, qui n'attendent pas. */
+  pause: Pause = pauseReelle;
+  stopTimeoutMs = RESTORE_STOP_TIMEOUT_MS;
+  safetyWaitMs = BACKUP_SAFETY_WAIT_MS;
 
   /* --- Côté agent ----------------------------------------------------------- */
 
@@ -130,6 +163,7 @@ export class SnapshotsService {
    */
   async applyReport(nodeId: string, report: AgentSnapshotReport): Promise<void> {
     const now = new Date().toISOString();
+    const finished: FinishedOrder[] = [];
     await this.db.transaction(async (tx) => {
       const status = {
         filesystem: report.systeme === "" ? null : report.systeme,
@@ -198,6 +232,7 @@ export class SnapshotsService {
             ),
           )
           .returning();
+        if (order) finished.push({ ...order, safety: result.instantane ?? null });
         // Un instantané pris pour quelqu'un porte sa cause et son demandeur.
         if (order?.cause && result.instantane) {
           await tx
@@ -218,12 +253,16 @@ export class SnapshotsService {
         }
       }
     });
+    for (const order of finished) await this.settleRestore(order);
   }
 
-  /** Ordres restés sans compte rendu : clos en échec. */
+  /**
+   * Ordres restés sans compte rendu : clos en échec. Une restauration close
+   * ainsi rend son serveur.
+   */
   async expireOrders(nodeId: string): Promise<void> {
     const now = new Date();
-    await this.db
+    const closed = await this.db
       .update(snapshotOrders)
       .set({
         state: "failed",
@@ -234,10 +273,54 @@ export class SnapshotsService {
       .where(
         and(
           eq(snapshotOrders.nodeId, nodeId),
-          eq(snapshotOrders.state, "pending"),
-          lt(snapshotOrders.createdAt, new Date(now.getTime() - ORDER_TIMEOUT_MS).toISOString()),
+          or(
+            and(
+              eq(snapshotOrders.state, "pending"),
+              lt(
+                snapshotOrders.createdAt,
+                new Date(now.getTime() - ORDER_TIMEOUT_MS).toISOString(),
+              ),
+            ),
+            and(
+              eq(snapshotOrders.state, "waiting"),
+              lt(
+                snapshotOrders.createdAt,
+                new Date(now.getTime() - WAITING_TIMEOUT_MS).toISOString(),
+              ),
+            ),
+          ),
         ),
-      );
+      )
+      .returning();
+    for (const order of closed) await this.settleRestore({ ...order, safety: null });
+  }
+
+  /**
+   * Fin d'une restauration d'instantané, réussie ou non : le serveur est
+   * rendu (état `restoring` levé, et lui seul) et l'issue va au journal du
+   * serveur. Une fois seulement, quand l'état est effectivement levé.
+   */
+  private async settleRestore(order: FinishedOrder): Promise<void> {
+    if (order.kind !== "restaurer" || !order.serverId) return;
+    const released = await this.db
+      .update(servers)
+      .set({ state: null, updatedAt: new Date().toISOString() })
+      .where(and(eq(servers.id, order.serverId), eq(servers.state, "restoring")))
+      .returning({ id: servers.id });
+    if (released.length === 0) return;
+    const ok = order.state === "done";
+    await this.activity.record({
+      event: ok ? "snapshot.restore_completed" : "snapshot.restore_failed",
+      serverId: order.serverId,
+      actorId: null,
+      actorType: "system",
+      actorLabel: "Agent de node",
+      properties: {
+        name: order.snapshotName,
+        safety: order.safety,
+        ...(ok ? {} : { error: order.error }),
+      },
+    });
   }
 
   /* --- Côté serveur --------------------------------------------------------- */
@@ -409,6 +492,7 @@ export class SnapshotsService {
         and(
           eq(snapshotOrders.serverId, serverId),
           eq(snapshotOrders.kind, "prendre"),
+          eq(snapshotOrders.cause, "manual"),
           eq(snapshotOrders.state, "pending"),
         ),
       )
@@ -509,6 +593,169 @@ export class SnapshotsService {
           eq(volumeSnapshotPins.serverId, serverId),
         ),
       );
+  }
+
+  /**
+   * Restaure le serveur depuis un instantané (ADR 0009), orchestré par le
+   * panel :
+   *
+   * 1. le serveur passe en `restoring` (démarrage, fichiers et SFTP refusés),
+   *    seulement s'il n'a aucun autre état ;
+   * 2. l'ordre est créé « en attente de l'arrêt », invisible pour l'agent ;
+   * 3. Wings reçoit `stop` ; l'ordre ne part vers l'agent que quand Wings
+   *    donne le serveur arrêté, sinon il échoue et le serveur est rendu ;
+   * 4. l'agent prend un instantané de sûreté, recopie, et rend compte :
+   *    `applyReport` rend le serveur, qui reste arrêté.
+   *
+   * Rend dès l'étape 2 ; la suite se lit dans la liste et le journal.
+   */
+  async restore(serverId: string, name: string, requestedBy: string | null) {
+    const server = await this.server(serverId);
+    const { status } = await this.requireWritable(server.nodeId);
+    if (status.suspended) {
+      throw new ConflictException(
+        "Espace disque insuffisant sur la machine : l'instantané de sûreté ne peut pas être pris.",
+      );
+    }
+    await this.snapshotOf(serverId, server.nodeId, name);
+
+    const [claimed] = await this.db
+      .update(servers)
+      .set({ state: "restoring", updatedAt: new Date().toISOString() })
+      .where(and(eq(servers.id, serverId), isNull(servers.state)))
+      .returning({ id: servers.id });
+    if (!claimed) {
+      throw new ConflictException(
+        "Ce serveur est occupé par une autre opération. Réessayez quand elle sera terminée.",
+      );
+    }
+    const [order] = await this.db
+      .insert(snapshotOrders)
+      .values({
+        nodeId: server.nodeId,
+        kind: "restaurer",
+        cause: "safety" satisfies SnapshotCause,
+        serverId,
+        snapshotName: name,
+        state: "waiting",
+        requestedBy,
+      })
+      .returning({ id: snapshotOrders.id });
+    const orderId = (order as { id: string }).id;
+
+    // Sans attendre : l'arrêt d'un serveur de jeu prend le temps qu'il prend.
+    // Si le panel s'arrête entre-temps, `expireOrders` rend le serveur.
+    void this.releaseWhenStopped(orderId, serverId).catch(() =>
+      this.failWaiting(orderId, "Arrêt du serveur impossible à suivre."),
+    );
+    return { orderId };
+  }
+
+  /** Étape 3 : l'ordre part vers l'agent une fois le serveur arrêté. */
+  async releaseWhenStopped(orderId: string, serverId: string): Promise<void> {
+    await this.wings.power(serverId, "stop").catch(() => undefined);
+    const deadline = Date.now() + this.stopTimeoutMs;
+    for (;;) {
+      const state = await this.wings
+        .resources(serverId)
+        .then((r) => r.state)
+        .catch(() => null);
+      if (state === "offline") {
+        // Seulement s'il attend encore : clos entre-temps (expiré), le
+        // serveur a déjà été rendu, et rien ne part.
+        await this.db
+          .update(snapshotOrders)
+          .set({ state: "pending", updatedAt: new Date().toISOString() })
+          .where(and(eq(snapshotOrders.id, orderId), eq(snapshotOrders.state, "waiting")));
+        return;
+      }
+      if (Date.now() >= deadline) {
+        await this.failWaiting(orderId, NOT_STOPPED);
+        return;
+      }
+      await this.pause(STOP_POLL_MS);
+    }
+  }
+
+  private async failWaiting(orderId: string, error: string): Promise<void> {
+    const now = new Date().toISOString();
+    const [order] = await this.db
+      .update(snapshotOrders)
+      .set({ state: "failed", error, completedAt: now, updatedAt: now })
+      .where(and(eq(snapshotOrders.id, orderId), eq(snapshotOrders.state, "waiting")))
+      .returning();
+    if (order) await this.settleRestore({ ...order, safety: null });
+  }
+
+  /**
+   * Instantané de sûreté avant une restauration de **sauvegarde** (ADR 0009,
+   * « une restauration de sauvegarde gagne un instantané de sûreté »).
+   *
+   * Seulement là où la fonction est offerte et possible ; ailleurs, rien. Le
+   * serveur est déjà en `restoring` quand elle est appelée : rien ne l'écrit
+   * pendant l'attente. Bornée (`BACKUP_SAFETY_WAIT_MS`) : l'agent qui tarde
+   * ne bloque pas la restauration demandée, il est seulement dit au journal.
+   * Rend le nom de l'instantané, ou `null`.
+   */
+  async safetyBeforeBackupRestore(serverId: string, backupId: string): Promise<string | null> {
+    const server = await this.server(serverId);
+    const capability = (await this.capabilities.forNode(server.nodeId)).instantanes;
+    if (!capability.writable) return null;
+    const [{ policy }, status] = await Promise.all([
+      this.policies.forNode(server.nodeId),
+      this.status(server.nodeId),
+    ]);
+    if (!policy.enabled || !status.filesystem || status.suspended) return null;
+
+    const [order] = await this.db
+      .insert(snapshotOrders)
+      .values({
+        nodeId: server.nodeId,
+        kind: "prendre",
+        cause: "safety" satisfies SnapshotCause,
+        serverId,
+      })
+      .returning({ id: snapshotOrders.id });
+    const orderId = (order as { id: string }).id;
+
+    const deadline = Date.now() + this.safetyWaitMs;
+    let row: typeof snapshotOrders.$inferSelect | undefined;
+    for (;;) {
+      [row] = await this.db
+        .select()
+        .from(snapshotOrders)
+        .where(eq(snapshotOrders.id, orderId))
+        .limit(1);
+      if (row?.state !== "pending" || Date.now() >= deadline) break;
+      await this.pause(SAFETY_POLL_MS);
+    }
+    const safety = row?.state === "done" ? row.result : null;
+    if (row?.state === "pending") {
+      // Trop tard : pris pendant la restauration, il ne garderait pas
+      // l'état d'avant. L'ordre est retiré ; s'il est déjà parti, l'agent
+      // le prendra quand même, sans que le panel le range comme sûreté.
+      const now = new Date().toISOString();
+      await this.db
+        .update(snapshotOrders)
+        .set({
+          state: "failed",
+          error: "Abandonné : la restauration n'attend plus.",
+          completedAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(snapshotOrders.id, orderId), eq(snapshotOrders.state, "pending")));
+    }
+    await this.activity.record({
+      event: "backup.restore_safety",
+      serverId,
+      actorId: null,
+      actorType: "system",
+      actorLabel: "Agent de node",
+      properties: safety
+        ? { backupId, name: safety }
+        : { backupId, name: null, error: row?.error ?? "L'agent n'a pas répondu à temps." },
+    });
+    return safety;
   }
 
   /* --- Administration ------------------------------------------------------- */

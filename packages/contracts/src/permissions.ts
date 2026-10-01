@@ -26,6 +26,7 @@ export const SERVER_PERMISSIONS = [
   // seules machines qui en ont un. Épingler compte comme prendre.
   "snapshots.read",
   "snapshots.create",
+  "snapshots.restore",
   "databases.read",
   "databases.create",
   "databases.update",
@@ -321,6 +322,12 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     permissions: [
       { value: "snapshots.read", label: "Lister" },
       { value: "snapshots.create", label: "Prendre et épingler" },
+      {
+        value: "snapshots.restore",
+        label: "Restaurer",
+        warning:
+          "Arrête le serveur et remet ses fichiers dans l'état de l'instantané ; un instantané de sûreté est pris juste avant.",
+      },
     ],
   },
   {

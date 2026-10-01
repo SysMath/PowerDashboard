@@ -19,6 +19,7 @@
  */
 
 import { z } from "zod";
+import { SNAPSHOT_BOUNDS } from "./snapshots";
 
 export const APPLICATION_SCOPES = [
   /* Comptes clients. */
@@ -319,6 +320,7 @@ const ResourceRequest = z.object({
   allocations: z.number().int(),
   backups: z.number().int(),
   databases: z.number().int(),
+  snapshots: z.number().int().min(0).max(SNAPSHOT_BOUNDS.pinLimitMax).nullable().optional(),
 });
 
 export const ApplicationServerCreate = z.object({

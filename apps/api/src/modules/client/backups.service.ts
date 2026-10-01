@@ -12,6 +12,7 @@ import { DATABASE } from "../../common/database.provider";
 import { S3Service } from "../storage/s3.service";
 import { WingsClientService, WingsUnavailableError } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
+import { BackupRestoreHooks } from "./backup-restore-hooks";
 
 /** Intervalle de relecture d'une sauvegarde attendue. */
 const BACKUP_POLL_MS = 3000;
@@ -43,6 +44,7 @@ export class BackupsService {
     @Inject(WingsClientService) private readonly wings: WingsClientService,
     @Inject(WingsTokenService) private readonly tokens: WingsTokenService,
     @Inject(S3Service) private readonly s3: S3Service,
+    @Inject(BackupRestoreHooks) private readonly hooks: BackupRestoreHooks,
   ) {}
 
   /**
@@ -322,6 +324,10 @@ export class BackupsService {
     }
 
     try {
+      // Sur un node qui prend des instantanés, un instantané de sûreté d'abord
+      // (ADR 0009) : une restauration de sauvegarde se défait alors. Le
+      // serveur est déjà en `restoring`, rien ne l'écrit pendant l'attente.
+      await this.hooks.beforeRestore(serverId, backupId);
       await this.wings.restoreBackup(serverId, backupId, truncate, downloadUrl);
     } catch (error) {
       // Refusée par le daemon, la restauration n'a pas commencé : aucun

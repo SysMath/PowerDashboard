@@ -6,9 +6,11 @@ import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { AuthModule } from "../auth/auth.module";
 import { ClientModule } from "../client/client.module";
 import { NodeAgentModule } from "../node-agent/node-agent.module";
+import { WingsModule } from "../wings/wings.module";
 import { AdminSnapshotsController } from "./admin-snapshots.controller";
 import { AgentSnapshotsController } from "./agent-snapshots.controller";
 import { ClientSnapshotsController } from "./client-snapshots.controller";
+import { SnapshotHooks } from "./snapshot-hooks";
 import { SnapshotPolicyService } from "./snapshot-policy.service";
 import { SnapshotsService } from "./snapshots.service";
 
@@ -18,10 +20,16 @@ import { SnapshotsService } from "./snapshots.service";
  * chacune derrière la garde de son espace.
  */
 @Module({
-  imports: [AuthModule, AdminModule, ActivityModule, ClientModule, NodeAgentModule],
+  imports: [AuthModule, AdminModule, ActivityModule, ClientModule, NodeAgentModule, WingsModule],
   controllers: [AgentSnapshotsController, ClientSnapshotsController, AdminSnapshotsController],
   // La garde du second facteur du personnel lit les réglages de la plateforme.
-  providers: [databaseProvider, PlatformSettingsService, SnapshotPolicyService, SnapshotsService],
+  providers: [
+    databaseProvider,
+    PlatformSettingsService,
+    SnapshotPolicyService,
+    SnapshotsService,
+    SnapshotHooks,
+  ],
   exports: [SnapshotsService, SnapshotPolicyService],
 })
 export class SnapshotsModule {}

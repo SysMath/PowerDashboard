@@ -108,6 +108,13 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "snapshot.create": { category: "backups", label: "Instantané demandé" },
   "snapshot.pin": { category: "backups", label: "Instantané épinglé" },
   "snapshot.unpin": { category: "backups", label: "Instantané désépinglé" },
+  "snapshot.restore": { category: "backups", label: "Restauration d'instantané demandée" },
+  "snapshot.restore_completed": { category: "backups", label: "Instantané restauré" },
+  "snapshot.restore_failed": { category: "backups", label: "Restauration d'instantané échouée" },
+  "backup.restore_safety": {
+    category: "backups",
+    label: "Instantané de sûreté avant restauration",
+  },
   /**
    * Emporter une archive, c'est emporter tout le serveur — fichiers de
    * configuration, mots de passe RCON et clés d'API compris. La route le
