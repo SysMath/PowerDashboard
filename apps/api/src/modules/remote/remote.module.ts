@@ -48,5 +48,8 @@ import { SftpAuthService } from "./sftp-auth.service";
     PlatformSettingsService,
     NodeTokenGuard,
   ],
+  // Pour les archives que l'agent de node tire d'un instantané (ADR 0009) :
+  // même dépôt, même clôture que pour Wings.
+  exports: [RemoteBackupService],
 })
 export class RemoteModule {}

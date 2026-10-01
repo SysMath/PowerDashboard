@@ -14,7 +14,7 @@ import { RESTORE_STALE_MS, RemoteBackupService } from "../remote/remote-backup.s
 import type { S3Service } from "../storage/s3.service";
 import { type WingsClientService, WingsUnavailableError } from "../wings/wings-client.service";
 import type { WingsTokenService } from "../wings/wings-token.service";
-import { BackupRestoreHooks } from "./backup-restore-hooks";
+import { BackupHooks } from "./backup-hooks";
 import { BackupsService } from "./backups.service";
 
 /**
@@ -35,7 +35,7 @@ describe.skipIf(!HAS_DATABASE)("BackupsService (intégration)", () => {
   let compartimentRegle: boolean;
   let lienSigne: string | null;
 
-  const hooks = new BackupRestoreHooks();
+  const hooks = new BackupHooks();
   const wings = {
     createBackup: vi.fn(async () => undefined),
     deleteBackup: vi.fn(async () => undefined),
@@ -113,6 +113,41 @@ describe.skipIf(!HAS_DATABASE)("BackupsService (intégration)", () => {
 
     expect(wings.createBackup).toHaveBeenCalledWith(serverId, creee.id, [], "wings");
     expect((await ligne(creee.id))?.disk).toBe("local");
+  });
+
+  /*
+   * ADR 0009 : sur un node qui prend des instantanés, l'archive distante est
+   * tirée d'un instantané par l'agent, et Wings n'est pas appelé. Jamais une
+   * archive locale, et jamais au prix de la sauvegarde : un agent en échec
+   * rend la main à Wings.
+   */
+  it("confie l'archive distante à l'agent quand il la prend, à Wings sinon", async () => {
+    const vues: string[] = [];
+    hooks.registerArchive(async (_serveur, sauvegarde) => {
+      vues.push(sauvegarde);
+      return true;
+    });
+    try {
+      const confiee = await service.create(serverId, "Nuit", []);
+      expect(confiee.source).toBe("snapshot");
+      expect(vues).toEqual([confiee.id]);
+      expect(wings.createBackup).not.toHaveBeenCalled();
+
+      compartimentRegle = false;
+      const locale = await service.create(serverId, "Locale", []);
+      expect(vues).toHaveLength(1);
+      expect(wings.createBackup).toHaveBeenCalledWith(serverId, locale.id, [], "wings");
+
+      compartimentRegle = true;
+      hooks.registerArchive(async () => {
+        throw new Error("agent muet");
+      });
+      const repli = await service.create(serverId, "Repli", []);
+      expect(repli.source).toBe("wings");
+      expect(wings.createBackup).toHaveBeenCalledWith(serverId, repli.id, [], "s3");
+    } finally {
+      hooks.registerArchive(async () => false);
+    }
   });
 
   it("restaure une archive distante par le lien signé", async () => {

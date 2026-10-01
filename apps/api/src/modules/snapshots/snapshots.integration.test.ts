@@ -5,6 +5,7 @@ import {
 } from "@gamedashboard/contracts";
 import {
   activityLogs,
+  backups,
   type Database,
   nodeAgents,
   servers,
@@ -25,9 +26,10 @@ import { ActivityService } from "../activity/activity.service";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { NodeAgentRepository } from "../node-agent/node-agent.repository";
 import { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
+import type { RemoteBackupService } from "../remote/remote-backup.service";
 import type { WingsClientService } from "../wings/wings-client.service";
 import { SnapshotPolicyService } from "./snapshot-policy.service";
-import { ORDER_TIMEOUT_MS, SnapshotsService } from "./snapshots.service";
+import { LONG_ORDER_TIMEOUT_MS, ORDER_TIMEOUT_MS, SnapshotsService } from "./snapshots.service";
 
 process.env.APP_SECRET_KEY ??= "clé de test des instantanés, factice et assez longue";
 
@@ -55,6 +57,12 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
   const wings = {
     power: vi.fn(async () => undefined),
     resources: vi.fn(async () => ({ state: wingsState })),
+    createBackup: vi.fn(async () => undefined),
+  };
+  /** Le dépôt et la clôture de Wings, testés ailleurs : ici, seulement appelés. */
+  const remote = {
+    openUpload: vi.fn(async () => ({ parts: ["https://s3.test/1"], part_size: 5 })),
+    complete: vi.fn(async () => undefined),
   };
 
   beforeAll(async () => {
@@ -69,6 +77,7 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
       capabilities,
       wings as unknown as WingsClientService,
       new ActivityService(db),
+      remote as unknown as RemoteBackupService,
     );
     service.pause = (ms) => new Promise((resolve) => setTimeout(resolve, Math.min(ms, 5)));
   }, 60_000);
@@ -80,7 +89,7 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
   beforeEach(async () => {
     await db.execute(
       sql.raw(
-        "truncate table activity_logs, settings, snapshot_orders, volume_snapshot_pins, volume_snapshots, node_snapshots, node_agents, servers, allocations, eggs, nests, nodes, locations, users cascade",
+        "truncate table activity_logs, backups, settings, snapshot_orders, volume_snapshot_pins, volume_snapshots, node_snapshots, node_agents, servers, allocations, eggs, nests, nodes, locations, users cascade",
       ),
     );
     nodeId = await seedNode(db, { locationId: await seedLocation(db) });
@@ -90,6 +99,9 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
     await agent();
     wingsState = "offline";
     wings.power.mockClear();
+    wings.createBackup.mockClear();
+    remote.openUpload.mockClear();
+    remote.complete.mockClear();
     service.stopTimeoutMs = 60_000;
     service.safetyWaitMs = 10_000;
   });
@@ -473,5 +485,147 @@ describe.skipIf(!HAS_DATABASE)("instantanés (intégration)", () => {
     await db.delete(snapshotOrders);
     expect(await service.safetyBeforeBackupRestore(serverId, backupId)).toBeNull();
     expect(await ordre("prendre")).toBeUndefined();
+  });
+
+  describe("archive S3 tirée d'un instantané", () => {
+    async function sauvegarde(ignored = ["logs/", "*.tmp"]) {
+      const [row] = await db
+        .insert(backups)
+        .values({ serverId, name: "nuit", ignoredFiles: ignored, disk: "s3" })
+        .returning({ id: backups.id });
+      return row?.id as string;
+    }
+
+    async function ligne(id: string) {
+      const [row] = await db.select().from(backups).where(eq(backups.id, id));
+      return row;
+    }
+
+    it("donne l'ordre à l'agent, avec les exclusions de la sauvegarde", async () => {
+      await service.applyReport(nodeId, rapport());
+      const id = await sauvegarde();
+      expect(await service.archiveBackup(serverId, id)).toBe(true);
+      expect((await ligne(id))?.source).toBe("snapshot");
+
+      const [ordre_] = (await service.agentState(nodeId)).ordres;
+      expect(ordre_).toEqual({
+        id: ordre_?.id,
+        type: "archiver",
+        serveur: serverId,
+        sauvegarde: id,
+        exclusions: "logs/\n*.tmp",
+      });
+
+      // Le dépôt passe par le code de Wings, pour ce node et cette sauvegarde.
+      expect(await service.openArchiveUpload(nodeId, id, 10)).toEqual({
+        parts: ["https://s3.test/1"],
+        part_size: 5,
+      });
+      expect(remote.openUpload).toHaveBeenCalledWith(nodeId, id, 10);
+      await service.completeArchive(nodeId, id, { successful: true, size: 10 });
+      expect(remote.complete).toHaveBeenCalledWith(nodeId, id, { successful: true, size: 10 });
+
+      await service.applyReport(
+        nodeId,
+        rapport({ ordres: [{ id: ordre_?.id as string, etat: "reussi", instantane: T2 }] }),
+      );
+      expect((await ligne(id))?.snapshotName).toBe(T2);
+      // L'ordre rendu, le dépôt se ferme à l'agent.
+      await expect(service.openArchiveUpload(nodeId, id, 10)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("refuse le dépôt d'une sauvegarde que l'agent n'a pas à archiver", async () => {
+      await service.applyReport(nodeId, rapport());
+      const id = await sauvegarde();
+      await expect(service.openArchiveUpload(nodeId, id, 10)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(
+        service.completeArchive(nodeId, id, { successful: true }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      // Un autre node, même avec l'ordre en attente ailleurs.
+      await service.archiveBackup(serverId, id);
+      const autre = await seedNode(db, { locationId: await seedLocation(db) });
+      await expect(service.openArchiveUpload(autre, id, 10)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(remote.openUpload).not.toHaveBeenCalled();
+    });
+
+    it("rend la sauvegarde à Wings quand l'agent échoue avant le dépôt", async () => {
+      await service.applyReport(nodeId, rapport());
+      const id = await sauvegarde();
+      await service.archiveBackup(serverId, id);
+      const [ordre_] = (await service.agentState(nodeId)).ordres;
+      await service.applyReport(
+        nodeId,
+        rapport({
+          ordres: [{ id: ordre_?.id as string, etat: "echoue", erreur: "disque plein" }],
+        }),
+      );
+      expect(wings.createBackup).toHaveBeenCalledWith(serverId, id, ["logs/", "*.tmp"], "s3");
+      expect((await ligne(id))?.source).toBe("wings");
+      expect(remote.complete).not.toHaveBeenCalled();
+    });
+
+    it("close en échec la sauvegarde quand le dépôt avait commencé", async () => {
+      await service.applyReport(nodeId, rapport());
+      const id = await sauvegarde();
+      await service.archiveBackup(serverId, id);
+      const [ordre_] = (await service.agentState(nodeId)).ordres;
+      await service.applyReport(
+        nodeId,
+        rapport({
+          ordres: [
+            { id: ordre_?.id as string, etat: "echoue", erreur: "coupure", depot_commence: true },
+          ],
+        }),
+      );
+      expect(remote.complete).toHaveBeenCalledWith(nodeId, id, { successful: false });
+      expect(wings.createBackup).not.toHaveBeenCalled();
+    });
+
+    it("laisse la sauvegarde à Wings quand le node ne peut pas la tirer d'un instantané", async () => {
+      await service.applyReport(nodeId, rapport());
+      const id = await sauvegarde();
+      await policies.saveForNode(nodeId, { ...DEFAULT_SNAPSHOT_POLICY, s3FromSnapshot: false });
+      expect(await service.archiveBackup(serverId, id)).toBe(false);
+      await policies.saveForNode(nodeId, null);
+      await service.applyReport(nodeId, rapport({ systeme: "", instantanes: [] }));
+      expect(await service.archiveBackup(serverId, id)).toBe(false);
+      expect((await ligne(id))?.source).toBe("wings");
+      expect(await ordre("archiver")).toBeUndefined();
+    });
+
+    it("rend à Wings une archive en attente quand la fonction est coupée", async () => {
+      await service.applyReport(nodeId, rapport());
+      const id = await sauvegarde();
+      await service.archiveBackup(serverId, id);
+      await policies.saveForNode(nodeId, { ...DEFAULT_SNAPSHOT_POLICY, enabled: false });
+      expect((await service.agentState(nodeId)).ordres).toEqual([]);
+      expect((await ordre("archiver"))?.state).toBe("failed");
+      expect(wings.createBackup).toHaveBeenCalledWith(serverId, id, ["logs/", "*.tmp"], "s3");
+    });
+
+    it("laisse six heures à une archive, et rend la main ensuite", async () => {
+      await service.applyReport(nodeId, rapport());
+      const id = await sauvegarde();
+      await service.archiveBackup(serverId, id);
+      await db
+        .update(snapshotOrders)
+        .set({ createdAt: new Date(Date.now() - ORDER_TIMEOUT_MS * 2).toISOString() });
+      await service.sweep();
+      expect((await ordre("archiver"))?.state).toBe("pending");
+
+      await db
+        .update(snapshotOrders)
+        .set({ createdAt: new Date(Date.now() - LONG_ORDER_TIMEOUT_MS - 1000).toISOString() });
+      await service.sweep();
+      expect((await ordre("archiver"))?.state).toBe("failed");
+      expect(wings.createBackup).toHaveBeenCalledTimes(1);
+    });
   });
 });

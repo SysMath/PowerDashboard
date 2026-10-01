@@ -1,18 +1,24 @@
 import { Inject, Injectable, type OnModuleInit } from "@nestjs/common";
-import { BackupRestoreHooks } from "../client/backup-restore-hooks";
+import { BackupHooks } from "../client/backup-hooks";
 import { SnapshotsService } from "./snapshots.service";
 
-/** Inscrit l'instantané de sûreté avant chaque restauration de sauvegarde. */
+/**
+ * Inscrit les instantanés auprès des sauvegardes : instantané de sûreté
+ * avant chaque restauration, archive S3 tirée d'un instantané.
+ */
 @Injectable()
 export class SnapshotHooks implements OnModuleInit {
   constructor(
-    @Inject(BackupRestoreHooks) private readonly backups: BackupRestoreHooks,
+    @Inject(BackupHooks) private readonly backups: BackupHooks,
     @Inject(SnapshotsService) private readonly snapshots: SnapshotsService,
   ) {}
 
   onModuleInit(): void {
     this.backups.register((serverId, backupId) =>
       this.snapshots.safetyBeforeBackupRestore(serverId, backupId),
+    );
+    this.backups.registerArchive((serverId, backupId) =>
+      this.snapshots.archiveBackup(serverId, backupId),
     );
   }
 }

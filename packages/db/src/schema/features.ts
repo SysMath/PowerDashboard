@@ -53,6 +53,14 @@ export const backups = pgTable(
     uploadId: text("upload_id"),
     /** Une sauvegarde verrouillée échappe à la rotation de rétention. */
     isLocked: boolean("is_locked").notNull().default(false),
+    /**
+     * Qui fait l'archive (ADR 0009) : `wings`, depuis le dossier vivant, ou
+     * `snapshot`, l'agent de node depuis un instantané, donc cohérente. Le
+     * format est le même et la restauration passe toujours par Wings.
+     */
+    source: varchar("source", { length: 10 }).notNull().default("wings"),
+    /** L'instantané d'où l'agent a tiré l'archive. */
+    snapshotName: varchar("snapshot_name", { length: 32 }),
     completedAt: moment("completed_at"),
     expiresAt: moment("expires_at"),
     ...timestamps,
@@ -408,16 +416,22 @@ export const snapshotOrders = pgTable(
     cause: varchar("cause", { length: 10 }),
     serverId: uuid("server_id").references(() => servers.id, { onDelete: "cascade" }),
     snapshotName: varchar("snapshot_name", { length: 32 }),
-    /** `pending`, `done` ou `failed`. */
+    /**
+     * `pending` (envoyé à l'agent), `waiting` (restauration qui attend l'arrêt
+     * du serveur, pas encore envoyée), `done` ou `failed`.
+     */
     state: varchar("state", { length: 10 }).notNull().default("pending"),
     /** Instantané pris ou réutilisé, rendu par l'agent. */
     result: varchar("result", { length: 32 }),
     error: text("error"),
+    /** La sauvegarde qu'un ordre `archiver` produit. */
+    backupId: uuid("backup_id").references(() => backups.id, { onDelete: "cascade" }),
     requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
     completedAt: moment("completed_at"),
     ...timestamps,
   },
   (table) => [
+    index("snapshot_order_backup_idx").on(table.backupId),
     index("snapshot_order_node_state_idx").on(table.nodeId, table.state),
     index("snapshot_order_server_idx").on(table.serverId, table.createdAt),
   ],

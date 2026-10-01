@@ -6,11 +6,13 @@ import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { AuthModule } from "../auth/auth.module";
 import { ClientModule } from "../client/client.module";
 import { NodeAgentModule } from "../node-agent/node-agent.module";
+import { RemoteModule } from "../remote/remote.module";
 import { WingsModule } from "../wings/wings.module";
 import { AdminSnapshotsController } from "./admin-snapshots.controller";
 import { AgentSnapshotsController } from "./agent-snapshots.controller";
 import { ClientSnapshotsController } from "./client-snapshots.controller";
 import { SnapshotHooks } from "./snapshot-hooks";
+import { SnapshotOrderReaperService } from "./snapshot-order-reaper.service";
 import { SnapshotPolicyService } from "./snapshot-policy.service";
 import { SnapshotsService } from "./snapshots.service";
 
@@ -20,7 +22,15 @@ import { SnapshotsService } from "./snapshots.service";
  * chacune derrière la garde de son espace.
  */
 @Module({
-  imports: [AuthModule, AdminModule, ActivityModule, ClientModule, NodeAgentModule, WingsModule],
+  imports: [
+    AuthModule,
+    AdminModule,
+    ActivityModule,
+    ClientModule,
+    NodeAgentModule,
+    RemoteModule,
+    WingsModule,
+  ],
   controllers: [AgentSnapshotsController, ClientSnapshotsController, AdminSnapshotsController],
   // La garde du second facteur du personnel lit les réglages de la plateforme.
   providers: [
@@ -29,6 +39,7 @@ import { SnapshotsService } from "./snapshots.service";
     SnapshotPolicyService,
     SnapshotsService,
     SnapshotHooks,
+    SnapshotOrderReaperService,
   ],
   exports: [SnapshotsService, SnapshotPolicyService],
 })

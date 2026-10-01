@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppModule } from "./app.module";
 import { ServerTransferReaperService } from "./modules/admin/server-transfer-reaper.service";
 import { RestoreReaperService } from "./modules/remote/restore-reaper.service";
+import { SnapshotOrderReaperService } from "./modules/snapshots/snapshot-order-reaper.service";
 
 /**
  * L'API entière se câble : chaque module trouve chacune de ses dépendances.
@@ -36,6 +37,7 @@ describe("AppModule", () => {
   it.each([
     ["restaurations sans nouvelles", RestoreReaperService],
     ["transferts perdus", ServerTransferReaperService],
+    ["ordres d'instantanés sans nouvelles", SnapshotOrderReaperService],
   ])("enregistre le balayage des %s", async (_nom, balayage) => {
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     expect(module.get(balayage, { strict: false })).toBeInstanceOf(balayage);

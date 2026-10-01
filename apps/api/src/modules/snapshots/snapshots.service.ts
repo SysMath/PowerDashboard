@@ -12,6 +12,7 @@ import {
   SnapshotCause as SnapshotCauseSchema,
 } from "@gamedashboard/contracts";
 import {
+  backups,
   type Database,
   nodeSnapshots,
   servers,
@@ -31,11 +32,20 @@ import { and, asc, desc, eq, gt, inArray, isNull, lt, notInArray, or, sql } from
 import { DATABASE } from "../../common/database.provider";
 import { ActivityService } from "../activity/activity.service";
 import { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
+import { type BackupReport, RemoteBackupService } from "../remote/remote-backup.service";
 import { WingsClientService } from "../wings/wings-client.service";
 import { SnapshotPolicyService } from "./snapshot-policy.service";
 
 /** Un ordre sans compte rendu au-delà est clos en échec : l'agent s'est tu. */
 export const ORDER_TIMEOUT_MS = 30 * 60_000;
+/**
+ * Pour une restauration ou une archive, qui recopient ou compressent tout un
+ * serveur : le délai des restaurations de Wings (`RESTORE_STALE_MS`).
+ */
+export const LONG_ORDER_TIMEOUT_MS = 6 * 60 * 60_000;
+const LONG_ORDERS = ["restaurer", "archiver"];
+/** L'agent refuse une liste d'exclusions plus longue (`ExclusionsMax`). */
+const EXCLUSIONS_MAX = 64 << 10;
 /** Au plus, par relevé, pour tenir dans les bornes de l'agent (`OrdresMax`). */
 const ORDERS_PER_STATE = 100;
 
@@ -63,7 +73,11 @@ const NOT_STOPPED = "Le serveur ne s'est pas arrêté à temps : restauration ab
 type Pause = (ms: number) => Promise<void>;
 const pauseReelle: Pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-type FinishedOrder = typeof snapshotOrders.$inferSelect & { safety: string | null };
+type FinishedOrder = typeof snapshotOrders.$inferSelect & {
+  safety: string | null;
+  /** L'agent a commencé le dépôt S3 : Wings ne peut plus reprendre la sauvegarde. */
+  uploadStarted?: boolean;
+};
 
 export interface OrderReceipt {
   orderId: string;
@@ -88,6 +102,7 @@ export class SnapshotsService {
     @Inject(NodeCapabilitiesService) private readonly capabilities: NodeCapabilitiesService,
     @Inject(WingsClientService) private readonly wings: WingsClientService,
     @Inject(ActivityService) private readonly activity: ActivityService,
+    @Inject(RemoteBackupService) private readonly remoteBackups: RemoteBackupService,
   ) {}
 
   /** Remplacés dans les tests, qui n'attendent pas. */
@@ -111,6 +126,8 @@ export class SnapshotsService {
     ]);
     const active = capability.offered && policy.enabled;
     await this.expireOrders(nodeId);
+    // Coupée : une archive en attente revient à Wings plutôt que d'attendre.
+    if (!active) await this.abandonArchives(nodeId, "Instantanés coupés sur ce node.");
 
     const pinned = await this.db
       .selectDistinct({ name: volumeSnapshots.name })
@@ -141,6 +158,23 @@ export class SnapshotsService {
       .orderBy(asc(snapshotOrders.createdAt))
       .limit(ORDERS_PER_STATE);
 
+    const archives = pending.filter((order) => order.kind === "archiver" && order.backupId);
+    const exclusions = new Map(
+      archives.length === 0
+        ? []
+        : (
+            await this.db
+              .select({ id: backups.id, ignored: backups.ignoredFiles })
+              .from(backups)
+              .where(
+                inArray(
+                  backups.id,
+                  archives.map((order) => order.backupId as string),
+                ),
+              )
+          ).map((row) => [row.id, row.ignored.join("\n")]),
+    );
+
     const ordres: AgentSnapshotOrder[] = pending
       .filter((order) => active || order.kind === "detruire")
       .map((order) => ({
@@ -148,6 +182,12 @@ export class SnapshotsService {
         type: order.kind as AgentOrderKind,
         ...(order.serverId ? { serveur: order.serverId } : {}),
         ...(order.snapshotName ? { instantane: order.snapshotName } : {}),
+        ...(order.backupId
+          ? {
+              sauvegarde: order.backupId,
+              exclusions: exclusions.get(order.backupId) ?? "",
+            }
+          : {}),
       }));
 
     return {
@@ -232,7 +272,13 @@ export class SnapshotsService {
             ),
           )
           .returning();
-        if (order) finished.push({ ...order, safety: result.instantane ?? null });
+        if (order) {
+          finished.push({
+            ...order,
+            safety: result.instantane ?? null,
+            uploadStarted: result.depot_commence === true,
+          });
+        }
         // Un instantané pris pour quelqu'un porte sa cause et son demandeur.
         if (order?.cause && result.instantane) {
           await tx
@@ -253,7 +299,10 @@ export class SnapshotsService {
         }
       }
     });
-    for (const order of finished) await this.settleRestore(order);
+    for (const order of finished) {
+      await this.settleRestore(order);
+      await this.settleArchive(nodeId, order);
+    }
   }
 
   /**
@@ -276,9 +325,18 @@ export class SnapshotsService {
           or(
             and(
               eq(snapshotOrders.state, "pending"),
+              notInArray(snapshotOrders.kind, LONG_ORDERS),
               lt(
                 snapshotOrders.createdAt,
                 new Date(now.getTime() - ORDER_TIMEOUT_MS).toISOString(),
+              ),
+            ),
+            and(
+              eq(snapshotOrders.state, "pending"),
+              inArray(snapshotOrders.kind, LONG_ORDERS),
+              lt(
+                snapshotOrders.createdAt,
+                new Date(now.getTime() - LONG_ORDER_TIMEOUT_MS).toISOString(),
               ),
             ),
             and(
@@ -292,7 +350,87 @@ export class SnapshotsService {
         ),
       )
       .returning();
-    for (const order of closed) await this.settleRestore({ ...order, safety: null });
+    for (const order of closed) {
+      await this.settleRestore({ ...order, safety: null });
+      await this.settleArchive(nodeId, { ...order, safety: null });
+    }
+  }
+
+  /**
+   * Balayage de fond : les ordres de tous les nodes, même d'un agent qui ne
+   * tire plus rien (une restauration resterait sinon en `restoring`).
+   */
+  async sweep(): Promise<void> {
+    const rows = await this.db
+      .selectDistinct({ nodeId: snapshotOrders.nodeId })
+      .from(snapshotOrders)
+      .where(inArray(snapshotOrders.state, ["pending", "waiting"]));
+    for (const { nodeId } of rows) await this.expireOrders(nodeId);
+  }
+
+  /** Archives pas encore faites rendues à Wings, avec la raison. */
+  private async abandonArchives(nodeId: string, error: string): Promise<void> {
+    const now = new Date().toISOString();
+    const closed = await this.db
+      .update(snapshotOrders)
+      .set({ state: "failed", error, completedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(snapshotOrders.nodeId, nodeId),
+          eq(snapshotOrders.kind, "archiver"),
+          eq(snapshotOrders.state, "pending"),
+        ),
+      )
+      .returning();
+    for (const order of closed) await this.settleArchive(nodeId, { ...order, safety: null });
+  }
+
+  /**
+   * Fin d'une archive tirée d'un instantané (ADR 0009).
+   *
+   * Réussie : la sauvegarde a déjà été close par le compte rendu de dépôt,
+   * reçu avant celui de l'ordre ; il reste à noter l'instantané d'origine.
+   * Échouée **avant le dépôt** : Wings fait la sauvegarde, comme sans agent,
+   * et la ligne le dit (`source`). Échouée pendant le dépôt : la sauvegarde
+   * est close en échec par le même code que pour Wings, qui abandonne le
+   * dépôt fractionné et prévient le titulaire.
+   */
+  private async settleArchive(nodeId: string, order: FinishedOrder): Promise<void> {
+    if (order.kind !== "archiver" || !order.backupId || !order.serverId) return;
+    const backupId = order.backupId;
+    if (order.state === "done") {
+      await this.db
+        .update(backups)
+        .set({ snapshotName: order.result, updatedAt: new Date().toISOString() })
+        .where(eq(backups.id, backupId));
+      return;
+    }
+    const [backup] = await this.db
+      .select({
+        completedAt: backups.completedAt,
+        uploadId: backups.uploadId,
+        ignored: backups.ignoredFiles,
+      })
+      .from(backups)
+      .where(eq(backups.id, backupId))
+      .limit(1);
+    if (!backup || backup.completedAt !== null) return;
+
+    const closeFailed = () =>
+      this.remoteBackups.complete(nodeId, backupId, { successful: false } satisfies BackupReport);
+    if (order.uploadStarted || backup.uploadId) {
+      await closeFailed();
+      return;
+    }
+    await this.db
+      .update(backups)
+      .set({ source: "wings", updatedAt: new Date().toISOString() })
+      .where(eq(backups.id, backupId));
+    try {
+      await this.wings.createBackup(order.serverId, backupId, backup.ignored, "s3");
+    } catch {
+      await closeFailed();
+    }
   }
 
   /**
@@ -756,6 +894,77 @@ export class SnapshotsService {
         : { backupId, name: null, error: row?.error ?? "L'agent n'a pas répondu à temps." },
     });
     return safety;
+  }
+
+  /**
+   * Fait tirer d'un instantané l'archive S3 d'une sauvegarde qui vient d'être
+   * créée (ADR 0009), là où c'est possible : fonction offerte et allumée,
+   * réglage « S3 depuis un instantané », système d'instantanés, espace libre.
+   * Rend faux sinon, et la sauvegarde reste à Wings.
+   */
+  async archiveBackup(serverId: string, backupId: string): Promise<boolean> {
+    const server = await this.server(serverId);
+    const capability = (await this.capabilities.forNode(server.nodeId)).instantanes;
+    if (!capability.writable) return false;
+    const [{ policy }, status] = await Promise.all([
+      this.policies.forNode(server.nodeId),
+      this.status(server.nodeId),
+    ]);
+    if (!policy.enabled || !policy.s3FromSnapshot || !status.filesystem || status.suspended) {
+      return false;
+    }
+    const [backup] = await this.db
+      .select({ ignored: backups.ignoredFiles })
+      .from(backups)
+      .where(and(eq(backups.id, backupId), eq(backups.serverId, serverId)))
+      .limit(1);
+    if (!backup || backup.ignored.join("\n").length > EXCLUSIONS_MAX) return false;
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(backups)
+        .set({ source: "snapshot", updatedAt: new Date().toISOString() })
+        .where(eq(backups.id, backupId));
+      await tx
+        .insert(snapshotOrders)
+        .values({ nodeId: server.nodeId, kind: "archiver", serverId, backupId });
+    });
+    return true;
+  }
+
+  /**
+   * Le dépôt S3 d'une archive, demandé par l'agent : seulement pour une
+   * sauvegarde que ce node doit tirer d'un instantané, ordre envoyé et pas
+   * encore rendu. Le reste est le code des dépôts de Wings
+   * (`RemoteBackupService`), mêmes réponses, mêmes contrôles.
+   */
+  async openArchiveUpload(nodeId: string, backupId: string, size: number) {
+    await this.requireArchiveOrder(nodeId, backupId);
+    return this.remoteBackups.openUpload(nodeId, backupId, size);
+  }
+
+  async completeArchive(nodeId: string, backupId: string, report: BackupReport): Promise<void> {
+    await this.requireArchiveOrder(nodeId, backupId);
+    await this.remoteBackups.complete(nodeId, backupId, report);
+  }
+
+  private async requireArchiveOrder(nodeId: string, backupId: string): Promise<void> {
+    const [row] = await this.db
+      .select({ id: snapshotOrders.id })
+      .from(snapshotOrders)
+      .innerJoin(backups, eq(backups.id, snapshotOrders.backupId))
+      .where(
+        and(
+          eq(snapshotOrders.nodeId, nodeId),
+          eq(snapshotOrders.backupId, backupId),
+          eq(snapshotOrders.kind, "archiver"),
+          eq(snapshotOrders.state, "pending"),
+          eq(backups.source, "snapshot"),
+        ),
+      )
+      .limit(1);
+    // 404, définitif pour l'agent, comme pour Wings.
+    if (!row) throw new NotFoundException("Sauvegarde introuvable.");
   }
 
   /* --- Administration ------------------------------------------------------- */

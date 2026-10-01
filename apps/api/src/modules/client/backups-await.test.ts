@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { S3Service } from "../storage/s3.service";
 import type { WingsClientService } from "../wings/wings-client.service";
 import type { WingsTokenService } from "../wings/wings-token.service";
-import { BackupRestoreHooks } from "./backup-restore-hooks";
+import { BackupHooks } from "./backup-hooks";
 import { BackupsService } from "./backups.service";
 
 /** Attente d'une sauvegarde préalable : relue jusqu'au compte rendu du daemon. */
@@ -28,7 +28,7 @@ function service(etats: (boolean | null | undefined)[]) {
     {} as WingsClientService,
     {} as WingsTokenService,
     {} as S3Service,
-    new BackupRestoreHooks(),
+    new BackupHooks(),
   );
 }
 
