@@ -81,7 +81,7 @@ describe("inscrirePousse", () => {
   it("passe par le relais connu, et ne donne au panel que la poignée", async () => {
     const b = banc({
       reponses: (url) =>
-        url.startsWith(RELAIS)
+        new URL(url).origin === RELAIS
           ? reponse({ data: { poignee: POIGNEE } })
           : new Response(null, { status: 204 }),
     });
