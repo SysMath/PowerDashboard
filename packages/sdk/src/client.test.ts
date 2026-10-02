@@ -3,6 +3,8 @@ import {
   APP_PRESENCE_ROUTES,
   APPLICATION_ROUTES,
   type ApiRoute,
+  BACKUP_RESTORE_TIMEOUT_MS,
+  BACKUP_SAFETY_WAIT_MS,
   CLIENT_ROUTES,
   SESSION_ROUTES,
 } from "@gamedashboard/contracts";
@@ -345,6 +347,42 @@ describe("GameDashboardClient", () => {
     expect(appel).toHaveBeenCalledTimes(2);
     expect(presence).toHaveBeenCalledTimes(1);
     expect(entetes(appel, 1)[APP_PRESENCE_HEADER]).toBe("defi.signature");
+  });
+
+  /*
+   * Le panel attend l'instantané de sûreté de l'agent avant de restaurer.
+   * Avec le délai ordinaire, le client abandonnait et disait « délai
+   * dépassé » à une restauration qui partait pourtant.
+   */
+  it("attend une restauration au-delà du délai ordinaire, et elle seule", async () => {
+    vi.useFakeTimers();
+    try {
+      const lente = (_url: string, init?: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          const fin = setTimeout(() => resolve(fausseReponse({ data: {} })), BACKUP_SAFETY_WAIT_MS);
+          init?.signal?.addEventListener("abort", () => {
+            clearTimeout(fin);
+            reject(new DOMException("interrompu", "AbortError"));
+          });
+        });
+      const c = new GameDashboardClient({
+        baseUrl: "https://panel.example",
+        token: "gd_mob_essai",
+        fetch: vi.fn(lente) as unknown as typeof fetch,
+      });
+
+      const restauration = c.restoreBackup("31201e0c", "7f3a9c2e");
+      const suppression = c.deleteBackup("31201e0c", "7f3a9c2e");
+      const issues = Promise.allSettled([restauration, suppression]);
+      await vi.advanceTimersByTimeAsync(BACKUP_SAFETY_WAIT_MS);
+      const [restauree, supprimee] = await issues;
+
+      expect(restauree.status).toBe("fulfilled");
+      expect(supprimee.status).toBe("rejected");
+      expect(BACKUP_RESTORE_TIMEOUT_MS).toBeGreaterThan(BACKUP_SAFETY_WAIT_MS);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("suspend et rétablit par la même route, avec un booléen", async () => {

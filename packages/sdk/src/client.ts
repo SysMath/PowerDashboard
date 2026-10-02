@@ -1,14 +1,15 @@
-import type {
-  ClientBackupList,
-  ClientBackupView,
-  ClientFileEntryView,
-  ClientNotificationView,
-  ClientPlayersView,
-  ClientServerView,
-  ConsoleGrant,
-  PowerSignal,
-  ServerLimitsPatch,
-  UploadGrant,
+import {
+  BACKUP_RESTORE_TIMEOUT_MS,
+  type ClientBackupList,
+  type ClientBackupView,
+  type ClientFileEntryView,
+  type ClientNotificationView,
+  type ClientPlayersView,
+  type ClientServerView,
+  type ConsoleGrant,
+  type PowerSignal,
+  type ServerLimitsPatch,
+  type UploadGrant,
 } from "@gamedashboard/contracts";
 
 /**
@@ -231,11 +232,23 @@ export class GameDashboardClient {
    */
   restoreBackup(serverId: string, backupId: string, truncate = false): Promise<unknown> {
     const chemin = this.serverPath(serverId, "backups", backupId, "restore");
-    return this.call("POST", chemin, { truncate }, true);
+    // Le panel attend d'abord l'instantané de sûreté de l'agent, quand le
+    // node en a un : bien plus que le délai ordinaire.
+    return this.call(
+      "POST",
+      chemin,
+      { truncate },
+      {
+        protege: true,
+        delaiMs: BACKUP_RESTORE_TIMEOUT_MS,
+      },
+    );
   }
 
   deleteBackup(serverId: string, backupId: string): Promise<unknown> {
-    return this.call("DELETE", this.serverPath(serverId, "backups", backupId), undefined, true);
+    return this.call("DELETE", this.serverPath(serverId, "backups", backupId), undefined, {
+      protege: true,
+    });
   }
 
   /* --- Fichiers ------------------------------------------------------------- */
@@ -279,7 +292,12 @@ export class GameDashboardClient {
 
   /** Suppression définitive. Geste protégé : confirmation de présence. */
   deleteFiles(serverId: string, root: string, files: string[]): Promise<unknown> {
-    return this.call("POST", this.serverPath(serverId, "files", "delete"), { root, files }, true);
+    return this.call(
+      "POST",
+      this.serverPath(serverId, "files", "delete"),
+      { root, files },
+      { protege: true },
+    );
   }
 
   /** Rend le nom et la taille de l'archive, choisis par le daemon. */
@@ -343,7 +361,9 @@ export class GameDashboardClient {
    * sûreté est pris, puis le dossier est recopié. Il reste arrêté.
    */
   restoreSnapshot(serverId: string, name: string): Promise<unknown> {
-    return this.call("POST", this.snapshotPath(serverId, name, "restore"), undefined, true);
+    return this.call("POST", this.snapshotPath(serverId, name, "restore"), undefined, {
+      protege: true,
+    });
   }
 
   private snapshotPath(serverId: string, name?: string, action?: string): string {
@@ -465,12 +485,24 @@ export class GameDashboardClient {
    * n'envoie rien. Ce refus ressemble à une demande invalide et coûte
    * longtemps à comprendre.
    */
-  private async call<T>(method: string, path: string, body?: unknown, protege = false): Promise<T> {
+  /**
+   * `protege` : geste qui exige une confirmation de présence. `delaiMs` :
+   * attente propre à ce geste, jamais plus courte que celle du client.
+   */
+  private async call<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options: { protege?: boolean; delaiMs?: number } = {},
+  ): Promise<T> {
     // Le défi est demandé avant l'appel et signé pour ce chemin seul, sans
     // la requête : c'est ce que le panel vérifie.
     const entetes =
-      protege && this.presence ? await this.presence(method, path.split("?")[0] ?? path) : {};
-    const corps = await this.request(method, path, body, entetes);
+      options.protege && this.presence
+        ? await this.presence(method, path.split("?")[0] ?? path)
+        : {};
+    const delai = Math.max(this.timeoutMs, options.delaiMs ?? 0);
+    const corps = await this.request(method, path, body, entetes, delai);
     // L'API enveloppe ses réponses dans `data`. Le client la déballe : c'est
     // une convention de transport, pas une information pour l'appelant.
     return (corps && "data" in corps ? corps.data : corps) as T;
@@ -482,9 +514,10 @@ export class GameDashboardClient {
     path: string,
     body?: unknown,
     entetes: Record<string, string> = {},
+    delai = this.timeoutMs,
   ): Promise<Record<string, unknown> | null> {
     try {
-      return await this.once(method, path, body, entetes);
+      return await this.once(method, path, body, entetes, delai);
     } catch (error) {
       // Un seul nouvel essai, et seulement si le jeton a vraiment changé :
       // rejouer en boucle un 401 ferait tourner un renouvellement refusé.
@@ -493,7 +526,7 @@ export class GameDashboardClient {
       }
       if (!(await this.onUnauthorized())) throw error;
       // Le défi n'a pas été consommé : le panel refuse le jeton avant de le lire.
-      return this.once(method, path, body, entetes);
+      return this.once(method, path, body, entetes, delai);
     }
   }
 
@@ -502,10 +535,11 @@ export class GameDashboardClient {
     path: string,
     body: unknown,
     entetes: Record<string, string>,
+    delai: number,
   ): Promise<Record<string, unknown> | null> {
     const token = typeof this.token === "string" ? this.token : await this.token();
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), delai);
 
     try {
       const response = await this.fetchImpl(`${this.baseUrl}${path}`, {

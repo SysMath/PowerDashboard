@@ -1,6 +1,10 @@
 "use server";
 
-import type { ClientBackupList, ClientBackupView } from "@gamedashboard/contracts";
+import {
+  BACKUP_RESTORE_TIMEOUT_MS,
+  type ClientBackupList,
+  type ClientBackupView,
+} from "@gamedashboard/contracts";
 import { revalidatePath } from "next/cache";
 import { apiFetch, apiSend } from "./client";
 
@@ -40,7 +44,13 @@ export async function restoreBackup(
   truncate: boolean,
 ): Promise<{ error: string | null }> {
   return act(serverId, () =>
-    apiSend(`/api/v1/client/servers/${serverId}/backups/${backupId}/restore`, { truncate }),
+    // L'API attend d'abord l'instantané de sûreté de l'agent, s'il y en a un.
+    apiSend(
+      `/api/v1/client/servers/${serverId}/backups/${backupId}/restore`,
+      { truncate },
+      "POST",
+      { delaiMs: BACKUP_RESTORE_TIMEOUT_MS },
+    ),
   );
 }
 

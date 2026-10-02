@@ -4,6 +4,7 @@ import {
   type AgentSnapshotReport,
   type AgentSnapshotState,
   agentSettingsFromPolicy,
+  BACKUP_SAFETY_WAIT_MS,
   type NodeSnapshotStatus,
   type ServerSnapshotsMeta,
   type ServerSnapshotView,
@@ -59,12 +60,6 @@ export const RESTORE_STOP_TIMEOUT_MS = 3 * 60_000;
 const WAITING_TIMEOUT_MS = RESTORE_STOP_TIMEOUT_MS + 2 * 60_000;
 const STOP_POLL_MS = 2_000;
 
-/**
- * Attente de l'instantané de sûreté avant une restauration de sauvegarde :
- * deux relevés de l'agent (15 s chacun) et de la marge. Au-delà, la
- * restauration part sans lui, et le journal du serveur le dit.
- */
-export const BACKUP_SAFETY_WAIT_MS = 40_000;
 const SAFETY_POLL_MS = 1_000;
 
 const EXPIRED = "L'agent de node n'a pas rendu compte de cet ordre à temps.";

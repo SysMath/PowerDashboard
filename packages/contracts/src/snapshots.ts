@@ -20,6 +20,21 @@ export const SnapshotName = z.string().regex(SNAPSHOT_NAME);
  */
 export const SNAPSHOT_REQUESTED_KEEP_HOURS = 24;
 
+/**
+ * Attente de l'instantané de sûreté avant une restauration de sauvegarde :
+ * deux relevés de l'agent (15 s chacun) et de la marge. Au-delà, la
+ * restauration part sans lui, et le journal du serveur le dit.
+ */
+export const BACKUP_SAFETY_WAIT_MS = 40_000;
+
+/**
+ * Ce qu'un client attend la réponse à une restauration de sauvegarde :
+ * l'instantané de sûreté, puis l'ordre à Wings. Le délai ordinaire (dix
+ * secondes) faisait dire « délai dépassé » à une restauration qui partait
+ * pourtant, dès que l'agent tardait.
+ */
+export const BACKUP_RESTORE_TIMEOUT_MS = BACKUP_SAFETY_WAIT_MS + 30_000;
+
 /** Clé de `settings` qui porte les valeurs par défaut, hors du catalogue. */
 export const SNAPSHOT_DEFAULTS_SETTING_KEY = "snapshots.defaults";
 
