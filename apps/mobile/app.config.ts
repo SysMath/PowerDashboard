@@ -29,6 +29,32 @@ function lireVersions(env: NodeJS.ProcessEnv): { version: string; construction: 
 
 const { version, construction } = lireVersions(process.env);
 
+/**
+ * Notifications poussées (ADR 0010, lot 4), posées par `mobile.yml` depuis
+ * l'environnement « magasins » :
+ * - `EXPO_PROJECT_ID` : le projet Expo de l'éditeur, auquel Expo Push rattache
+ *   les jetons des téléphones. Absent, l'application ne demande aucune
+ *   permission et relève la cloche de chaque panel à l'ouverture ;
+ * - `GAMEDASHBOARD_PUSH_RELAYS` : les relais de l'éditeur (origines https,
+ *   séparées par des virgules), les seuls auxquels l'application confie son
+ *   jeton Expo ;
+ * - `GD_GOOGLE_SERVICES` : le chemin du `google-services.json` de Firebase,
+ *   par lequel Android reçoit (FCM).
+ */
+function lirePousse(env: NodeJS.ProcessEnv) {
+  const projet = env.EXPO_PROJECT_ID?.trim() || undefined;
+  if (projet && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projet)) {
+    throw new Error(`Projet Expo invalide : ${projet}`);
+  }
+  return {
+    projet,
+    relais: env.GAMEDASHBOARD_PUSH_RELAYS?.trim() ?? "",
+    googleServices: env.GD_GOOGLE_SERVICES?.trim() || undefined,
+  };
+}
+
+const pousse = lirePousse(process.env);
+
 const config: ExpoConfig = {
   name: "GameDashboard",
   slug: "gamedashboard",
@@ -53,6 +79,7 @@ const config: ExpoConfig = {
     // Le trousseau ne doit pas partir dans une sauvegarde : la clé d'appareil
     // n'en sortirait pas, et le secret restauré seul serait rejoué.
     allowBackup: false,
+    ...(pousse.googleServices ? { googleServicesFile: pousse.googleServices } : {}),
     permissions: ["android.permission.USE_BIOMETRIC", "android.permission.CAMERA"],
     // Ajoutées d'office par le modèle d'Expo, inutiles ici : l'application
     // n'écrit aucun fichier partagé et ne dessine pas par-dessus les autres.
@@ -81,7 +108,14 @@ const config: ExpoConfig = {
         recordAudioAndroid: false,
       },
     ],
+    // `production` : le profil de distribution porte le droit aux
+    // notifications d'Apple (aps-environment).
+    ["expo-notifications", { mode: "production", defaultChannel: "default" }],
   ],
+  extra: {
+    ...(pousse.projet ? { eas: { projectId: pousse.projet } } : {}),
+    relais: pousse.relais,
+  },
   // Pas de mise à jour « à chaud » : chaque version passe par les magasins,
   // donc par leur vérification (ADR 0010, « Construire et publier »).
   updates: { enabled: false },

@@ -18,7 +18,7 @@ export async function appelerPanel<T>(
   fetch: typeof globalThis.fetch,
   adresse: string,
   requete: {
-    method: "GET" | "POST" | "DELETE";
+    method: "GET" | "POST" | "PUT" | "DELETE";
     path: string;
     body?: unknown;
     jeton?: string;

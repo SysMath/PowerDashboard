@@ -53,8 +53,44 @@ ne l'embarque pas.
   retour, par les liens signés que délivre le panel, comme pour le web.
   Un fichier téléchargé passe par un seul dossier du cache, vidé au
   téléchargement suivant.
+- **Notifications poussées** : voir plus bas. Le toucher ouvre la cloche du
+  panel qui les a envoyées.
 - Restent au navigateur : bases de données, planificateur, permissions des
   fichiers, sous-utilisateurs, réglages du compte.
+
+## Notifications poussées
+
+Le droit d'écrire à l'application appartient à son éditeur : Apple et Google
+ne la joignent que par Expo Push, avec le **jeton d'accès Expo de
+l'éditeur** (« sécurité renforcée » : sans lui, le jeton d'un téléphone ne
+sert à rien). Un panel le dit dans son descripteur (`notifications`) :
+
+| Mode | Réglage de l'API | Chemin |
+|---|---|---|
+| `direct` | `EXPO_ACCESS_TOKEN` | Le panel écrit à Expo avec le jeton de l'éditeur : son propre panel, ou un exploitant à qui l'éditeur l'a confié. |
+| `relais` | `PUSH_RELAY_URL` (https) | Le panel signe ses envois et les remet au relais de l'éditeur, qui seul détient le jeton. Cas de tout panel auto-hébergé. |
+| `aucune` | ni l'un ni l'autre, ou `PUSH_MODE=aucune` | L'application relève la cloche à l'ouverture. |
+
+- **Ce qui voyage** : le type d'événement, le nom du serveur (64 caractères
+  au plus), l'identifiant de la notification et celui du panel. Le texte
+  est fixe (« Survie » — « Serveur injoignable ») ; le reste se lit dans
+  l'application déverrouillée. Une ligne de la boîte d'envoi
+  (`push_outbox`) vit une heure au plus ; trois essais.
+- **Qui reçoit** : les téléphones liés au compte, vus depuis trente jours,
+  pour les événements dont la colonne « Téléphone » est cochée dans
+  Compte › Notifications. Par défaut : ce qui part aussi par courriel, plus
+  le retour d'un serveur ou d'un node.
+- **Le relais** : une instance avec `PUSH_RELAY=1` et `EXPO_ACCESS_TOKEN`
+  sert `/api/v1/relais/` (relayé par nginx et par Next). Un panel s'y
+  enregistre avec la clé publique Ed25519 de son instance, que le relais
+  n'accepte que si le descripteur publié à l'origine du panel la porte ;
+  l'application y inscrit son jeton Expo et ne donne au panel que la
+  poignée rendue. Le relais ne garde que le condensat des poignées.
+  Envois signés, datés à cinq minutes près, rejeu refusé, 2 000 par heure et
+  20 000 poignées par instance.
+- **L'application ne suit qu'un relais connu** : la liste vient de sa
+  construction (`RELAIS_NOTIFICATIONS`), jamais du panel. Un panel qui
+  annonce un autre relais n'a pas de notifications poussées.
 
 ## Écarts assumés avec l'ADR 0010
 
@@ -113,6 +149,25 @@ publication au public se fait ensuite à la main, dans chaque console.
      dans `APPLE_CLE_API`, son identifiant dans `APPLE_CLE_API_ID`,
      l'émetteur dans `APPLE_EMETTEUR_API` ;
    - variable `APPLE_EQUIPE` : l'identifiant d'équipe à dix caractères.
+4. **Notifications poussées** (facultatives : sans elles, l'application se
+   construit et relève la cloche de chaque panel) :
+   - compte Expo de l'éditeur, projet `gamedashboard` ; son identifiant
+     (UUID) dans la variable `EXPO_PROJET` ;
+   - dans le projet Expo, *Push notifications* : activer la **sécurité
+     renforcée**, déposer la clé APNs (`.p8`, Apple Developer › Keys,
+     *Apple Push Notifications service*) et la clé du compte de service
+     FCM v1 de Firebase ;
+   - créer le jeton d'accès Expo : il ne va **que** dans `env/api.env`
+     (`EXPO_ACCESS_TOKEN`) du relais de l'éditeur, jamais dans GitHub ;
+   - Firebase : application Android `fr.gamedashboard.app`, son
+     `google-services.json` en base64 dans le secret `GOOGLE_SERVICES_JSON` ;
+   - Apple : cocher *Push Notifications* sur l'identifiant d'application,
+     puis régénérer le profil (`APPLE_PROFIL`) ;
+   - variable `RELAIS_NOTIFICATIONS` : l'origine du relais de l'éditeur
+     (`https://…`), plusieurs séparées par des virgules ;
+   - sur le relais : `PUSH_RELAY=1` et `EXPO_ACCESS_TOKEN` dans
+     `env/api.env`. Les panels auto-hébergés posent `PUSH_RELAY_URL` à la
+     même origine.
 
 ### Chaque version
 

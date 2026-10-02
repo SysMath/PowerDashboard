@@ -54,6 +54,16 @@ construire() {
     export GD_ANDROID_KEYSTORE=$cle/magasin.jks
   fi
   unset ANDROID_KEYSTORE_BASE64
+  # Firebase (FCM), par lequel Android reçoit les notifications poussées :
+  # le fichier n'entre jamais dans le dépôt.
+  if [ -n "${GOOGLE_SERVICES_JSON:-}" ]; then
+    (
+      umask 077
+      printf '%s' "$GOOGLE_SERVICES_JSON" | base64 -d >"$cle/google-services.json"
+    )
+    export GD_GOOGLE_SERVICES=$cle/google-services.json
+  fi
+  unset GOOGLE_SERVICES_JSON
 
   (cd apps/mobile && CI=1 npx expo prebuild --platform android --clean --no-install)
   echo "sdk.dir=$SDK" >apps/mobile/android/local.properties

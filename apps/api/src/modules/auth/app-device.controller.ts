@@ -2,12 +2,14 @@ import {
   type AppDeviceGrant,
   type AppDeviceSummary,
   appAuthorizeBodySchema,
+  appPushBodySchema,
   appRefreshBodySchema,
   appTokenBodySchema,
 } from "@gamedashboard/contracts";
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -17,11 +19,13 @@ import {
   NotFoundException,
   Param,
   Post,
+  Put,
   Req,
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
 import { ActivityService } from "../activity/activity.service";
+import { pushConfig } from "../push/push-config";
 import { AppDeviceRepository, type AppGrantOutcome } from "./app-device.repository";
 import { BrowserSessionGuard } from "./browser-session.guard";
 import { ImpersonationReadOnlyGuard } from "./impersonation.guard";
@@ -44,7 +48,7 @@ const REFUSED = "Liaison refusée. Recommencez depuis l'application.";
  * - `app/token` et `app/refresh` : **publiques**, elles s'authentifient par
  *   ce qu'elles portent (code et PKCE, ou secret d'appareil), toujours signé
  *   par la clé de l'appareil ;
- * - `app/challenge` et `app/device` : par le jeton de l'appareil ;
+ * - `app/challenge`, `app/device` et `app/push` : par le jeton de l'appareil ;
  * - `devices` : la liste du compte, dans le navigateur seulement.
  */
 @Controller("api/v1/auth")
@@ -122,6 +126,33 @@ export class AppDeviceController {
     }
     const name = await this.devices.revokeById(request.user.id, request.appDeviceId, "device");
     if (name) await this.record(request, request.user.id, "account.app_device_revoked", name);
+  }
+
+  /**
+   * L'application dépose où lui pousser ses notifications : son jeton Expo
+   * en mode `direct`, sa poignée du relais en mode `relais`. Seul le mode que
+   * sert le panel est accepté ; « aucune » refuse tout dépôt.
+   */
+  @Put("app/push")
+  @HttpCode(204)
+  @UseGuards(SessionGuard)
+  async push(@Req() request: DeviceRequest, @Body() body: unknown): Promise<void> {
+    if (!request.appDeviceId) throw new ForbiddenException("Réservé à l'application mobile.");
+    const parsed = appPushBodySchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException("Inscription aux notifications invalide.");
+    if (parsed.data.mode !== pushConfig().mode) {
+      throw new ConflictException("Ce panel n'envoie pas ses notifications par ce chemin.");
+    }
+    await this.devices.setPush(request.appDeviceId, parsed.data);
+  }
+
+  /** L'application ne veut plus de notifications sur ce téléphone. */
+  @Delete("app/push")
+  @HttpCode(204)
+  @UseGuards(SessionGuard)
+  async unpush(@Req() request: DeviceRequest): Promise<void> {
+    if (!request.appDeviceId) throw new ForbiddenException("Réservé à l'application mobile.");
+    await this.devices.setPush(request.appDeviceId, null);
   }
 
   /** Appareils mobiles liés au compte, pour Compte › Sécurité. */

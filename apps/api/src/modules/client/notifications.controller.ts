@@ -15,6 +15,7 @@ import { SessionGuard } from "../auth/session.guard";
 import { MailerService } from "../mail/mailer.service";
 import { NotificationPreferencesRepository } from "../notifications/notification-preferences.repository";
 import { NotificationsService } from "../notifications/notifications.service";
+import { pushConfig } from "../push/push-config";
 
 /**
  * Cloche du panel.
@@ -69,17 +70,26 @@ export class NotificationsController {
 
   @Get("preferences")
   async listPreferences(@Req() request: AuthenticatedRequest) {
-    const [items, mailEnabled] = await Promise.all([
+    const { mode } = pushConfig();
+    const [items, mailEnabled, pushDevices] = await Promise.all([
       this.preferences.forUser(request.user.id),
       // L'écran doit pouvoir dire que le courriel ne partira pas : proposer une
       // case qui n'enverra rien fait attendre des messages qui ne viendront
       // jamais.
       this.mail.isConfigured(),
+      // Même raison pour le téléphone : un panel sans chemin de notifications,
+      // ou un compte sans téléphone relié.
+      mode === "aucune" ? 0 : this.preferences.pushDevices(request.user.id, mode),
     ]);
 
     return {
       data: items,
-      meta: { mailEnabled, emailVerified: request.user.emailVerifiedAt !== null },
+      meta: {
+        mailEnabled,
+        emailVerified: request.user.emailVerifiedAt !== null,
+        pushEnabled: mode !== "aucune",
+        pushDevices,
+      },
     };
   }
 

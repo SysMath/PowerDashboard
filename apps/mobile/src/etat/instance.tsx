@@ -1,5 +1,6 @@
 import type { GameDashboardClient } from "@gamedashboard/sdk";
 import { createContext, useContext } from "react";
+import type { Descripteur } from "@/noyau/descripteur";
 import type { InstanceLiee } from "@/noyau/instances";
 import type { SessionAppareil } from "@/noyau/session";
 
@@ -8,6 +9,8 @@ export interface InstanceOuverte {
   instance: InstanceLiee;
   session: SessionAppareil;
   client: GameDashboardClient;
+  /** Le descripteur lu à l'ouverture ; `null` s'il n'a pas pu l'être. */
+  descripteur: Descripteur | null;
   /** Une erreur d'un écran qui concerne tout le panel (verrou, liaison perdue). */
   signaler(erreur: unknown): void;
 }

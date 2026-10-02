@@ -8,6 +8,8 @@ import { type Database, settings } from "@gamedashboard/db";
 import { Controller, Get, Header, Inject } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
+import { pushConfig } from "../push/push-config";
+import { instanceKey } from "../push/push-instance-key";
 
 /** Clé de réglage de l'identifiant d'instance. */
 export const INSTANCE_ID_SETTING = "instance.id";
@@ -36,9 +38,25 @@ export class InstanceController {
         version_app_minimale: APP_MINIMUM_VERSION,
         instance: await instanceId(this.db),
         origine: process.env.PANEL_ORIGIN ?? "http://localhost:3000",
-        // Les notifications poussées arrivent avec le lot 4.
-        notifications: "aucune",
+        ...(await this.notifications()),
       },
+    };
+  }
+
+  /**
+   * Le chemin des notifications poussées. Par le relais, le descripteur
+   * publie aussi la clé publique du panel : c'est là que le relais la lit
+   * pour croire que l'instance est servie à cette origine.
+   */
+  private async notifications(): Promise<
+    Pick<InstanceIdentity, "notifications" | "relais" | "cle_notifications">
+  > {
+    const config = pushConfig();
+    if (config.mode !== "relais" || !config.relayUrl) return { notifications: config.mode };
+    return {
+      notifications: "relais",
+      relais: config.relayUrl,
+      cle_notifications: (await instanceKey(this.db)).publicKey,
     };
   }
 }

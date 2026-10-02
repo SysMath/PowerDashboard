@@ -8,6 +8,7 @@ const panel = (instance: string, nom = "Panel A") => ({
   origine: "https://a.example",
   version: null,
   notifications: "aucune" as const,
+  relais: null,
 });
 
 describe("Registre", () => {

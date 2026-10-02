@@ -286,6 +286,8 @@ const APP_ACCOUNT_ROUTES: readonly AppRoute[] = [
   { method: "GET", path: "/api/v1/auth/me" },
   { method: "POST", path: "/api/v1/auth/app/challenge" },
   { method: "DELETE", path: "/api/v1/auth/app/device" },
+  { method: "PUT", path: "/api/v1/auth/app/push" },
+  { method: "DELETE", path: "/api/v1/auth/app/push" },
 ];
 
 const STAFF_PREFIXES = ["/api/v1/admin/", "/api/v1/reseller/"];
@@ -337,8 +339,15 @@ export interface InstanceDescriptor {
   nom: string;
   /** Origine que Wings attend pour la console (`PANEL_ORIGIN`). */
   origine: string;
-  /** Mode des notifications poussées (lot 4) ; `aucune` d'ici là. */
+  /** Mode des notifications poussées (`pushMode`). */
   notifications: "direct" | "relais" | "aucune";
+  /**
+   * En mode `relais` : l'adresse du relais, que l'application ne suit que si
+   * c'est celui de son éditeur, et la clé publique Ed25519 du panel auprès
+   * de lui, qui prouve au relais que l'instance est bien servie ici.
+   */
+  relais?: string;
+  cle_notifications?: string;
 }
 
 /** Ce que l'API rend pour composer le descripteur (le nom vient de la marque). */
@@ -364,4 +373,6 @@ export const instanceDescriptorSchema = z.looseObject({
     .url()
     .refine((value) => new URL(value).protocol === "https:", "Origine en https:// attendue."),
   notifications: z.string().max(32),
+  relais: z.string().max(255).optional(),
+  cle_notifications: z.string().max(200).optional(),
 });

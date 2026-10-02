@@ -131,14 +131,21 @@ jobs:
 
       # La clé d'envoi n'est donnée qu'à cette commande (GD_LINUX_TRANSMETTRE),
       # pas au conteneur : elle n'existait pas pendant l'installation.
+      # Notifications poussées (ADR 0010, lot 4) : facultatives, une
+      # construction sans projet Expo relève la cloche de chaque panel.
       - name: Construire et signer
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           GD_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_MOT_DE_PASSE }}
           GD_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_CLE_ALIAS }}
           GD_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_CLE_MOT_DE_PASSE }}
+          EXPO_PROJECT_ID: ${{ vars.EXPO_PROJET }}
+          GAMEDASHBOARD_PUSH_RELAYS: ${{ vars.RELAIS_NOTIFICATIONS }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          GD_LINUX_TRANSMETTRE="GAMEDASHBOARD_MOBILE_VERSION GAMEDASHBOARD_MOBILE_BUILD ANDROID_KEYSTORE_BASE64 GD_ANDROID_KEYSTORE_PASSWORD GD_ANDROID_KEY_ALIAS GD_ANDROID_KEY_PASSWORD" \
+          [ -n "$EXPO_PROJECT_ID" ] && [ -n "$GOOGLE_SERVICES_JSON" ] \
+            || echo "::warning::EXPO_PROJET ou GOOGLE_SERVICES_JSON absent : application sans notifications poussées."
+          GD_LINUX_TRANSMETTRE="GAMEDASHBOARD_MOBILE_VERSION GAMEDASHBOARD_MOBILE_BUILD ANDROID_KEYSTORE_BASE64 GD_ANDROID_KEYSTORE_PASSWORD GD_ANDROID_KEY_ALIAS GD_ANDROID_KEY_PASSWORD EXPO_PROJECT_ID GAMEDASHBOARD_PUSH_RELAYS GOOGLE_SERVICES_JSON" \
             bash infra/ci/linux.sh lancer 'bash apps/mobile/scripts/android.sh construire'
 
       # Inventaire des dépendances livrées dans l'application (CycloneDX),
@@ -205,6 +212,9 @@ jobs:
       attestations: write
     env:
       ETIQUETTE: ${{ inputs.version || github.ref_name }}
+      # Lus par app.config.ts au projet Xcode puis à l'archive (expo-constants).
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJET }}
+      GAMEDASHBOARD_PUSH_RELAYS: ${{ vars.RELAIS_NOTIFICATIONS }}
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0

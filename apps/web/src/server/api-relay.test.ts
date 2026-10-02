@@ -43,6 +43,7 @@ describe("relayablePath", () => {
     expect(relayablePath("/api/node-agent/heartbeat")).toBe(true);
     expect(relayablePath("/api/v1/openapi.json")).toBe(true);
     expect(relayablePath("/api/v1/status")).toBe(true);
+    expect(relayablePath("/api/v1/relais/envois")).toBe(true);
   });
 
   it("relaie le signal de release d'un hébergement autonome, avec sa signature", async () => {

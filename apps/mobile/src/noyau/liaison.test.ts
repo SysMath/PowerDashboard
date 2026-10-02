@@ -20,6 +20,7 @@ const descripteur = {
   origine: "https://panel.example.com",
   version: "1.0.0",
   notifications: "aucune" as const,
+  relais: null,
 };
 
 function grant(n: number) {

@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { FournisseurApplis } from "@/etat/applis";
+import { useToucherNotification } from "@/hooks/usePousse";
 import { Traductions } from "@/i18n/traductions";
 import { useCouleurs } from "@/theme/theme";
 
@@ -13,6 +14,7 @@ export default function Racine() {
       <Traductions>
         <FournisseurApplis>
           <StatusBar style="auto" />
+          <ToucherNotifications />
           <Stack
             screenOptions={{
               headerStyle: { backgroundColor: c.surface },
@@ -26,4 +28,10 @@ export default function Racine() {
       </Traductions>
     </SafeAreaProvider>
   );
+}
+
+/** Écoute le toucher des notifications, sous le registre des panels. */
+function ToucherNotifications() {
+  useToucherNotification();
+  return null;
 }

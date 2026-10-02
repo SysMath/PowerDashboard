@@ -15,6 +15,8 @@ export type Descripteur = {
   origine: string;
   version: string | null;
   notifications: "direct" | "relais" | "aucune";
+  /** Le relais annoncé en mode `relais` (origine https), `null` sinon. */
+  relais: string | null;
 };
 
 export type VerdictInstance =
@@ -84,6 +86,18 @@ export function juger(corps: unknown, versionApplication: string): VerdictInstan
       // l'application relève alors la cloche à l'ouverture.
       notifications:
         d.notifications === "direct" || d.notifications === "relais" ? d.notifications : "aucune",
+      relais: d.notifications === "relais" ? origineHttps(d.relais) : null,
     },
   };
+}
+
+/** L'origine d'une adresse en https://, ou `null`. */
+function origineHttps(adresse: string | undefined): string | null {
+  if (!adresse) return null;
+  try {
+    const url = new URL(adresse);
+    return url.protocol === "https:" ? url.origin : null;
+  } catch {
+    return null;
+  }
 }

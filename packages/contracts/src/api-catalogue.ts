@@ -591,6 +591,23 @@ export const SESSION_ROUTES: ApiRoute[] = [
     auth: "appareil",
   },
   {
+    method: "PUT",
+    path: "/auth/app/push",
+    summary:
+      "Dépose de quoi joindre l'appareil : son jeton Expo en mode direct, sa poignée du relais en mode relais. Refusé (409) quand le mode diffère de celui que sert le panel, que publie /.well-known/gamedashboard.",
+    scope: null,
+    group: "Application mobile",
+    auth: "appareil",
+  },
+  {
+    method: "DELETE",
+    path: "/auth/app/push",
+    summary: "L'appareil ne reçoit plus de notifications poussées.",
+    scope: null,
+    group: "Application mobile",
+    auth: "appareil",
+  },
+  {
     method: "GET",
     path: "/auth/devices",
     summary: "Appareils mobiles liés au compte, le plus récemment vu en tête.",

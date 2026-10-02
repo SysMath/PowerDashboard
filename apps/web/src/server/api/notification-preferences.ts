@@ -18,15 +18,24 @@ export interface NotificationPreferences {
   mailEnabled: boolean;
   /** Faux tant que l'adresse n'a pas été confirmée : rien ne lui sera écrit. */
   emailVerified: boolean;
+  /** Faux quand le panel n'envoie pas de notifications à l'application mobile. */
+  pushEnabled: boolean;
+  /** Téléphones liés au compte qui les recevront. */
+  pushDevices: number;
 }
 
 export async function fetchNotificationPreferences(): Promise<NotificationPreferences> {
   const { data, meta } = await apiFetch<{
     data: NotificationPreference[];
-    meta: { mailEnabled: boolean; emailVerified: boolean };
+    meta: {
+      mailEnabled: boolean;
+      emailVerified: boolean;
+      pushEnabled?: boolean;
+      pushDevices?: number;
+    };
   }>("/api/v1/client/notifications/preferences");
 
-  return { items: data, ...meta };
+  return { items: data, pushEnabled: false, pushDevices: 0, ...meta };
 }
 
 export async function saveNotificationPreference(

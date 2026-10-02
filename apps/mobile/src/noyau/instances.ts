@@ -1,6 +1,7 @@
 import { versBase64Url } from "./base64";
 import type { Descripteur } from "./descripteur";
 import type { Coffre, Hasard } from "./outils";
+import { oublierPousse } from "./pousse";
 
 /**
  * Les panels liés, rangés chacun à part (ADR 0010, « Plusieurs instances »).
@@ -94,6 +95,7 @@ export class Registre {
     const liste = (await this.lister()).filter((instance) => instance.id !== id);
     await this.coffre.ecrire(CLE_LISTE, JSON.stringify(liste));
     await this.coffre.effacer(cleSecret(id));
+    await oublierPousse(this.coffre, id);
   }
 
   /**

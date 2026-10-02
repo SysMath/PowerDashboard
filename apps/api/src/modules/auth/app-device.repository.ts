@@ -11,6 +11,7 @@ import {
   type AppDeviceGrant,
   type AppDeviceSummary,
   type AppPlatform,
+  type AppPushBody,
   appLinkMessage,
   appPresenceMessage,
   appRefreshMessage,
@@ -424,6 +425,29 @@ export class AppDeviceRepository {
     return revokeAppDevices(this.db, userId, reason);
   }
 
+  /**
+   * Où pousser les notifications de cet appareil : son jeton Expo ou sa
+   * poignée du relais, selon le mode du panel. `null` l'efface. Un jeton
+   * déjà inscrit sur un autre appareil de ce panel lui est retiré : un
+   * téléphone délié puis relié ne reçoit pas tout en double.
+   */
+  async setPush(deviceId: string, push: AppPushBody | null): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      if (push) {
+        await tx
+          .update(appDevices)
+          .set({ pushMode: null, pushHandle: null })
+          .where(
+            and(eq(appDevices.pushHandle, push.poignee), sql`${appDevices.id} <> ${deviceId}`),
+          );
+      }
+      await tx
+        .update(appDevices)
+        .set({ pushMode: push?.mode ?? null, pushHandle: push?.poignee ?? null })
+        .where(and(eq(appDevices.id, deviceId), isNull(appDevices.revokedAt)));
+    });
+  }
+
   /** Un appareil encore valable (ni retiré, ni trop ancien, ni endormi), ou `null`. */
   private async activeDevice(deviceId: string, now: number) {
     const [device] = await this.db
@@ -478,6 +502,10 @@ function revocation(reason: AppDeviceRevocation) {
     accessExpiresAt: null,
     challengeHash: null,
     challengeExpiresAt: null,
+    // Un appareil retiré ne reçoit plus rien, pas même ce qui était en file
+    // (`PushSenderService` écarte une ligne sans poignée).
+    pushMode: null,
+    pushHandle: null,
     updatedAt: now,
   };
 }

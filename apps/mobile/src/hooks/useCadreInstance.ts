@@ -40,6 +40,7 @@ export function useCadreInstance(instanceId: string) {
       let instance = await registre.trouver(instanceId);
       if (!instance) return { etat: "introuvable" };
       const verdict = await lireInstance(instance.adresse, { fetch, versionApplication });
+      const descripteur = verdict.etat === "ok" ? verdict.descripteur : null;
       if (verdict.etat === "ok") {
         instance = (await registre.verifierIdentite(instanceId, verdict.descripteur)) ?? instance;
       }
@@ -62,7 +63,7 @@ export function useCadreInstance(instanceId: string) {
       }
       return {
         etat: "ouvert",
-        ouverte: { instance, session: s, client: client(instance), signaler },
+        ouverte: { instance, session: s, client: client(instance), descripteur, signaler },
       };
     },
     [registre, session, client, instanceId, signaler, t],

@@ -4,6 +4,7 @@ import { EcranCadre } from "@/composants/instances";
 import { useApplis } from "@/etat/applis";
 import { ContexteInstance } from "@/etat/instance";
 import { useCadreInstance } from "@/hooks/useCadreInstance";
+import { usePousse } from "@/hooks/usePousse";
 import { cle } from "@/natif/cle";
 import { aliasCle } from "@/noyau/instances";
 import { useCouleurs } from "@/theme/theme";
@@ -19,6 +20,7 @@ export default function CadreInstance() {
   const router = useRouter();
   const c = useCouleurs();
   const { cadre, reessayer } = useCadreInstance(id);
+  usePousse(cadre.etat === "ouvert" ? cadre.ouverte : null);
 
   const retirer = async () => {
     await cle.supprimer(aliasCle(id));

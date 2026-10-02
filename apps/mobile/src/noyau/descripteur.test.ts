@@ -29,6 +29,7 @@ describe("lireInstance", () => {
         origine: "https://panel.example.com",
         version: "1.4.0",
         notifications: "aucune",
+        relais: null,
       },
     });
     expect(fetch).toHaveBeenCalledWith(
@@ -95,5 +96,18 @@ describe("juger", () => {
     );
     expect(verdict.etat).toBe("ok");
     expect(verdict.etat === "ok" && verdict.descripteur.notifications).toBe("aucune");
+  });
+
+  it("ne retient le relais qu'en mode relais, et en https seulement", () => {
+    const lire = (corps: object) => {
+      const verdict = juger({ ...descripteur, ...corps }, "1.0.0");
+      return verdict.etat === "ok" ? verdict.descripteur.relais : "refuse";
+    };
+    expect(lire({ notifications: "relais", relais: "https://relais.example.org/" })).toBe(
+      "https://relais.example.org",
+    );
+    expect(lire({ notifications: "relais", relais: "http://relais.example.org" })).toBeNull();
+    expect(lire({ notifications: "direct", relais: "https://relais.example.org" })).toBeNull();
+    expect(lire({ notifications: "relais" })).toBeNull();
   });
 });

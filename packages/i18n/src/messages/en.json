@@ -123,7 +123,13 @@
     "noSmtpTitle": "No email will be sent",
     "noSmtpBody": "The platform has no outgoing mail server configured. Your choices are saved and will apply as soon as it has one.",
     "unverifiedTitle": "Your address is not confirmed",
-    "unverifiedBody": "Nothing will be written to an address nobody has confirmed. Confirm it from the panel banner to receive these messages."
+    "unverifiedBody": "Nothing will be written to an address nobody has confirmed. Confirm it from the panel banner to receive these messages.",
+    "channelEmail": "Email",
+    "channelPush": "Phone",
+    "noPushTitle": "No notification will reach a phone",
+    "noPushBody": "This panel does not send notifications to the mobile app. Your choices are saved and will apply as soon as it does; the bell in the app stays up to date.",
+    "noDeviceTitle": "No phone is linked to this account",
+    "noDeviceBody": "Install the GameDashboard app and link it from Security › Mobile app to receive these notifications on your phone."
   },
   "activity": {
     "title": "Activity log",
@@ -2911,6 +2917,11 @@
       "titre": "Panel QR code",
       "permission": "The app needs the camera to read the QR code shown by your panel. It reads nothing else.",
       "autoriser": "Allow the camera"
+    },
+    "pousse": {
+      "nouvelle": "New notification",
+      "lire": "Open the app to read it.",
+      "canal": "Panel alerts"
     }
   }
 }

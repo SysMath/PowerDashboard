@@ -3,6 +3,7 @@ import {
   APP_ACCESS_TOKEN_PREFIX,
   APP_PRESENCE_HEADER,
   NODE_AGENT_PREFIX,
+  PUSH_RELAY_SIGNATURE_HEADER,
   WINGS_CONFIGURE_PREFIX,
   WINGS_REMOTE_PREFIX,
 } from "@gamedashboard/contracts";
@@ -41,6 +42,8 @@ const PREFIXES = [
   // L'agent de node facultatif (ADR 0008), sur le modèle du daemon.
   `${NODE_AGENT_PREFIX}/`,
   "/api/v1/application/",
+  // Le relais de notifications de l'éditeur (ADR 0010), inerte sans `PUSH_RELAY=1`.
+  "/api/v1/relais/",
 ];
 const EXACTS = ["/api/v1/openapi.json", "/api/v1/status", "/api/v1/updates/signal"];
 
@@ -88,6 +91,8 @@ const FORWARDED_REQUEST_HEADERS = [
   "user-agent",
   // La confirmation de présence d'un geste lourd venu de l'application.
   APP_PRESENCE_HEADER,
+  // La signature d'un envoi au relais de notifications.
+  PUSH_RELAY_SIGNATURE_HEADER,
   "x-gamedashboard-signature",
   "x-gamedashboard-timestamp",
   "x-gamedashboard-version",

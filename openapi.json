@@ -1381,6 +1381,90 @@
         }
       }
     },
+    "/api/v1/auth/app/push": {
+      "put": {
+        "summary": "Dépose de quoi joindre l'appareil : son jeton Expo en mode direct, sa poignée du relais en mode relais. Refusé (409) quand le mode diffère de celui que sert le panel, que publie /.well-known/gamedashboard.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-put-auth-app-push",
+        "security": [
+          {
+            "appDevice": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      },
+      "delete": {
+        "summary": "L'appareil ne reçoit plus de notifications poussées.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-delete-auth-app-push",
+        "security": [
+          {
+            "appDevice": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
     "/api/v1/auth/devices": {
       "get": {
         "summary": "Appareils mobiles liés au compte, le plus récemment vu en tête.",

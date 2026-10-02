@@ -123,7 +123,13 @@
     "noSmtpTitle": "Aucun courriel ne partira",
     "noSmtpBody": "La plateforme n'a pas de serveur d'envoi configuré. Vos choix sont enregistrés et s'appliqueront dès qu'elle en aura un.",
     "unverifiedTitle": "Votre adresse n'est pas confirmée",
-    "unverifiedBody": "Rien ne sera écrit à une adresse que personne n'a confirmée. Confirmez-la depuis le bandeau du panel pour recevoir ces messages."
+    "unverifiedBody": "Rien ne sera écrit à une adresse que personne n'a confirmée. Confirmez-la depuis le bandeau du panel pour recevoir ces messages.",
+    "channelEmail": "Courriel",
+    "channelPush": "Téléphone",
+    "noPushTitle": "Aucune notification n'ira sur un téléphone",
+    "noPushBody": "Ce panel n'envoie pas de notifications à l'application mobile. Vos choix sont enregistrés et s'appliqueront dès qu'il le fera ; la cloche de l'application reste à jour.",
+    "noDeviceTitle": "Aucun téléphone n'est relié à ce compte",
+    "noDeviceBody": "Installez l'application GameDashboard et reliez-la depuis Sécurité › Application mobile pour recevoir ces notifications sur votre téléphone."
   },
   "activity": {
     "title": "Journal d'activité",
@@ -2911,6 +2917,11 @@
       "titre": "Code QR du panel",
       "permission": "L'application a besoin de la caméra pour lire le code QR affiché par votre panel. Elle ne lit rien d'autre.",
       "autoriser": "Autoriser la caméra"
+    },
+    "pousse": {
+      "nouvelle": "Nouvelle notification",
+      "lire": "Ouvrez l'application pour la lire.",
+      "canal": "Alertes des panels"
     }
   }
 }
