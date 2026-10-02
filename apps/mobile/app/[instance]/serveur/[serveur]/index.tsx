@@ -16,7 +16,11 @@ import { useInstance } from "@/etat/instance";
 import { useServeur } from "@/hooks/useServeurs";
 import { lireServeur } from "@/noyau/alimentation";
 
-/** Un serveur : son état, l'alimentation, et l'accès à la console et aux joueurs. */
+/**
+ * Un serveur : son état, l'alimentation, et l'accès à la console, aux
+ * joueurs, aux fichiers et aux sauvegardes. Fichiers et sauvegardes passent
+ * par le daemon : fermés, comme sur le web, tant que le serveur est bloqué.
+ */
 export default function Serveur() {
   const { serveur: id } = useLocalSearchParams<{ serveur: string }>();
   const t = useTranslations("mobile.serveur");
@@ -61,6 +65,15 @@ export default function Serveur() {
         variante="secondaire"
         onPress={() => router.push(`/${instance.id}/serveur/${id}/joueurs`)}
       />
+      {(["fichiers", "sauvegardes"] as const).map((ecran) => (
+        <Bouton
+          key={ecran}
+          titre={t(ecran)}
+          variante="secondaire"
+          inactif={blocage !== null}
+          onPress={() => router.push(`/${instance.id}/serveur/${id}/${ecran}`)}
+        />
+      ))}
     </Ecran>
   );
 }

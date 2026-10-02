@@ -2539,6 +2539,63 @@
         }
       }
     },
+    "/api/v1/client/servers/{server}/files/create-directory": {
+      "post": {
+        "summary": "Créer un dossier : `{ root, name }`, `name` relatif à `root`.",
+        "description": "Clé personnelle. Portée requise : `files.write`.",
+        "tags": [
+          "Fichiers"
+        ],
+        "operationId": "client-post-servers-by-server-files-create-directory",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "files.write"
+            ]
+          }
+        ],
+        "x-gd-scope": "files.write",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « files.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
     "/api/v1/client/servers/{server}/files/rename": {
       "post": {
         "summary": "Renommer ou déplacer un fichier ou un dossier.",
@@ -2808,6 +2865,72 @@
           },
           "403": {
             "description": "Authentifié, mais sans la portée « backups.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/backups/{backup}/lock": {
+      "post": {
+        "summary": "Verrouiller ou déverrouiller une sauvegarde (`{ locked }`) : verrouillée, la rotation de rétention ne l'efface pas. Exige le droit de supprimer.",
+        "description": "Clé personnelle. Portée requise : `backups.delete`.",
+        "tags": [
+          "Sauvegardes"
+        ],
+        "operationId": "client-post-servers-by-server-backups-by-backup-lock",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "backup",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant de la sauvegarde.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "backups.delete"
+            ]
+          }
+        ],
+        "x-gd-scope": "backups.delete",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « backups.delete », ou refusé pour la ressource visée : la cause est dans le corps.",
             "content": {
               "application/json": {
                 "schema": {

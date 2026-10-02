@@ -44,6 +44,9 @@ export interface CleAppareil {
 /** Erreur levée par `CleAppareil.signer` quand il faut d'abord déverrouiller. */
 export const CLE_VERROUILLEE = "VERROUILLEE";
 
+/** La biométrie ou le code a été refusé ou annulé : rien n'est parti. */
+export const PRESENCE_REFUSEE = "PRESENCE_REFUSEE";
+
 export interface Horloge {
   maintenant(): number;
 }

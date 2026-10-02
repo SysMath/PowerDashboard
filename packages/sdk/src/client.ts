@@ -1,10 +1,14 @@
 import type {
+  ClientBackupList,
+  ClientBackupView,
+  ClientFileEntryView,
   ClientNotificationView,
   ClientPlayersView,
   ClientServerView,
   ConsoleGrant,
   PowerSignal,
   ServerLimitsPatch,
+  UploadGrant,
 } from "@gamedashboard/contracts";
 
 /**
@@ -47,6 +51,13 @@ export interface GameDashboardClientOptions {
    * remonte tel quel.
    */
   onUnauthorized?: () => Promise<boolean>;
+  /**
+   * Confirmation de présence d'un appareil mobile (ADR 0010). Appelée avant
+   * chaque geste que le panel protège ainsi (restaurer, supprimer), avec le
+   * verbe et le chemin exacts, sans la requête ; rend l'en-tête à joindre.
+   * Sans elle, ces gestes partent tels quels, ce qui convient à une clé.
+   */
+  presence?: (method: string, path: string) => Promise<Record<string, string>>;
   /** Au-delà, on cesse d'attendre. Dix secondes par défaut. */
   timeoutMs?: number;
   /** Pour les environnements sans `fetch` global, ou pour un client instrumenté. */
@@ -95,6 +106,7 @@ export class GameDashboardClient {
   private readonly baseUrl: string;
   private readonly token: string | (() => Promise<string>);
   private readonly onUnauthorized: (() => Promise<boolean>) | undefined;
+  private readonly presence: GameDashboardClientOptions["presence"];
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof globalThis.fetch;
 
@@ -105,6 +117,7 @@ export class GameDashboardClient {
     this.baseUrl = sansBarresFinales(options.baseUrl);
     this.token = options.token;
     this.onUnauthorized = options.onUnauthorized;
+    this.presence = options.presence;
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.fetchImpl = options.fetch ?? globalThis.fetch;
   }
@@ -189,6 +202,120 @@ export class GameDashboardClient {
     return this.call("POST", "/api/v1/client/notifications/read-all");
   }
 
+  /* --- Sauvegardes ---------------------------------------------------------- */
+
+  /** Les sauvegardes du serveur, plus récentes d'abord, et son quota. */
+  async backups(serverId: string): Promise<ClientBackupList> {
+    const corps = await this.request("GET", this.serverPath(serverId, "backups"));
+    const meta = corps?.meta as { used?: unknown; limit?: unknown } | undefined;
+    return {
+      items: Array.isArray(corps?.data) ? (corps.data as ClientBackupView[]) : [],
+      used: typeof meta?.used === "number" ? meta.used : 0,
+      limit: typeof meta?.limit === "number" ? meta.limit : 0,
+    };
+  }
+
+  /** Lance une sauvegarde : le daemon archive en arrière-plan. */
+  createBackup(serverId: string, name: string): Promise<ClientBackupView> {
+    return this.call("POST", this.serverPath(serverId, "backups"), { name });
+  }
+
+  /** Verrouillée, la rotation de rétention ne l'efface pas. */
+  lockBackup(serverId: string, backupId: string, locked: boolean): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "backups", backupId, "lock"), { locked });
+  }
+
+  /**
+   * Restaure par-dessus les fichiers du serveur ; `truncate` les efface
+   * d'abord. Geste protégé : confirmation de présence pour un appareil.
+   */
+  restoreBackup(serverId: string, backupId: string, truncate = false): Promise<unknown> {
+    const chemin = this.serverPath(serverId, "backups", backupId, "restore");
+    return this.call("POST", chemin, { truncate }, true);
+  }
+
+  deleteBackup(serverId: string, backupId: string): Promise<unknown> {
+    return this.call("DELETE", this.serverPath(serverId, "backups", backupId), undefined, true);
+  }
+
+  /* --- Fichiers ------------------------------------------------------------- */
+
+  /** Le contenu d'un dossier, tel que Wings le rend (sans tri). */
+  async files(serverId: string, directory = "/"): Promise<ClientFileEntryView[]> {
+    const entrees = await this.call<unknown>(
+      "GET",
+      `${this.serverPath(serverId, "files")}?directory=${encodeURIComponent(directory)}`,
+    );
+    return Array.isArray(entrees) ? (entrees as ClientFileEntryView[]) : [];
+  }
+
+  async fileContents(serverId: string, file: string): Promise<string> {
+    const { content } = await this.call<{ content: string }>(
+      "GET",
+      `${this.serverPath(serverId, "files", "contents")}?file=${encodeURIComponent(file)}`,
+    );
+    return content;
+  }
+
+  writeFile(serverId: string, file: string, content: string): Promise<unknown> {
+    return this.call(
+      "POST",
+      `${this.serverPath(serverId, "files", "write")}?file=${encodeURIComponent(file)}`,
+      { content },
+    );
+  }
+
+  createDirectory(serverId: string, root: string, name: string): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "files", "create-directory"), {
+      root,
+      name,
+    });
+  }
+
+  /** `to` est relatif à `root`, comme `from` : un chemin avec « / » déplace. */
+  renameFile(serverId: string, root: string, from: string, to: string): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "files", "rename"), { root, from, to });
+  }
+
+  /** Suppression définitive. Geste protégé : confirmation de présence. */
+  deleteFiles(serverId: string, root: string, files: string[]): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "files", "delete"), { root, files }, true);
+  }
+
+  /** Rend le nom et la taille de l'archive, choisis par le daemon. */
+  compressFiles(
+    serverId: string,
+    root: string,
+    files: string[],
+  ): Promise<{ name: string; size: number }> {
+    return this.call("POST", this.serverPath(serverId, "files", "compress"), { root, files });
+  }
+
+  decompressFile(serverId: string, root: string, file: string): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "files", "decompress"), { root, file });
+  }
+
+  /** Adresse chez le daemon, valable une minute et une fois : à suivre aussitôt. */
+  async fileDownloadUrl(serverId: string, file: string): Promise<string> {
+    const { url } = await this.call<{ url: string }>(
+      "GET",
+      `${this.serverPath(serverId, "files", "download")}?file=${encodeURIComponent(file)}`,
+    );
+    return url;
+  }
+
+  /** Autorisation de déposer des fichiers directement chez le daemon. */
+  uploadGrant(serverId: string): Promise<UploadGrant> {
+    return this.call("POST", this.serverPath(serverId, "files", "upload-grant"));
+  }
+
+  private serverPath(serverId: string, ...segments: string[]): string {
+    return [
+      `/api/v1/client/servers/${encodeURIComponent(serverId)}`,
+      ...segments.map(encodeURIComponent),
+    ].join("/");
+  }
+
   /**
    * Instantanés du serveur sur son node (ADR 0009), avec l'état de la
    * fonction dans `meta`. 404 là où aucun agent ne les offre.
@@ -216,7 +343,7 @@ export class GameDashboardClient {
    * sûreté est pris, puis le dossier est recopié. Il reste arrêté.
    */
   restoreSnapshot(serverId: string, name: string): Promise<unknown> {
-    return this.call("POST", this.snapshotPath(serverId, name, "restore"));
+    return this.call("POST", this.snapshotPath(serverId, name, "restore"), undefined, true);
   }
 
   private snapshotPath(serverId: string, name?: string, action?: string): string {
@@ -338,8 +465,12 @@ export class GameDashboardClient {
    * n'envoie rien. Ce refus ressemble à une demande invalide et coûte
    * longtemps à comprendre.
    */
-  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const corps = await this.request(method, path, body);
+  private async call<T>(method: string, path: string, body?: unknown, protege = false): Promise<T> {
+    // Le défi est demandé avant l'appel et signé pour ce chemin seul, sans
+    // la requête : c'est ce que le panel vérifie.
+    const entetes =
+      protege && this.presence ? await this.presence(method, path.split("?")[0] ?? path) : {};
+    const corps = await this.request(method, path, body, entetes);
     // L'API enveloppe ses réponses dans `data`. Le client la déballe : c'est
     // une convention de transport, pas une information pour l'appelant.
     return (corps && "data" in corps ? corps.data : corps) as T;
@@ -350,9 +481,10 @@ export class GameDashboardClient {
     method: string,
     path: string,
     body?: unknown,
+    entetes: Record<string, string> = {},
   ): Promise<Record<string, unknown> | null> {
     try {
-      return await this.once(method, path, body);
+      return await this.once(method, path, body, entetes);
     } catch (error) {
       // Un seul nouvel essai, et seulement si le jeton a vraiment changé :
       // rejouer en boucle un 401 ferait tourner un renouvellement refusé.
@@ -360,14 +492,16 @@ export class GameDashboardClient {
         throw error;
       }
       if (!(await this.onUnauthorized())) throw error;
-      return this.once(method, path, body);
+      // Le défi n'a pas été consommé : le panel refuse le jeton avant de le lire.
+      return this.once(method, path, body, entetes);
     }
   }
 
   private async once(
     method: string,
     path: string,
-    body?: unknown,
+    body: unknown,
+    entetes: Record<string, string>,
   ): Promise<Record<string, unknown> | null> {
     const token = typeof this.token === "string" ? this.token : await this.token();
     const controller = new AbortController();
@@ -377,6 +511,7 @@ export class GameDashboardClient {
       const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
         method,
         headers: {
+          ...entetes,
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),

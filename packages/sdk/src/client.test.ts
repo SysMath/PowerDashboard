@@ -1,4 +1,6 @@
 import {
+  APP_PRESENCE_HEADER,
+  APP_PRESENCE_ROUTES,
   APPLICATION_ROUTES,
   type ApiRoute,
   CLIENT_ROUTES,
@@ -244,6 +246,22 @@ describe("GameDashboardClient", () => {
     await c.pinSnapshot(id, nom, "avant la mise à jour");
     await c.unpinSnapshot(id, nom);
     await c.restoreSnapshot(id, nom);
+    const sauvegarde = "7f3a9c2e";
+    await c.backups(id);
+    await c.createBackup(id, "avant-mise-a-jour");
+    await c.lockBackup(id, sauvegarde, true);
+    await c.restoreBackup(id, sauvegarde, true);
+    await c.deleteBackup(id, sauvegarde);
+    await c.files(id, "/plugins");
+    await c.fileContents(id, "/server.properties");
+    await c.writeFile(id, "/server.properties", "motd=Bonjour");
+    await c.createDirectory(id, "/", "mondes");
+    await c.renameFile(id, "/", "a.txt", "b.txt");
+    await c.deleteFiles(id, "/", ["b.txt"]);
+    await c.compressFiles(id, "/", ["world"]);
+    await c.decompressFile(id, "/", "world.tar.gz");
+    await c.fileDownloadUrl(id, "/latest.log");
+    await c.uploadGrant(id);
     await c.createServer({});
     await c.suspendServer(id, "impayé");
     await c.unsuspendServer(id);
@@ -256,9 +274,77 @@ describe("GameDashboardClient", () => {
 
     const visees = appel.mock.calls.map(
       ([url, init]) =>
-        `${init?.method ?? "GET"} ${forme(new URL(String(url)).pathname.replace(id, "{x}").replace(nom, "{x}"))}`,
+        `${init?.method ?? "GET"} ${forme(new URL(String(url)).pathname.replace(id, "{x}").replace(nom, "{x}").replace("7f3a9c2e", "{x}"))}`,
     );
     expect(visees.filter((route) => !connues.has(route))).toEqual([]);
+  });
+
+  /*
+   * Un appareil mobile ne restaure ni ne supprime sans confirmer sa présence
+   * (ADR 0010) : le SDK demande l'en-tête pour exactement les routes que le
+   * panel protège, avec le chemin sans la requête, et pour aucune autre.
+   */
+  it("joint la confirmation de présence aux seuls gestes que le panel protège", async () => {
+    const appel = espion(() => fausseReponse({ data: { content: "", url: "u" } }));
+    const presence = vi.fn(async (method: string, path: string) => ({
+      [APP_PRESENCE_HEADER]: `defi.${method} ${path}`,
+    }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: "gd_mob_essai",
+      fetch: appel,
+      presence,
+    });
+    const [id, sauvegarde, nom] = ["31201e0c", "7f3a9c2e", "gd-20260930T120000.000Z"];
+    await c.backups(id);
+    await c.restoreBackup(id, sauvegarde, true);
+    await c.deleteBackup(id, sauvegarde);
+    await c.lockBackup(id, sauvegarde, false);
+    await c.files(id, "/");
+    await c.deleteFiles(id, "/", ["a"]);
+    await c.renameFile(id, "/", "a", "b");
+    await c.restoreSnapshot(id, nom);
+
+    const protegees = new Set(
+      APP_PRESENCE_ROUTES.map((r) => `${r.method} ${r.path.replace(/:\w+/g, ":x")}`),
+    );
+    appel.mock.calls.forEach(([url, init], n) => {
+      const chemin = new URL(String(url)).pathname;
+      const gabarit = `${init?.method ?? "GET"} ${chemin.replace(id, ":x").replace(sauvegarde, ":x").replace(nom, ":x")}`;
+      const entete = entetes(appel, n)[APP_PRESENCE_HEADER];
+      if (protegees.has(gabarit)) expect(entete, gabarit).toBe(`defi.${init?.method} ${chemin}`);
+      else expect(entete, gabarit).toBeUndefined();
+    });
+    expect(presence).toHaveBeenCalledTimes(4);
+  });
+
+  /*
+   * Le panel résout le jeton avant de consommer le défi : la reprise après
+   * un 401 renvoie le même en-tête, sans redemander la biométrie.
+   */
+  it("garde la même confirmation de présence pour la reprise après un 401", async () => {
+    let jeton = "gd_mob_perime";
+    const appel = espion((_url, init) =>
+      (init?.headers as Record<string, string> | undefined)?.Authorization === "Bearer gd_mob_frais"
+        ? fausseReponse({ data: {} })
+        : fausseReponse({ title: "Session expirée" }, 401),
+    );
+    const presence = vi.fn(async () => ({ [APP_PRESENCE_HEADER]: "defi.signature" }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: async () => jeton,
+      onUnauthorized: async () => {
+        jeton = "gd_mob_frais";
+        return true;
+      },
+      fetch: appel,
+      presence,
+    });
+
+    await c.deleteBackup("31201e0c", "7f3a9c2e");
+    expect(appel).toHaveBeenCalledTimes(2);
+    expect(presence).toHaveBeenCalledTimes(1);
+    expect(entetes(appel, 1)[APP_PRESENCE_HEADER]).toBe("defi.signature");
   });
 
   it("suspend et rétablit par la même route, avec un booléen", async () => {

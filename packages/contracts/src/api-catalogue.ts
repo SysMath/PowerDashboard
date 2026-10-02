@@ -165,6 +165,13 @@ export const CLIENT_ROUTES: ApiRoute[] = [
   },
   {
     method: "POST",
+    path: "/servers/{server}/files/create-directory",
+    summary: "Créer un dossier : `{ root, name }`, `name` relatif à `root`.",
+    scope: "files.write",
+    group: "Fichiers",
+  },
+  {
+    method: "POST",
     path: "/servers/{server}/files/rename",
     summary: "Renommer ou déplacer un fichier ou un dossier.",
     scope: "files.write",
@@ -197,6 +204,14 @@ export const CLIENT_ROUTES: ApiRoute[] = [
     path: "/servers/{server}/backups",
     summary: "Déclencher une sauvegarde. Accepte un en-tête d'idempotence.",
     scope: "backups.create",
+    group: "Sauvegardes",
+  },
+  {
+    method: "POST",
+    path: "/servers/{server}/backups/{backup}/lock",
+    summary:
+      "Verrouiller ou déverrouiller une sauvegarde (`{ locked }`) : verrouillée, la rotation de rétention ne l'efface pas. Exige le droit de supprimer.",
+    scope: "backups.delete",
     group: "Sauvegardes",
   },
   {

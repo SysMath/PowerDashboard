@@ -69,3 +69,50 @@ export interface ConsoleGrant {
   token: string;
   socket: string;
 }
+
+/** Une sauvegarde (`GET /api/v1/client/servers/:id/backups`). */
+export interface ClientBackupView {
+  id: string;
+  name: string;
+  bytes: number;
+  checksum: string | null;
+  /** `null` = en cours. Ni réussie, ni ratée : on ne sait pas encore. */
+  isSuccessful: boolean | null;
+  isLocked: boolean;
+  createdAt: string;
+  completedAt: string | null;
+  /** `snapshot` : archivée par l'agent depuis un instantané, donc cohérente. */
+  source?: "wings" | "snapshot";
+}
+
+/** Les sauvegardes d'un serveur et son quota (`meta` de la même route). */
+export interface ClientBackupList {
+  items: ClientBackupView[];
+  used: number;
+  limit: number;
+}
+
+/**
+ * Une entrée de dossier, telle que Wings la rend et que l'API la relaie
+ * (`GET /api/v1/client/servers/:id/files`). Wings ne garantit aucun tri.
+ */
+export interface ClientFileEntryView {
+  name: string;
+  mode: string;
+  size: number;
+  directory: boolean;
+  file: boolean;
+  symlink: boolean;
+  mime: string;
+  modified: string;
+}
+
+/**
+ * Autorisation de déposer des fichiers chez le daemon : une adresse et un
+ * jeton à usage unique, quinze minutes, ce serveur seul. Le dépôt part en
+ * `multipart/form-data`, champ `files`, vers `url?token=…&directory=…`.
+ */
+export interface UploadGrant {
+  token: string;
+  url: string;
+}

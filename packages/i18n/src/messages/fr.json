@@ -2739,10 +2739,18 @@
   },
   "mobile": {
     "commun": {
-      "annuler": "Annuler"
+      "annuler": "Annuler",
+      "refuse": "Geste refusé"
     },
     "verrou": {
       "raison": "Ouvrir la clé qui relie ce téléphone au panel"
+    },
+    "presence": {
+      "restaurerSauvegarde": "Confirmer la restauration de la sauvegarde",
+      "supprimerSauvegarde": "Confirmer la suppression de la sauvegarde",
+      "supprimerFichiers": "Confirmer la suppression des fichiers",
+      "restaurerInstantane": "Confirmer la restauration de l'instantané",
+      "geste": "Confirmer cette action sur le serveur"
     },
     "instances": {
       "titre": "Mes panels",
@@ -2824,7 +2832,44 @@
     },
     "serveur": {
       "console": "Console",
-      "joueurs": "Joueurs"
+      "joueurs": "Joueurs",
+      "fichiers": "Fichiers",
+      "sauvegardes": "Sauvegardes"
+    },
+    "sauvegardes": {
+      "quota": "{utilise} sur {max} sauvegardes",
+      "quotaAtteint": "Quota atteint : supprimez une sauvegarde déverrouillée pour en créer une autre.",
+      "nom": "Nom de la sauvegarde",
+      "nomVide": "Indiquez un nom.",
+      "restaurer": "Restaurer",
+      "viderPuisRestaurer": "Vider, puis restaurer",
+      "viderAide": "« Vider, puis restaurer » supprime d'abord tous les fichiers du serveur : ceux que l'archive ne contient pas disparaissent.",
+      "restaurationLancee": "Restauration lancée",
+      "restaurationAide": "Le daemon réécrit les fichiers du serveur. Attendez la fin avant de le démarrer : la console et la cloche le signaleront.",
+      "supprimer": "Supprimer"
+    },
+    "fichiers": {
+      "ouvrir": "Ouvrir",
+      "partager": "Télécharger et partager",
+      "supprimer": "Supprimer",
+      "dossier": "Dossier",
+      "appuiLong": "Appui long sur une entrée pour la renommer, la déplacer, la compresser ou la supprimer.",
+      "tropGros": "Ce fichier dépasse 1 Mo : il ne s'ouvre pas dans l'éditeur du téléphone. Téléchargez-le, ou modifiez-le depuis le navigateur.",
+      "binaire": "Ce fichier n'est pas du texte : il se télécharge, il ne s'ouvre pas ici.",
+      "nomDossier": "Nom du dossier",
+      "creer": "Créer",
+      "valider": "Valider",
+      "nom": {
+        "vide": "Indiquez un nom.",
+        "reserve": "Ce nom est réservé par le système.",
+        "barre": "Un nom ne contient pas de « / » : créez les dossiers un par un."
+      }
+    },
+    "editeur": {
+      "enregistrer": "Enregistrer",
+      "quitterTitre": "Quitter sans enregistrer ?",
+      "quitterCorps": "Vos modifications de ce fichier seront perdues.",
+      "quitter": "Quitter"
     },
     "alimentation": {
       "refuse": "Ordre refusé",
@@ -2855,7 +2900,7 @@
       "titre": "Ce téléphone",
       "lieeLe": "Lié le {date}",
       "expire": "Nouvelle connexion nécessaire au plus tard le {date}",
-      "webAide": "Bases de données, planificateur, fichiers, sauvegardes et réglages du compte restent dans le panel, depuis le navigateur.",
+      "webAide": "Bases de données, planificateur, permissions des fichiers et réglages du compte restent dans le panel, depuis le navigateur.",
       "ouvrirPanel": "Ouvrir le panel dans le navigateur",
       "panels": "Mes panels",
       "delier": "Délier ce téléphone",

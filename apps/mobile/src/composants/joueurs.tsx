@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Alert } from "react-native";
 import { useTranslations } from "use-intl";
 import { Bandeau, Bouton, Carte, Champ, Texte } from "./base";
+import { Menu } from "./menu";
 
 /**
  * Les joueurs connectés et les actions que l'egg déclare : rien d'autre n'est
@@ -13,24 +14,19 @@ export function ListeJoueurs(props: {
   onAgir: (action: PlayerAction, joueur: string) => Promise<void>;
 }) {
   const t = useTranslations("players");
-  const tc = useTranslations("mobile.commun");
   const [autre, setAutre] = useState("");
   const { vue } = props;
 
+  const [cible, setCible] = useState<string | null>(null);
+  const agir = (action: PlayerAction, joueur: string) =>
+    props
+      .onAgir(action, joueur)
+      .then(() => Alert.alert(t("sent", { action: t(`action.${action}`), player: joueur })))
+      .catch((erreur: unknown) => Alert.alert(String((erreur as Error).message ?? erreur)));
+  // Une feuille plutôt qu'`Alert` : Android n'y montre que trois boutons, et
+  // l'egg peut en déclarer davantage (expulser, bannir, opérateur…).
   const choisir = (joueur: string) => {
-    if (vue.actions.length === 0) return;
-    Alert.alert(joueur, t("actHint"), [
-      ...vue.actions.map((action) => ({
-        text: t(`action.${action}`),
-        onPress: () => {
-          props
-            .onAgir(action, joueur)
-            .then(() => Alert.alert(t("sent", { action: t(`action.${action}`), player: joueur })))
-            .catch((erreur: unknown) => Alert.alert(String((erreur as Error).message ?? erreur)));
-        },
-      })),
-      { text: tc("annuler"), style: "cancel" as const },
-    ]);
+    if (vue.actions.length > 0) setCible(joueur);
   };
 
   return (
@@ -67,6 +63,14 @@ export function ListeJoueurs(props: {
           />
         </Carte>
       )}
+      <Menu
+        titre={cible}
+        choix={vue.actions.map((action) => ({
+          titre: t(`action.${action}`),
+          onPress: () => cible && agir(action, cible),
+        }))}
+        onFermer={() => setCible(null)}
+      />
     </>
   );
 }

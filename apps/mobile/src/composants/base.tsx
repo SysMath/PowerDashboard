@@ -80,7 +80,15 @@ export function Bouton(props: {
   );
 }
 
-export function Carte({ children, onPress }: { children: ReactNode; onPress?: () => void }) {
+export function Carte({
+  children,
+  onPress,
+  onLongPress,
+}: {
+  children: ReactNode;
+  onPress?: () => void;
+  onLongPress?: () => void;
+}) {
   const c = useCouleurs();
   const style = {
     backgroundColor: c.surface,
@@ -91,7 +99,7 @@ export function Carte({ children, onPress }: { children: ReactNode; onPress?: ()
     gap: ESPACE.s,
   };
   return onPress ? (
-    <Pressable accessibilityRole="button" onPress={onPress} style={style}>
+    <Pressable accessibilityRole="button" onPress={onPress} onLongPress={onLongPress} style={style}>
       {children}
     </Pressable>
   ) : (

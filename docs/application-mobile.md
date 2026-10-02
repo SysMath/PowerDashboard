@@ -35,6 +35,27 @@ certificat valide.
 Les textes sont dans l'espace `mobile` de `packages/i18n` ; l'interface web
 ne l'embarque pas.
 
+## Ce que fait l'application
+
+- **Serveurs** : état, alimentation, console en direct, joueurs.
+- **Sauvegardes** : liste et quota, création, verrouillage, restauration
+  (par-dessus les fichiers, ou après les avoir vidés), suppression.
+- **Fichiers** : parcours, éditeur à chasse fixe pour les fichiers texte
+  de 1 Mo au plus, envoi depuis le téléphone, téléchargement vers le
+  partage du système, renommage et déplacement (un chemin relatif, comme
+  sur le web), nouveau dossier, compression, extraction, suppression. Un
+  fichier binaire ou plus gros se télécharge et ne s'ouvre pas.
+- **Gestes lourds** : restaurer ou supprimer une sauvegarde, supprimer des
+  fichiers, restaurer un instantané. Le SDK y joint une présence fraîche
+  (`x-gd-presence`), donc une biométrie, sur les seules routes de
+  `APP_PRESENCE_ROUTES` ; l'invite dit le geste.
+- Les octets des fichiers vont directement du téléphone au daemon, et
+  retour, par les liens signés que délivre le panel, comme pour le web.
+  Un fichier téléchargé passe par un seul dossier du cache, vidé au
+  téléchargement suivant.
+- Restent au navigateur : bases de données, planificateur, permissions des
+  fichiers, sous-utilisateurs, réglages du compte.
+
 ## Écarts assumés avec l'ADR 0010
 
 - **Secret d'appareil sans authentification propre dans le trousseau.**

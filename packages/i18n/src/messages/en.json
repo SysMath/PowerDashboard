@@ -2739,10 +2739,18 @@
   },
   "mobile": {
     "commun": {
-      "annuler": "Cancel"
+      "annuler": "Cancel",
+      "refuse": "Action refused"
     },
     "verrou": {
       "raison": "Open the key that links this phone to the panel"
+    },
+    "presence": {
+      "restaurerSauvegarde": "Confirm restoring the backup",
+      "supprimerSauvegarde": "Confirm deleting the backup",
+      "supprimerFichiers": "Confirm deleting the files",
+      "restaurerInstantane": "Confirm restoring the snapshot",
+      "geste": "Confirm this action on the server"
     },
     "instances": {
       "titre": "My panels",
@@ -2824,7 +2832,44 @@
     },
     "serveur": {
       "console": "Console",
-      "joueurs": "Players"
+      "joueurs": "Players",
+      "fichiers": "Files",
+      "sauvegardes": "Backups"
+    },
+    "sauvegardes": {
+      "quota": "{utilise} of {max} backups",
+      "quotaAtteint": "Quota reached: delete an unlocked backup to create another one.",
+      "nom": "Backup name",
+      "nomVide": "Enter a name.",
+      "restaurer": "Restore",
+      "viderPuisRestaurer": "Empty, then restore",
+      "viderAide": "\"Empty, then restore\" first deletes every file of the server: files missing from the archive are lost.",
+      "restaurationLancee": "Restore started",
+      "restaurationAide": "The daemon is rewriting the server's files. Wait for it to finish before starting the server: the console and the bell will tell you.",
+      "supprimer": "Delete"
+    },
+    "fichiers": {
+      "ouvrir": "Open",
+      "partager": "Download and share",
+      "supprimer": "Delete",
+      "dossier": "Folder",
+      "appuiLong": "Long-press an entry to rename, move, compress or delete it.",
+      "tropGros": "This file is larger than 1 MB: it does not open in the phone editor. Download it, or edit it from the browser.",
+      "binaire": "This file is not text: it downloads, it does not open here.",
+      "nomDossier": "Folder name",
+      "creer": "Create",
+      "valider": "Confirm",
+      "nom": {
+        "vide": "Enter a name.",
+        "reserve": "This name is reserved by the system.",
+        "barre": "A name cannot contain \"/\": create folders one at a time."
+      }
+    },
+    "editeur": {
+      "enregistrer": "Save",
+      "quitterTitre": "Leave without saving?",
+      "quitterCorps": "Your changes to this file will be lost.",
+      "quitter": "Leave"
     },
     "alimentation": {
       "refuse": "Order refused",
@@ -2855,7 +2900,7 @@
       "titre": "This phone",
       "lieeLe": "Linked on {date}",
       "expire": "New sign-in required by {date} at the latest",
-      "webAide": "Databases, scheduler, files, backups and account settings stay in the panel, in the browser.",
+      "webAide": "Databases, scheduler, file permissions and account settings stay in the panel, in the browser.",
       "ouvrirPanel": "Open the panel in the browser",
       "panels": "My panels",
       "delier": "Unlink this phone",

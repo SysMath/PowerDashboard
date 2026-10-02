@@ -1,6 +1,6 @@
 import * as LocalAuthentication from "expo-local-authentication";
 import { Platform } from "react-native";
-import { CLE_VERROUILLEE, type CleAppareil } from "@/noyau/outils";
+import { CLE_VERROUILLEE, type CleAppareil, PRESENCE_REFUSEE } from "@/noyau/outils";
 import CleAppareilNatif from "../../modules/cle-appareil";
 
 /**
@@ -27,6 +27,7 @@ async function traduire<T>(appel: () => Promise<T>): Promise<T> {
   } catch (error) {
     const texte = `${(error as { code?: string }).code ?? ""} ${(error as Error).message ?? ""}`;
     if (texte.includes("VERROUILLEE")) throw new Error(CLE_VERROUILLEE);
+    if (texte.includes(PRESENCE_REFUSEE)) throw new Error(PRESENCE_REFUSEE);
     throw error;
   }
 }
@@ -36,7 +37,7 @@ export const cle: CleAppareil = {
   signer: (alias, message) => traduire(() => CleAppareilNatif.signer(alias, message)),
   async signerEnPresence(alias, message, raison) {
     if (Platform.OS === "android" && !(await inviter(raison))) {
-      throw new Error("PRESENCE_REFUSEE");
+      throw new Error(PRESENCE_REFUSEE);
     }
     return traduire(() => CleAppareilNatif.signerEnPresence(alias, message, raison));
   },

@@ -1,5 +1,6 @@
-import { useColorScheme } from "react-native";
+import { Platform, useColorScheme } from "react-native";
 import { COULEURS, type NomCouleur } from "./couleurs";
+import { policeMono } from "./police";
 
 export type Couleurs = Record<NomCouleur, string>;
 
@@ -12,5 +13,5 @@ export function useCouleurs(): Couleurs {
 export const ESPACE = { xs: 4, s: 8, m: 12, l: 16, xl: 24 } as const;
 export const RAYON = { normal: 12, petit: 8 } as const;
 
-/** Police à chasse fixe du système, pour la console. */
-export const MONO = { fontFamily: "monospace" } as const;
+/** Police à chasse fixe du système, pour la console et l'éditeur. */
+export const MONO = { fontFamily: policeMono(Platform.OS) } as const;
