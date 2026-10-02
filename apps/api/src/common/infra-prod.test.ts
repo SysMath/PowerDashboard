@@ -85,8 +85,9 @@ describe("infra/prod/panel.conf", () => {
     const local = readFileSync(join(RACINE, "infra", "local", "gamedashboard.local.conf"), "utf8");
     for (const texte of [vhost, local]) {
       const variables = [...texte.matchAll(/^.*proxy_pass http:\/\/\$(\w+);(.*)$/gm)];
-      // Espace client, espace revendeur et profil, pour le jeton d'appareil.
-      expect(variables.length).toBe(3);
+      // Espace client, espace revendeur, administration et profil, pour le
+      // jeton d'appareil.
+      expect(variables.length).toBe(4);
       for (const [, nom, suite] of variables) {
         expect(suite).toMatch(
           /^ # nosemgrep: generic\.nginx\.security\.dynamic-proxy-host\.dynamic-proxy-host -- \S/,

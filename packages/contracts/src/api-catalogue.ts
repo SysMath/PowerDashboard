@@ -645,6 +645,106 @@ export const SESSION_ROUTES: ApiRoute[] = [
     scope: null,
     group: "Espace revendeur",
   },
+  {
+    method: "GET",
+    path: "/admin/nodes",
+    summary:
+      "Machines du parc : capacité, allocation, relevés et dernier signal du daemon. Personnel (support compris).",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/nodes/{node}/agent",
+    summary:
+      "Agent de la machine : état, version, fonctions annoncées et capacités qui en découlent.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/servers",
+    summary: "Tous les serveurs : titulaire, machine, egg, état de gestion et état du conteneur.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/servers/{server}/suspend",
+    summary:
+      "Suspend (`suspended: true`, motif facultatif) ou rétablit un serveur. Administration seulement ; depuis l'application, confirmation de présence exigée.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/users",
+    summary: "Tous les comptes : rôle, second facteur, suspension, dernière connexion, serveurs.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/users/{user}/suspend",
+    summary:
+      "Suspend un compte (`suspended: true`, motif exigé, sessions coupées) ou le rétablit. Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/users/{user}/revoke-sessions",
+    summary:
+      "Déconnecte un compte partout : ses sessions et ses appareils mobiles liés. Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/incidents",
+    summary: "Incidents de la page /status, ouverts et clos, avec leurs mises à jour.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/incidents",
+    summary:
+      "Ouvre et publie un incident (`title`, `impact`, `body`, `nodeIds`). Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/incidents/{incident}/updates",
+    summary:
+      "Ajoute une mise à jour (`state`, `body`) ; l'état `resolved` clôt l'incident. Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/updates",
+    summary:
+      "État de la mise à jour autonome du panel (hébergement cPanel) ; `actif: false` ailleurs.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/updates/check",
+    summary:
+      "Lance la recherche d'une nouvelle version, et son installation si elle paraît. Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/activity?query={recherche}&page={page}",
+    summary: "Journal de la plateforme, le plus récent d'abord, par pages.",
+    scope: null,
+    group: "Administration",
+  },
 ];
 
 /**

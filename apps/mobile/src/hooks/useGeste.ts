@@ -23,3 +23,25 @@ export function useGeste() {
     [t],
   );
 }
+
+/** Demande confirmation, puis lance le geste (biométrie comprise s'il est protégé). */
+export function useConfirme() {
+  const t = useTranslations("mobile.commun");
+  const geste = useGeste();
+  return useCallback(
+    (
+      texte: { titre: string; corps: string; bouton: string },
+      action: () => Promise<unknown>,
+      danger = false,
+    ) =>
+      Alert.alert(texte.titre, texte.corps, [
+        { text: t("annuler"), style: "cancel" },
+        {
+          text: texte.bouton,
+          style: danger ? "destructive" : "default",
+          onPress: () => void geste(action),
+        },
+      ]),
+    [t, geste],
+  );
+}

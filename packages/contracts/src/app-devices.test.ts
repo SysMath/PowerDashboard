@@ -53,7 +53,7 @@ describe("routes de l'application", () => {
   it("ouvre l'espace client et ferme le reste", () => {
     expect(appMayReach("GET", "/api/v1/client/servers")).toBe(true);
     expect(appMayReach("POST", "/api/v1/client/servers/:id/power")).toBe(true);
-    expect(appMayReach("GET", "/api/v1/admin/users")).toBe(false);
+    expect(appMayReach("GET", "/api/v1/admin/settings")).toBe(false);
     expect(appMayReach("GET", "/api/v1/reseller/servers")).toBe(false);
     expect(appMayReach("POST", "/api/v1/auth/password")).toBe(false);
     expect(appMayReach("GET", "/api/v1/auth/sessions")).toBe(false);
@@ -86,6 +86,47 @@ describe("routes de l'application", () => {
     // Une écriture du revendeur demande la présence, une lecture non.
     expect(appNeedsPresence("POST", "/api/v1/reseller/servers/:serverId/suspension")).toBe(true);
     expect(appNeedsPresence("GET", "/api/v1/reseller/overview")).toBe(false);
+  });
+
+  it("n'ouvre à l'administration que la surveillance et les gestes courants", () => {
+    for (const [method, path] of [
+      ["GET", "/api/v1/admin/nodes"],
+      ["GET", "/api/v1/admin/servers"],
+      ["GET", "/api/v1/admin/users"],
+      ["GET", "/api/v1/admin/incidents"],
+      ["GET", "/api/v1/admin/updates"],
+      ["GET", "/api/v1/admin/activity"],
+    ] as const) {
+      expect(appMayReach(method, path), path).toBe(true);
+      expect(appNeedsPresence(method, path), path).toBe(false);
+    }
+    for (const [method, path] of [
+      ["POST", "/api/v1/admin/servers/:serverId/suspend"],
+      ["POST", "/api/v1/admin/users/:userId/suspend"],
+      ["POST", "/api/v1/admin/users/:userId/revoke-sessions"],
+      ["POST", "/api/v1/admin/incidents"],
+      ["POST", "/api/v1/admin/incidents/:incidentId/updates"],
+      ["POST", "/api/v1/admin/updates/check"],
+    ] as const) {
+      expect(appMayReach(method, path), path).toBe(true);
+      expect(appNeedsPresence(method, path), path).toBe(true);
+    }
+    // Rien de ce qui se règle, même en lecture quand la lecture expose un secret.
+    for (const [method, path] of [
+      ["GET", "/api/v1/admin/settings"],
+      ["POST", "/api/v1/admin/settings"],
+      ["GET", "/api/v1/admin/nodes/:nodeId/configuration"],
+      ["POST", "/api/v1/admin/nodes/:nodeId/token/rotate"],
+      ["DELETE", "/api/v1/admin/servers/:serverId"],
+      ["DELETE", "/api/v1/admin/users/:userId"],
+      ["POST", "/api/v1/admin/users/:userId/role"],
+      ["POST", "/api/v1/admin/users/:userId/impersonate"],
+      ["GET", "/api/v1/admin/activity/export"],
+      ["POST", "/api/v1/admin/updates/rollback"],
+      ["POST", "/api/v1/admin/servers/:serverId/limits"],
+    ] as const) {
+      expect(appMayReach(method, path), path).toBe(false);
+    }
   });
 });
 

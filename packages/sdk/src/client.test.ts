@@ -273,6 +273,19 @@ describe("GameDashboardClient", () => {
     await c.ssoLink({ externalId: "client-42" });
     await c.consumption({ from: "2026-09-01", to: "2026-09-30" });
     await c.me();
+    await c.adminNodes();
+    await c.adminNodeAgent(id);
+    await c.adminServers();
+    await c.setAdminServerSuspended(id, true, "abus");
+    await c.adminUsers();
+    await c.setAdminUserSuspended(id, { suspended: true, reason: "fraude" });
+    await c.revokeAdminUserSessions(id);
+    await c.adminIncidents();
+    await c.openIncident({ title: "Panne", impact: "major", body: "On regarde." });
+    await c.postIncidentUpdate(id, { state: "resolved", body: "Rétabli." });
+    await c.panelUpdate();
+    await c.checkPanelUpdate();
+    await c.adminActivity({ query: "server.", page: 2 });
     await c.resellerOverview();
     await c.setResellerServerSuspended(id, true, "impayé");
     await c.resellerConsumption({ from: "2026-09-01" });
@@ -342,6 +355,56 @@ describe("GameDashboardClient", () => {
       "defi.POST /api/v1/reseller/servers/31201e0c/suspension",
     );
     expect(JSON.parse(String(initDe(appel, 1).body))).toEqual({ suspended: false });
+  });
+
+  it("demande la présence pour chaque geste d'administration, jamais pour une lecture", async () => {
+    const appel = espion(() => fausseReponse({ data: [] }));
+    const presence = vi.fn(async (method: string, path: string) => ({
+      [APP_PRESENCE_HEADER]: `defi.${method} ${path}`,
+    }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: "gd_mob_essai",
+      fetch: appel,
+      presence,
+    });
+    const id = "31201e0c";
+    await c.adminServers();
+    await c.adminUsers();
+    await c.adminIncidents();
+    await c.panelUpdate();
+    await c.adminActivity();
+    expect(presence).not.toHaveBeenCalled();
+    await c.setAdminServerSuspended(id, false);
+    await c.setAdminUserSuspended(id, { suspended: false });
+    await c.revokeAdminUserSessions(id);
+    await c.openIncident({ title: "Panne", impact: "minor", body: "On regarde." });
+    await c.postIncidentUpdate(id, { state: "monitoring", body: "Ça revient." });
+    await c.checkPanelUpdate();
+    expect(presence.mock.calls.map(([method, path]) => `${method} ${path}`)).toEqual([
+      `POST /api/v1/admin/servers/${id}/suspend`,
+      `POST /api/v1/admin/users/${id}/suspend`,
+      `POST /api/v1/admin/users/${id}/revoke-sessions`,
+      "POST /api/v1/admin/incidents",
+      `POST /api/v1/admin/incidents/${id}/updates`,
+      "POST /api/v1/admin/updates/check",
+    ]);
+  });
+
+  it("lit le journal de la plateforme par pages", async () => {
+    const appel = espion(() =>
+      fausseReponse({
+        data: [{ id: "a1", event: "server.created" }],
+        meta: { page: 2, hasMore: true },
+      }),
+    );
+    await expect(client(appel).adminActivity({ query: "server.", page: 2 })).resolves.toEqual({
+      items: [{ id: "a1", event: "server.created" }],
+      hasMore: true,
+    });
+    const url = new URL(String(appel.mock.calls[0]?.[0]));
+    expect(url.pathname).toBe("/api/v1/admin/activity");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ query: "server.", page: "2" });
   });
 
   it("lit la consommation du revendeur ligne à ligne, sans échouer sur une ligne", async () => {

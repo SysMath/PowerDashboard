@@ -260,7 +260,10 @@ interface AppRoute {
  *
  * Toute écriture qui y figure demande la confirmation de présence
  * (`appNeedsPresence`). Ce qui se règle reste au navigateur : marque,
- * domaines, clés, webhooks, limites et suppression des serveurs.
+ * domaines, clés, webhooks, limites et suppression des serveurs ; côté
+ * administration, paramètres, eggs, machines, emplacements, montages, hôtes
+ * de bases, clés, rôles, création et suppression de serveurs et de comptes,
+ * export du journal, retour arrière d'une mise à jour.
  */
 export const APP_STAFF_ROUTES: readonly AppRoute[] = [
   // Espace revendeur (lot 5) : son enveloppe, ses clients et leurs serveurs,
@@ -268,6 +271,23 @@ export const APP_STAFF_ROUTES: readonly AppRoute[] = [
   { method: "GET", path: "/api/v1/reseller/overview" },
   { method: "POST", path: "/api/v1/reseller/servers/:serverId/suspension" },
   { method: "GET", path: "/api/v1/reseller/consumption/export" },
+  // Administration simple (lot 6) : ce qu'on vérifie et ce qu'on fait sur le
+  // parc depuis un téléphone, sans un seul écran de réglage. Lectures ouvertes
+  // au support comme à l'administration ; écritures réservées à l'administration
+  // par l'API (`AdminWriteGuard`), toujours en présence.
+  { method: "GET", path: "/api/v1/admin/nodes" },
+  { method: "GET", path: "/api/v1/admin/nodes/:nodeId/agent" },
+  { method: "GET", path: "/api/v1/admin/servers" },
+  { method: "POST", path: "/api/v1/admin/servers/:serverId/suspend" },
+  { method: "GET", path: "/api/v1/admin/users" },
+  { method: "POST", path: "/api/v1/admin/users/:userId/suspend" },
+  { method: "POST", path: "/api/v1/admin/users/:userId/revoke-sessions" },
+  { method: "GET", path: "/api/v1/admin/incidents" },
+  { method: "POST", path: "/api/v1/admin/incidents" },
+  { method: "POST", path: "/api/v1/admin/incidents/:incidentId/updates" },
+  { method: "GET", path: "/api/v1/admin/updates" },
+  { method: "POST", path: "/api/v1/admin/updates/check" },
+  { method: "GET", path: "/api/v1/admin/activity" },
 ];
 
 /**

@@ -49,13 +49,14 @@ const EXACTS = ["/api/v1/openapi.json", "/api/v1/status", "/api/v1/updates/signa
 
 /**
  * Application mobile (ADR 0010), sur le modèle de nginx : la liaison pour
- * tous, l'espace client, l'espace revendeur et le profil pour le seul jeton
- * d'un appareil lié
+ * tous, l'espace client, l'espace revendeur, l'administration et le profil
+ * pour le seul jeton d'un appareil lié, qui n'y atteint que les routes de
+ * `APP_STAFF_ROUTES`
  * (`$gd_mobile_upstream` dans `panel.conf`). Une clé personnelle n'y passe
  * pas, et aucun cookie n'est jamais relayé.
  */
 const APP_PREFIXES = ["/api/v1/auth/app/"];
-const APP_DEVICE_PREFIXES = ["/api/v1/client/", "/api/v1/reseller/"];
+const APP_DEVICE_PREFIXES = ["/api/v1/client/", "/api/v1/reseller/", "/api/v1/admin/"];
 const APP_DEVICE_EXACTS = ["/api/v1/auth/me"];
 
 export function relayablePath(pathname: string, authorization: string | null = null): boolean {

@@ -2,6 +2,7 @@
 import "./zod-runtime";
 
 export * from "./activity";
+export * from "./admin-space";
 export * from "./api-catalogue";
 export * from "./app-devices";
 export * from "./application-api";

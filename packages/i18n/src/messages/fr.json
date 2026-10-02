@@ -2757,6 +2757,10 @@
       "supprimerFichiers": "Confirmer la suppression des fichiers",
       "restaurerInstantane": "Confirmer la restauration de l'instantané",
       "suspensionServeur": "Confirmer la suspension ou le rétablissement du serveur",
+      "suspensionCompte": "Confirmer la suspension ou le rétablissement du compte",
+      "deconnecterPartout": "Confirmer la déconnexion du compte partout",
+      "publierIncident": "Confirmer la publication sur la page d'état",
+      "miseAJourPanel": "Confirmer la mise à jour du panel",
       "geste": "Confirmer cette action sur le serveur"
     },
     "instances": {
@@ -2968,6 +2972,96 @@
         "reseau": "Réseau : {taille}",
         "joueurs": "Joueurs au plus : {n}",
         "incomplet": "Relevés incomplets"
+      }
+    },
+    "administration": {
+      "ouvrir": "Administration",
+      "titre": "Administration",
+      "erreur": "Administration indisponible",
+      "calme": "Rien à signaler : toutes les machines répondent, aucun serveur en échec, aucun incident ouvert.",
+      "enEchec": "{proprietaire} · {machine}",
+      "webAide": "Eggs, machines et réglages se règlent dans le navigateur.",
+      "ouvrirPanel": "Ouvrir l'administration du panel",
+      "rubrique": {
+        "machines": "Machines",
+        "serveurs": "Serveurs",
+        "comptes": "Comptes",
+        "incidents": "Incidents",
+        "activite": "Journal"
+      },
+      "miseAJour": {
+        "titre": "Chercher une nouvelle version ?",
+        "corps": "Si une version est parue, le panel l'essaie à part puis bascule dessus ; il revient seul à la précédente en cas d'échec.",
+        "lancer": "Chercher et installer",
+        "installer": "Installer la nouvelle version"
+      },
+      "machines": {
+        "titre": "Machine",
+        "serveurs": "{n, plural, =0 {aucun serveur} one {# serveur} other {# serveurs}}",
+        "vue": "Dernier signe {quand}",
+        "jamaisVue": "Jamais vue : Wings n'a pas encore appelé le panel",
+        "memoire": "Mémoire accordée : {accordee} sur {total}",
+        "vide": "Aucune machine.",
+        "maintenance": "En maintenance : aucun serveur n'y est créé.",
+        "agent": "Agent de node",
+        "agentEtat": {
+          "none": "Aucun agent installé",
+          "online": "En ligne",
+          "silent": "Silencieux depuis plus de deux minutes"
+        }
+      },
+      "serveurs": {
+        "titre": "Serveurs",
+        "chercher": "Nom, titulaire, machine ou egg",
+        "aucun": "Aucun serveur ne correspond.",
+        "affiner": "{n, plural, one {# autre serveur} other {# autres serveurs}} : affinez la recherche.",
+        "suspendre": "Suspendre",
+        "retablir": "Rétablir"
+      },
+      "comptes": {
+        "titre": "Comptes",
+        "chercher": "Nom ou adresse",
+        "aucun": "Aucun compte ne correspond.",
+        "affiner": "{n, plural, one {# autre compte} other {# autres comptes}} : affinez la recherche.",
+        "serveurs": "{n, plural, =0 {aucun serveur} one {# serveur} other {# serveurs}}",
+        "suspendu": "Compte suspendu",
+        "avec2fa": "Second facteur actif",
+        "sans2fa": "Sans second facteur",
+        "adresseConfirmee": "adresse confirmée",
+        "adresseNonConfirmee": "adresse non confirmée",
+        "suspendre": "Suspendre",
+        "retablir": "Rétablir",
+        "suspendreTitre": "Suspendre {nom} ?",
+        "suspendreCorps": "Le compte est déconnecté partout et ne peut plus se connecter. Le motif reste interne, lu par le personnel seulement.",
+        "motif": "Motif",
+        "motifVide": "Le motif est exigé.",
+        "motifLong": "500 caractères au plus.",
+        "confirmationAnnulee": "Confirmation annulée : rien n'est parti.",
+        "retablirTitre": "Rétablir ce compte ?",
+        "retablirCorps": "Le compte peut de nouveau se connecter.",
+        "deconnecter": "Déconnecter partout",
+        "deconnecterTitre": "Déconnecter ce compte partout ?",
+        "deconnecterCorps": "Ses sessions se ferment et ses téléphones liés sont retirés : il devra se reconnecter et relier l'application."
+      },
+      "incidents": {
+        "titre": "Incidents",
+        "nouveau": "Ouvrir un incident",
+        "aucunOuvert": "Aucun incident ouvert.",
+        "clos": "Derniers incidents clos",
+        "closFige": "Incident clos : il ne reçoit plus de mise à jour.",
+        "miseAJour": "Nouvelle mise à jour",
+        "cloture": "« Résolu » clôt l'incident, définitivement.",
+        "titreChamp": "Titre",
+        "impactChamp": "Impact",
+        "messageChamp": "Message public",
+        "publier": "Publier",
+        "public": "Publié aussitôt sur la page d'état, à la vue de tous."
+      },
+      "activite": {
+        "titre": "Journal",
+        "chercher": "Rechercher dans le journal",
+        "vide": "Aucune entrée.",
+        "plus": "Entrées plus anciennes"
       }
     }
   }

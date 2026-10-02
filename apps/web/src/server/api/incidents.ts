@@ -1,26 +1,10 @@
 "use server";
 
-import type { IncidentImpact, IncidentState } from "@gamedashboard/contracts";
+import type { AdminIncident, IncidentImpact, IncidentState } from "@gamedashboard/contracts";
 import { revalidatePath } from "next/cache";
 import { apiFetch, apiSendFor } from "./client";
 
-export interface AdminIncidentUpdate {
-  state: IncidentState;
-  body: string;
-  at: string;
-}
-
-export interface AdminIncident {
-  id: string;
-  title: string;
-  state: IncidentState;
-  impact: IncidentImpact;
-  nodeIds: string[];
-  updates: AdminIncidentUpdate[];
-  startedAt: string;
-  /** Nul tant que l'incident est ouvert. C'est ce champ qui le clôt, pas l'état. */
-  resolvedAt: string | null;
-}
+export type { AdminIncident, AdminIncidentUpdate } from "@gamedashboard/contracts";
 
 export async function fetchIncidents(): Promise<AdminIncident[]> {
   const { data } = await apiFetch<{ data: AdminIncident[] }>("/api/v1/admin/incidents");

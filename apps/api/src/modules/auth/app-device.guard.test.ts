@@ -69,7 +69,7 @@ describe("SessionGuard — appareil mobile", () => {
 
   it("ferme l'administration et l'espace revendeur, même au personnel", async () => {
     const { guard } = garde();
-    for (const route of ["/api/v1/admin/users", "/api/v1/reseller/servers"]) {
+    for (const route of ["/api/v1/admin/settings", "/api/v1/reseller/servers"]) {
       const { ctx } = requete("GET", route);
       await expect(guard.canActivate(ctx), route).rejects.toThrow(ForbiddenException);
     }
@@ -97,6 +97,25 @@ describe("SessionGuard — appareil mobile", () => {
     for (const [method, ferme] of [
       ["POST", "/api/v1/reseller/servers/:serverId/limits"],
       ["GET", "/api/v1/reseller/keys"],
+    ] as const) {
+      await expect(guard.canActivate(requete(method, ferme).ctx), ferme).rejects.toThrow(
+        ForbiddenException,
+      );
+    }
+  });
+
+  it("ouvre au personnel la surveillance, et ses gestes en présence seulement", async () => {
+    const { guard } = garde();
+    await expect(guard.canActivate(requete("GET", "/api/v1/admin/servers").ctx)).resolves.toBe(
+      true,
+    );
+    await expect(
+      guard.canActivate(requete("POST", "/api/v1/admin/users/:userId/suspend").ctx),
+    ).rejects.toMatchObject({ response: { code: "presence_required" } });
+    for (const [method, ferme] of [
+      ["GET", "/api/v1/admin/settings"],
+      ["GET", "/api/v1/admin/nodes/:nodeId/configuration"],
+      ["DELETE", "/api/v1/admin/servers/:serverId"],
     ] as const) {
       await expect(guard.canActivate(requete(method, ferme).ctx), ferme).rejects.toThrow(
         ForbiddenException,

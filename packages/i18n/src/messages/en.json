@@ -2757,6 +2757,10 @@
       "supprimerFichiers": "Confirm deleting the files",
       "restaurerInstantane": "Confirm restoring the snapshot",
       "suspensionServeur": "Confirm suspending or unsuspending the server",
+      "suspensionCompte": "Confirm suspending or restoring the account",
+      "deconnecterPartout": "Confirm signing the account out everywhere",
+      "publierIncident": "Confirm publishing on the status page",
+      "miseAJourPanel": "Confirm updating the panel",
       "geste": "Confirm this action on the server"
     },
     "instances": {
@@ -2968,6 +2972,96 @@
         "reseau": "Network: {taille}",
         "joueurs": "Peak players: {n}",
         "incomplet": "Incomplete readings"
+      }
+    },
+    "administration": {
+      "ouvrir": "Administration",
+      "titre": "Administration",
+      "erreur": "Administration unavailable",
+      "calme": "All clear: every machine answers, no failed server, no open incident.",
+      "enEchec": "{proprietaire} · {machine}",
+      "webAide": "Eggs, machines and settings are managed in the browser.",
+      "ouvrirPanel": "Open the panel's administration",
+      "rubrique": {
+        "machines": "Machines",
+        "serveurs": "Servers",
+        "comptes": "Accounts",
+        "incidents": "Incidents",
+        "activite": "Activity log"
+      },
+      "miseAJour": {
+        "titre": "Look for a new version?",
+        "corps": "If a version is out, the panel tries it on the side, then switches over; it goes back to the previous one on its own if anything fails.",
+        "lancer": "Look and install",
+        "installer": "Install the new version"
+      },
+      "machines": {
+        "titre": "Machine",
+        "serveurs": "{n, plural, =0 {no server} one {# server} other {# servers}}",
+        "vue": "Last seen {quand}",
+        "jamaisVue": "Never seen: Wings has not called the panel yet",
+        "memoire": "Memory allocated: {accordee} of {total}",
+        "vide": "No machine.",
+        "maintenance": "Under maintenance: no server is created on it.",
+        "agent": "Node agent",
+        "agentEtat": {
+          "none": "No agent installed",
+          "online": "Online",
+          "silent": "Silent for more than two minutes"
+        }
+      },
+      "serveurs": {
+        "titre": "Servers",
+        "chercher": "Name, owner, machine or egg",
+        "aucun": "No matching server.",
+        "affiner": "{n, plural, one {# more server} other {# more servers}}: refine the search.",
+        "suspendre": "Suspend",
+        "retablir": "Restore"
+      },
+      "comptes": {
+        "titre": "Accounts",
+        "chercher": "Name or address",
+        "aucun": "No matching account.",
+        "affiner": "{n, plural, one {# more account} other {# more accounts}}: refine the search.",
+        "serveurs": "{n, plural, =0 {no server} one {# server} other {# servers}}",
+        "suspendu": "Account suspended",
+        "avec2fa": "Second factor on",
+        "sans2fa": "No second factor",
+        "adresseConfirmee": "address confirmed",
+        "adresseNonConfirmee": "address not confirmed",
+        "suspendre": "Suspend",
+        "retablir": "Restore",
+        "suspendreTitre": "Suspend {nom}?",
+        "suspendreCorps": "The account is signed out everywhere and can no longer sign in. The reason stays internal, read by staff only.",
+        "motif": "Reason",
+        "motifVide": "A reason is required.",
+        "motifLong": "500 characters at most.",
+        "confirmationAnnulee": "Confirmation cancelled: nothing was sent.",
+        "retablirTitre": "Restore this account?",
+        "retablirCorps": "The account can sign in again.",
+        "deconnecter": "Sign out everywhere",
+        "deconnecterTitre": "Sign this account out everywhere?",
+        "deconnecterCorps": "Its sessions close and its linked phones are removed: it will have to sign in again and relink the app."
+      },
+      "incidents": {
+        "titre": "Incidents",
+        "nouveau": "Open an incident",
+        "aucunOuvert": "No open incident.",
+        "clos": "Latest closed incidents",
+        "closFige": "Incident closed: it takes no more updates.",
+        "miseAJour": "New update",
+        "cloture": "“Resolved” closes the incident for good.",
+        "titreChamp": "Title",
+        "impactChamp": "Impact",
+        "messageChamp": "Public message",
+        "publier": "Publish",
+        "public": "Published at once on the status page, for everyone to see."
+      },
+      "activite": {
+        "titre": "Activity log",
+        "chercher": "Search the log",
+        "vide": "No entry.",
+        "plus": "Older entries"
       }
     }
   }

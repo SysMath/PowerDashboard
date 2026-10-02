@@ -1,4 +1,10 @@
 import {
+  type AdminActivityEntry,
+  type AdminIncident,
+  type AdminNode,
+  type AdminNodeAgentView,
+  type AdminServer,
+  type AdminUser,
   BACKUP_RESTORE_TIMEOUT_MS,
   type ClientBackupList,
   type ClientBackupView,
@@ -7,9 +13,12 @@ import {
   type ClientPlayersView,
   type ClientServerView,
   type ConsoleGrant,
+  type IncidentImpact,
+  type IncidentState,
   type PowerSignal,
   type ResellerOverview,
   type ServerLimitsPatch,
+  type UpdateStatus,
   type UploadGrant,
 } from "@gamedashboard/contracts";
 
@@ -415,6 +424,109 @@ export class GameDashboardClient {
       const jour = lireJson(ligne);
       return jour ? [jour] : [];
     });
+  }
+
+  /* --- Administration simple (ADR 0010, lot 6) ---------------------------- */
+
+  adminNodes(): Promise<AdminNode[]> {
+    return this.call("GET", "/api/v1/admin/nodes");
+  }
+
+  adminNodeAgent(nodeId: string): Promise<AdminNodeAgentView> {
+    return this.call("GET", `/api/v1/admin/nodes/${encodeURIComponent(nodeId)}/agent`);
+  }
+
+  adminServers(): Promise<AdminServer[]> {
+    return this.call("GET", "/api/v1/admin/servers");
+  }
+
+  /** Suspend ou rétablit n'importe quel serveur ; un geste qui demande la présence. */
+  setAdminServerSuspended(
+    serverId: string,
+    suspended: boolean,
+    reason?: string,
+  ): Promise<{ serverId: string; suspended: boolean; sessionsNotClosed: number }> {
+    return this.call(
+      "POST",
+      `/api/v1/admin/servers/${encodeURIComponent(serverId)}/suspend`,
+      reason ? { suspended, reason } : { suspended },
+      { protege: true },
+    );
+  }
+
+  adminUsers(): Promise<AdminUser[]> {
+    return this.call("GET", "/api/v1/admin/users");
+  }
+
+  /** Suspend un compte (motif exigé) ou le rétablit ; présence demandée. */
+  setAdminUserSuspended(
+    userId: string,
+    input: { suspended: true; reason: string } | { suspended: false },
+  ): Promise<unknown> {
+    return this.call("POST", this.userPath(userId, "suspend"), input, { protege: true });
+  }
+
+  /** Déconnecte le compte partout, appareils liés compris ; présence demandée. */
+  revokeAdminUserSessions(userId: string): Promise<{ revoked: number }> {
+    return this.call("POST", this.userPath(userId, "revoke-sessions"), undefined, {
+      protege: true,
+    });
+  }
+
+  private userPath(userId: string, action: string): string {
+    return `/api/v1/admin/users/${encodeURIComponent(userId)}/${action}`;
+  }
+
+  adminIncidents(): Promise<AdminIncident[]> {
+    return this.call("GET", "/api/v1/admin/incidents");
+  }
+
+  /** Ouvre un incident, donc le publie sur /status ; présence demandée. */
+  openIncident(input: {
+    title: string;
+    impact: IncidentImpact;
+    body: string;
+    nodeIds?: string[];
+  }): Promise<AdminIncident> {
+    return this.call("POST", "/api/v1/admin/incidents", input, { protege: true });
+  }
+
+  /** Une mise à jour d'incident ; `resolved` le clôt. Présence demandée. */
+  postIncidentUpdate(
+    incidentId: string,
+    input: { state: IncidentState; body: string },
+  ): Promise<AdminIncident> {
+    return this.call(
+      "POST",
+      `/api/v1/admin/incidents/${encodeURIComponent(incidentId)}/updates`,
+      input,
+      { protege: true },
+    );
+  }
+
+  panelUpdate(): Promise<UpdateStatus> {
+    return this.call("GET", "/api/v1/admin/updates");
+  }
+
+  /** Cherche une nouvelle version et l'installe si elle paraît ; présence demandée. */
+  checkPanelUpdate(): Promise<UpdateStatus> {
+    return this.call("POST", "/api/v1/admin/updates/check", undefined, { protege: true });
+  }
+
+  /** Une page du journal de la plateforme, avec `hasMore` pour la suivante. */
+  async adminActivity(
+    query: { query?: string; page?: number } = {},
+  ): Promise<{ items: AdminActivityEntry[]; hasMore: boolean }> {
+    const search = new URLSearchParams();
+    if (query.query) search.set("query", query.query);
+    if (query.page) search.set("page", String(query.page));
+    const suffix = search.size > 0 ? `?${search}` : "";
+    const corps = await this.request("GET", `/api/v1/admin/activity${suffix}`);
+    const meta = corps?.meta as { hasMore?: unknown } | undefined;
+    return {
+      items: Array.isArray(corps?.data) ? (corps.data as AdminActivityEntry[]) : [],
+      hasMore: meta?.hasMore === true,
+    };
   }
 
   /* --- Espace applicatif, pour un système tiers ---------------------------- */

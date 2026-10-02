@@ -9,7 +9,20 @@ export type RaisonPresence =
   | "supprimerFichiers"
   | "restaurerInstantane"
   | "suspensionServeur"
+  | "suspensionCompte"
+  | "deconnecterPartout"
+  | "publierIncident"
+  | "miseAJourPanel"
   | "geste";
+
+/** Les gestes de l'administration (ADR 0010, lot 6), chemin par chemin. */
+const ADMINISTRATION: [RegExp, RaisonPresence][] = [
+  [/^\/api\/v1\/admin\/servers\/[^/]+\/suspend$/, "suspensionServeur"],
+  [/^\/api\/v1\/admin\/users\/[^/]+\/suspend$/, "suspensionCompte"],
+  [/^\/api\/v1\/admin\/users\/[^/]+\/revoke-sessions$/, "deconnecterPartout"],
+  [/^\/api\/v1\/admin\/incidents(\/[^/]+\/updates)?$/, "publierIncident"],
+  [/^\/api\/v1\/admin\/updates\/check$/, "miseAJourPanel"],
+];
 
 export function raisonPresence(method: string, path: string): RaisonPresence {
   const verbe = method.toUpperCase();
@@ -19,6 +32,10 @@ export function raisonPresence(method: string, path: string): RaisonPresence {
   if (verbe === "POST" && /\/snapshots\/[^/]+\/restore$/.test(path)) return "restaurerInstantane";
   if (verbe === "POST" && /^\/api\/v1\/reseller\/servers\/[^/]+\/suspension$/.test(path)) {
     return "suspensionServeur";
+  }
+  if (verbe === "POST") {
+    const trouvee = ADMINISTRATION.find(([motif]) => motif.test(path));
+    if (trouvee) return trouvee[1];
   }
   return "geste";
 }

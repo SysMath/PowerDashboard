@@ -65,9 +65,33 @@ ne l'embarque pas.
   L'application n'atteint que les trois routes de `APP_STAFF_ROUTES` :
   aperçu, suspension et export de la consommation. Une route de revendeur
   absente de cette liste lui est refusée, même par un appel fabriqué.
+- **Administration simple**, pour un compte administrateur ou support :
+  - un aperçu de ce qui ne va pas : machines injoignables, serveurs en
+    échec (installation ratée, arrêts en boucle), incidents ouverts, état
+    de la mise à jour du panel ; chaque ligne mène à son écran ;
+  - les machines, leur santé, leur agent et ce qu'il offre, en lecture ;
+  - tout le parc, avec une recherche ; un serveur s'ouvre avec les écrans
+    du client (l'API y donne déjà accès au personnel), se suspend et se
+    rétablit ;
+  - les comptes, avec une recherche : profil, suspension avec motif,
+    rétablissement, « déconnecter partout » (sessions et téléphones liés) ;
+  - les incidents de la page d'état : ouvrir, ajouter une mise à jour,
+    clore (« Résolu », définitif) ;
+  - la mise à jour du panel : la version parue, et le geste qui la cherche
+    et l'installe (hébergement autonome seulement) ;
+  - le journal de la plateforme, en lecture, avec une recherche.
+
+  Chaque écriture demande la biométrie et n'est proposée qu'à un
+  administrateur : le support lit, comme sur le web (`AdminWriteGuard`). Le
+  second facteur du personnel reste exigé par l'API (`StaffTwoFactorGuard`).
+  L'application n'atteint que les routes d'administration de
+  `APP_STAFF_ROUTES` ; tout le reste de `/api/v1/admin/` lui est refusé.
 - Restent au navigateur : bases de données, planificateur, permissions des
   fichiers, sous-utilisateurs, réglages du compte ; côté revendeur, marque,
-  domaines, clés, webhooks, limites et suppression des serveurs.
+  domaines, clés, webhooks, limites et suppression des serveurs ; côté
+  administration, tout ce qui se règle : eggs, machines, rôles, enveloppes,
+  paramètres de la plateforme, suppression, prise en main d'un compte,
+  export du journal, retour à la version précédente.
 
 ## Notifications poussées
 

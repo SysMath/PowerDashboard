@@ -10,6 +10,7 @@ import { useCloche, useServeurs } from "@/hooks/useServeurs";
 export default function Serveurs() {
   const t = useTranslations("mobile.serveurs");
   const tr = useTranslations("mobile.revendeur");
+  const ta = useTranslations("mobile.administration");
   const router = useRouter();
   const { instance } = useInstance();
   const { donnees, erreur, chargement } = useServeurs();
@@ -36,6 +37,13 @@ export default function Serveurs() {
             titre={tr("ouvrir")}
             variante="secondaire"
             onPress={() => router.push(`/${instance.id}/revendeur`)}
+          />
+        ) : null}
+        {role === "admin" || role === "support" ? (
+          <Bouton
+            titre={ta("ouvrir")}
+            variante="secondaire"
+            onPress={() => router.push(`/${instance.id}/admin`)}
           />
         ) : null}
       </Rangee>
