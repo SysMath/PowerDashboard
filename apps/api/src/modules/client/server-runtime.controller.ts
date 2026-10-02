@@ -25,7 +25,6 @@ import {
   ServiceUnavailableException,
   UseGuards,
 } from "@nestjs/common";
-import { requestOrigin } from "../../common/request-origin";
 import { ActivityService } from "../activity/activity.service";
 import { ImpersonationReadOnlyGuard, withImpersonator } from "../auth/impersonation.guard";
 import type { AuthenticatedRequest } from "../auth/session.guard";
@@ -38,7 +37,7 @@ import {
 } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
 import { FileUploadService } from "./file-upload.service";
-import { ServerAccessService } from "./server-access.service";
+import { accessPrincipal, ServerAccessService } from "./server-access.service";
 import { ServerPlayersService } from "./server-players.service";
 
 type ClientRequest = AuthenticatedRequest & { ip?: string };
@@ -51,8 +50,7 @@ type ClientRequest = AuthenticatedRequest & { ip?: string };
  * droits de son propriétaire.
  */
 function principalOf(request: ClientRequest) {
-  // `origin` ne sert qu'au journal des refus : route et adresse de la demande.
-  return { id: request.user.id, scopes: request.scopes, origin: requestOrigin(request) };
+  return accessPrincipal(request);
 }
 
 /** Un chemin passé en paramètre d'adresse ne s'y donne qu'une fois. */

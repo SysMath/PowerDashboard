@@ -12,11 +12,10 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { requestOrigin } from "../../common/request-origin";
 import { ActivityService } from "../activity/activity.service";
 import { ImpersonationReadOnlyGuard, withImpersonator } from "../auth/impersonation.guard";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard";
-import { ServerAccessService } from "../client/server-access.service";
+import { accessPrincipal, ServerAccessService } from "../client/server-access.service";
 import { SnapshotsService } from "./snapshots.service";
 
 type ClientRequest = AuthenticatedRequest & {
@@ -25,7 +24,7 @@ type ClientRequest = AuthenticatedRequest & {
 };
 
 function principalOf(request: ClientRequest) {
-  return { id: request.user.id, scopes: request.scopes, origin: requestOrigin(request) };
+  return accessPrincipal(request);
 }
 
 function snapshotName(raw: string): string {

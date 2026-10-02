@@ -806,3 +806,96 @@ export const brandImages = pgTable(
   },
   (table) => [index("brand_images_owner_idx").on(table.resellerId, table.kind)],
 );
+
+/**
+ * Appareils mobiles liés à un compte (ADR 0010).
+ *
+ * Un appareil n'est pas une session : il dure des semaines, se renouvelle de
+ * lui-même et ne porte aucun cookie. Il a donc sa table, lue par
+ * `SessionGuard` quand un jeton `gd_mob_` se présente, et listée à part dans
+ * Compte › Sécurité, avec « Retirer cet appareil ».
+ *
+ * Aucun secret n'y est en clair : jeton d'accès, secret d'appareil et défi de
+ * présence n'y sont que des condensats SHA-256, comme les sessions.
+ */
+export const appDevices = pgTable(
+  "app_devices",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Ce que le téléphone dit de lui (« Pixel de Léa »), montré au compte. */
+    name: varchar("name", { length: 80 }).notNull(),
+    /** `ios` ou `android` (`APP_PLATFORMS`). */
+    platform: varchar("platform", { length: 16 }).notNull(),
+    appVersion: varchar("app_version", { length: 32 }),
+    /**
+     * Clé publique P-256 de l'appareil (SPKI DER, base64).
+     *
+     * Sa partie privée ne quitte pas le téléphone (Secure Enclave, Android
+     * Keystore) : un secret d'appareil copié ailleurs ne sert à rien sans
+     * elle, puisque chaque renouvellement doit être signé.
+     */
+    publicKey: text("public_key").notNull(),
+    /** Condensat du secret d'appareil en cours. */
+    secretHash: text("secret_hash").notNull(),
+    /**
+     * Condensat du secret **précédent**.
+     *
+     * Gardé pour reconnaître un secret rejoué : présenté après avoir été
+     * remplacé, il signe une copie, et l'appareil est retiré.
+     */
+    previousSecretHash: text("previous_secret_hash"),
+    /** Condensat du seul jeton d'accès valide ; un renouvellement l'écrase. */
+    accessTokenHash: text("access_token_hash"),
+    accessExpiresAt: moment("access_expires_at"),
+    /** Défi de présence en attente, à usage unique. */
+    challengeHash: text("challenge_hash"),
+    challengeExpiresAt: moment("challenge_expires_at"),
+    /** Dernier jeton présenté ou renouvelé : décide du délai d'inactivité. */
+    lastSeenAt: moment("last_seen_at"),
+    lastIp: inet("last_ip"),
+    /** Quatre-vingt-dix jours après la liaison, quoi qu'il arrive. */
+    expiresAt: moment("expires_at").notNull(),
+    /** Conservé après retrait, comme une session : la trace reste lisible. */
+    revokedAt: moment("revoked_at"),
+    /** `user`, `device`, `replay`, `credentials` : qui ou quoi l'a coupé. */
+    revokedReason: varchar("revoked_reason", { length: 24 }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("app_device_access_token_unique").on(table.accessTokenHash),
+    index("app_device_user_idx").on(table.userId),
+  ],
+);
+
+/**
+ * Codes d'autorisation de la liaison : soixante secondes, une seule fois.
+ *
+ * Le code part vers l'application dans une adresse `gamedashboard://`, qu'une
+ * autre application pourrait revendiquer : il ne s'échange donc qu'avec le
+ * vérificateur PKCE dont `code_challenge` est l'empreinte.
+ */
+export const appLinkCodes = pgTable(
+  "app_link_codes",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    codeChallenge: varchar("code_challenge", { length: 64 }).notNull(),
+    deviceName: varchar("device_name", { length: 80 }).notNull(),
+    platform: varchar("platform", { length: 16 }).notNull(),
+    expiresAt: moment("expires_at").notNull(),
+    usedAt: moment("used_at"),
+    /**
+     * L'appareil né de ce code. Un code présenté une seconde fois a fuité :
+     * l'appareil qu'il a déjà créé est retiré (RFC 6749, §4.1.2).
+     */
+    deviceId: uuid("device_id").references(() => appDevices.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("app_link_code_hash_unique").on(table.codeHash)],
+);

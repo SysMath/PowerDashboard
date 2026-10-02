@@ -3,6 +3,7 @@ import "./zod-runtime";
 
 export * from "./activity";
 export * from "./api-catalogue";
+export * from "./app-devices";
 export * from "./application-api";
 export * from "./audit";
 export * from "./auth-cookies";

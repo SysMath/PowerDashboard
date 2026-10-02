@@ -1365,6 +1365,7 @@ export class AuthController {
       userAgent: headerValue(request.headers["user-agent"]),
       properties: {},
     });
+    await this.sessions.revokeDevices(user.id);
     this.noticeCredentialChange(user.id, "twoFactorEnabled", request);
 
     reply.status(200).send({ data: { recoveryCodes } });
@@ -1433,6 +1434,7 @@ export class AuthController {
       userAgent: headerValue(request.headers["user-agent"]),
       properties: { remainingPasskeys: remaining.length },
     });
+    await this.sessions.revokeDevices(user.id);
     this.noticeCredentialChange(user.id, "twoFactorDisabled", request);
 
     reply.status(204).send(null);

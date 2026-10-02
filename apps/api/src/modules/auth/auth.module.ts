@@ -8,10 +8,13 @@ import { BrandingService } from "../reseller/branding.service";
 import { WingsModule } from "../wings/wings.module";
 import { AccountMailService } from "./account-mail.service";
 import { ApiKeyRepository } from "./api-key.repository";
+import { AppDeviceController } from "./app-device.controller";
+import { AppDeviceRepository } from "./app-device.repository";
 import { AuthController } from "./auth.controller";
 import { AuthTokenRepository } from "./auth-token.repository";
 import { BillingSsoService } from "./billing-sso.service";
 import { BrowserSessionGuard } from "./browser-session.guard";
+import { InstanceController } from "./instance.controller";
 import { PasskeyRepository } from "./passkey.repository";
 import { PasskeyService } from "./passkey.service";
 import { PasswordConfirmationService } from "./password-confirmation.service";
@@ -32,12 +35,15 @@ import { UserRepository } from "./user.repository";
   // déconnexion ferme les consoles de la session, et le registre des jetons
   // émis doit être **le même** que celui qui les a signés.
   imports: [ActivityModule, NotificationsModule, WingsModule],
-  controllers: [AuthController],
+  // La liaison de l'application mobile et l'identité de l'instance (ADR 0010)
+  // vivent avec les sessions : `SessionGuard` lit les jetons des appareils.
+  controllers: [AuthController, AppDeviceController, InstanceController],
   providers: [
     databaseProvider,
     UserRepository,
     SessionRepository,
     ApiKeyRepository,
+    AppDeviceRepository,
     SessionGuard,
     BrowserSessionGuard,
     TwoFactorRepository,
@@ -85,6 +91,8 @@ import { UserRepository } from "./user.repository";
   exports: [
     SessionRepository,
     ApiKeyRepository,
+    // Sort avec la garde, qui en dépend dans chaque module qui l'emploie.
+    AppDeviceRepository,
     SessionGuard,
     TwoFactorRepository,
     // Sortent : l'émission du lien pour l'API applicative, l'ouverture de

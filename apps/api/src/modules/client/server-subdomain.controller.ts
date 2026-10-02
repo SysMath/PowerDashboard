@@ -10,13 +10,12 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { requestOrigin } from "../../common/request-origin";
 import { ActivityService } from "../activity/activity.service";
 import { ImpersonationReadOnlyGuard, withImpersonator } from "../auth/impersonation.guard";
 import type { AuthenticatedRequest } from "../auth/session.guard";
 import { SessionGuard } from "../auth/session.guard";
 import { SubdomainsService } from "../dns/subdomains.service";
-import { ServerAccessService } from "./server-access.service";
+import { accessPrincipal, ServerAccessService } from "./server-access.service";
 
 type ClientRequest = AuthenticatedRequest & { ip?: string };
 
@@ -87,5 +86,5 @@ export class ServerSubdomainController {
 }
 
 function principalOf(request: ClientRequest) {
-  return { id: request.user.id, scopes: request.scopes, origin: requestOrigin(request) };
+  return accessPrincipal(request);
 }

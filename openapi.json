@@ -16,6 +16,9 @@
       "name": "Accès"
     },
     {
+      "name": "Application mobile"
+    },
+    {
       "name": "Audit"
     },
     {
@@ -1128,6 +1131,310 @@
             "in": "path",
             "required": true,
             "description": "Valeur de « passkey ».",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/authorize": {
+      "post": {
+        "summary": "Accepte la liaison de l'application mobile depuis le navigateur du téléphone et rend un code de soixante secondes, à usage unique. Refusée à une prise en main.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-post-auth-app-authorize",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/token": {
+      "post": {
+        "summary": "Échange le code de liaison, le vérificateur PKCE et la clé publique de l'appareil (signature P-256 à l'appui) contre un jeton d'accès de quinze minutes et un secret d'appareil.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-post-auth-app-token",
+        "security": [],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/refresh": {
+      "post": {
+        "summary": "Renouvelle le jeton d'accès contre le secret d'appareil, signé par la clé de l'appareil. Le secret est remplacé ; présenter l'ancien retire l'appareil.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-post-auth-app-refresh",
+        "security": [],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/challenge": {
+      "post": {
+        "summary": "Défi de deux minutes à signer par la clé de l'appareil (en-tête x-gd-presence) avant un geste lourd : restauration, suppression, réinstallation.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-post-auth-app-challenge",
+        "security": [
+          {
+            "appDevice": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/device": {
+      "delete": {
+        "summary": "L'application se délie elle-même du panel.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-delete-auth-app-device",
+        "security": [
+          {
+            "appDevice": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/devices": {
+      "get": {
+        "summary": "Appareils mobiles liés au compte, le plus récemment vu en tête.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-get-auth-devices",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/devices/{device}": {
+      "delete": {
+        "summary": "Retire un appareil mobile : ses jetons cessent de valoir sur-le-champ.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-delete-auth-devices-by-device",
+        "parameters": [
+          {
+            "name": "device",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant de l'appareil mobile lié.",
             "schema": {
               "type": "string"
             }
@@ -4734,6 +5041,11 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Clé personnelle, créée depuis « Compte → Clés d'API ». Elle agit au nom de son propriétaire et ne porte jamais plus que les portées qu'on lui a données."
+      },
+      "appDevice": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Jeton d'accès d'un appareil mobile lié (gd_mob_…), quinze minutes. Il porte les droits du compte sur l'espace client, jamais la gestion de sa sécurité."
       },
       "applicationKey": {
         "type": "http",

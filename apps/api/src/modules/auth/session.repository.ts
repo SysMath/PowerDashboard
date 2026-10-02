@@ -5,6 +5,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DATABASE } from "../../common/database.provider";
+import { revokeAppDevices } from "./app-device.repository";
 
 export interface SessionUser {
   id: string;
@@ -392,8 +393,15 @@ export class SessionRepository {
    * Garder la session courante est délibéré : le geste sert à couper les accès
    * oubliés, et se déconnecter soi-même au passage ferait douter qu'il ait
    * abouti. Sans jeton courant — appel administratif — tout est révoqué.
+   *
+   * Les appareils mobiles liés tombent avec, sans exception : aucun n'est
+   * « celui qui le demande », et chaque appelant (mot de passe changé ou
+   * réinitialisé, compte suspendu, « déconnecter partout ») veut couper tout
+   * accès gardé ailleurs (ADR 0010). Le décompte rendu reste celui des
+   * sessions, que l'écran compare à la liste qu'il montrait.
    */
   async revokeOthers(userId: string, currentToken?: string | null): Promise<number> {
+    await revokeAppDevices(this.db, userId, "credentials");
     const conditions = [eq(sessions.userId, userId), isNull(sessions.revokedAt)];
     if (currentToken) conditions.push(ne(sessions.tokenHash, hashToken(currentToken)));
 
@@ -403,5 +411,17 @@ export class SessionRepository {
       .where(and(...conditions))
       .returning({ id: sessions.id });
     return rows.length;
+  }
+
+  /**
+   * Retire les appareils mobiles liés au compte, sans toucher aux sessions.
+   *
+   * Pour le second facteur activé ou retiré : le compte change de
+   * protection, et un téléphone lié sous l'ancienne doit repasser par la
+   * nouvelle (ADR 0010). Les sessions, elles, restent — c'est le choix déjà
+   * fait pour ces gestes, qu'on ne change pas ici.
+   */
+  async revokeDevices(userId: string): Promise<number> {
+    return revokeAppDevices(this.db, userId, "credentials");
   }
 }

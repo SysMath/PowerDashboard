@@ -21,6 +21,12 @@ export interface ApiRoute {
   /** Portée requise sur la clé. `null` quand aucune portée particulière n'est exigée. */
   scope: string | null;
   group: string;
+  /**
+   * Authentification, quand ce n'est pas celle de la famille : `public` pour
+   * une route qui s'authentifie par ce qu'elle porte (l'échange d'un code de
+   * liaison), `appareil` pour le jeton d'un appareil mobile lié (ADR 0010).
+   */
+  auth?: "public" | "appareil";
 }
 
 /** Routes accessibles avec une clé personnelle, au nom de l'utilisateur. */
@@ -510,6 +516,63 @@ export const SESSION_ROUTES: ApiRoute[] = [
     summary: "Supprime une clé d'accès. Mot de passe exigé.",
     scope: null,
     group: "Clés d'accès",
+  },
+  {
+    method: "POST",
+    path: "/auth/app/authorize",
+    summary:
+      "Accepte la liaison de l'application mobile depuis le navigateur du téléphone et rend un code de soixante secondes, à usage unique. Refusée à une prise en main.",
+    scope: null,
+    group: "Application mobile",
+  },
+  {
+    method: "POST",
+    path: "/auth/app/token",
+    summary:
+      "Échange le code de liaison, le vérificateur PKCE et la clé publique de l'appareil (signature P-256 à l'appui) contre un jeton d'accès de quinze minutes et un secret d'appareil.",
+    scope: null,
+    group: "Application mobile",
+    auth: "public",
+  },
+  {
+    method: "POST",
+    path: "/auth/app/refresh",
+    summary:
+      "Renouvelle le jeton d'accès contre le secret d'appareil, signé par la clé de l'appareil. Le secret est remplacé ; présenter l'ancien retire l'appareil.",
+    scope: null,
+    group: "Application mobile",
+    auth: "public",
+  },
+  {
+    method: "POST",
+    path: "/auth/app/challenge",
+    summary:
+      "Défi de deux minutes à signer par la clé de l'appareil (en-tête x-gd-presence) avant un geste lourd : restauration, suppression, réinstallation.",
+    scope: null,
+    group: "Application mobile",
+    auth: "appareil",
+  },
+  {
+    method: "DELETE",
+    path: "/auth/app/device",
+    summary: "L'application se délie elle-même du panel.",
+    scope: null,
+    group: "Application mobile",
+    auth: "appareil",
+  },
+  {
+    method: "GET",
+    path: "/auth/devices",
+    summary: "Appareils mobiles liés au compte, le plus récemment vu en tête.",
+    scope: null,
+    group: "Application mobile",
+  },
+  {
+    method: "DELETE",
+    path: "/auth/devices/{device}",
+    summary: "Retire un appareil mobile : ses jetons cessent de valoir sur-le-champ.",
+    scope: null,
+    group: "Application mobile",
   },
 ];
 

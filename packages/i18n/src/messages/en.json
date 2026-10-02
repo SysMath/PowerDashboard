@@ -1790,7 +1790,18 @@
     "problemTooLong": "The password cannot exceed {maximum} characters.",
     "problemContainsIdentity": "The password must not contain your name or your email address.",
     "problemPwned": "This password appears {occurrences, plural, one {# time} other {# times}} in known data breaches. Pick another one.",
-    "noOtherSession": "No other session"
+    "noOtherSession": "No other session",
+    "appSection": "Mobile app",
+    "appSectionHint": "Scan this code with the GameDashboard app to add this panel, then sign in in the browser that opens. Each linked phone appears here and can be removed in one click.",
+    "appQrAlt": "QR code of the panel address",
+    "appQrHint": "The code only contains the panel address:",
+    "appNoDevice": "No linked phone",
+    "appPlatform": {
+      "ios": "iPhone or iPad",
+      "android": "Android"
+    },
+    "appLinked": "linked",
+    "appRemove": "Remove"
   },
   "serverList": {
     "metaTitle": "Servers",
@@ -2304,7 +2315,9 @@
       "twoFactorDisabled": "Two-factor authentication turned off",
       "passkeyAdded": "Passkey added",
       "passkeyRemoved": "Passkey removed",
-      "emailChanged": "Email address changed"
+      "emailChanged": "Email address changed",
+      "appDeviceLinked": "Mobile app linked",
+      "appDeviceReplayed": "Mobile app removed for safety"
     },
     "credentialBody": {
       "passwordChanged": "The password of your account was just changed, and your other sessions were signed out.",
@@ -2313,7 +2326,9 @@
       "twoFactorDisabled": "Two-factor authentication with an app was just turned off for your account.",
       "passkeyAdded": "A new passkey was just registered on your account.",
       "passkeyRemoved": "A passkey was just removed from your account.",
-      "emailChanged": "The email address of your account was just replaced. This message goes to the former address; the next ones will go to the new one."
+      "emailChanged": "The email address of your account was just replaced. This message goes to the former address; the next ones will go to the new one.",
+      "appDeviceLinked": "A phone has just been linked to your account through the mobile app. You can find it, and remove it, in your account security.",
+      "appDeviceReplayed": "A mobile app secret was presented twice: it may have been copied. The phone concerned has been unlinked from your account; it will have to be linked again."
     },
     "credentialAdvice": "If this was not you, someone may have taken over your account: change your password, sign out your other sessions and check your two-factor authentication:",
     "credentialReassure": "If this was you, there is nothing to do.",
@@ -2704,5 +2719,22 @@
       "op": "Make operator",
       "deop": "Remove operator"
     }
+  },
+  "appLink": {
+    "title": "Allow the mobile app?",
+    "description": "“{device}” ({platform}) will be able to manage your servers as {email}, on {host}. You can remove it at any time from your account security.",
+    "platform": {
+      "ios": "iPhone or iPad",
+      "android": "Android"
+    },
+    "approve": "Allow this phone",
+    "refuse": "Refuse",
+    "notice": "Only accept if you have just started linking from the app, on this phone.",
+    "sentTitle": "Phone allowed",
+    "sentBody": "Go back to the app: it finishes linking on its own.",
+    "failedTitle": "Linking failed",
+    "failedBody": "The panel refused the link. Start again from the app.",
+    "expiredTitle": "No link in progress",
+    "expiredBody": "The request has expired or was already used. Start again from the app."
   }
 }

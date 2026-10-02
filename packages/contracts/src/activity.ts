@@ -212,6 +212,14 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
     label: "Prise en main par un membre du personnel",
   },
   "account.impersonation_ended": { category: "account", label: "Fin de la prise en main" },
+  // Application mobile (ADR 0010). Le nom de l'appareil est en propriété ;
+  // un rejeu est un secret présenté deux fois, donc copié : l'appareil tombe.
+  "account.app_device_linked": { category: "account", label: "Application mobile liée" },
+  "account.app_device_revoked": { category: "account", label: "Application mobile retirée" },
+  "account.app_device_replayed": {
+    category: "account",
+    label: "Application mobile retirée : secret rejoué",
+  },
 
   /**
    * Refus consignés (NC-12), au journal de la plateforme seulement.

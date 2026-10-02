@@ -1790,7 +1790,18 @@
     "problemTooLong": "Le mot de passe ne peut pas dépasser {maximum} caractères.",
     "problemContainsIdentity": "Le mot de passe ne doit pas contenir votre nom ni votre adresse e-mail.",
     "problemPwned": "Ce mot de passe apparaît {occurrences, plural, one {# fois} other {# fois}} dans des fuites de données connues. Choisissez-en un autre.",
-    "noOtherSession": "Aucune autre session"
+    "noOtherSession": "Aucune autre session",
+    "appSection": "Application mobile",
+    "appSectionHint": "Scannez ce code avec l'application GameDashboard pour y ajouter ce panel, puis connectez-vous dans le navigateur qui s'ouvre. Chaque téléphone lié apparaît ici et se retire d'un geste.",
+    "appQrAlt": "Code QR de l'adresse du panel",
+    "appQrHint": "Le code ne contient que l'adresse du panel :",
+    "appNoDevice": "Aucun téléphone lié",
+    "appPlatform": {
+      "ios": "iPhone ou iPad",
+      "android": "Android"
+    },
+    "appLinked": "lié",
+    "appRemove": "Retirer"
   },
   "serverList": {
     "metaTitle": "Serveurs",
@@ -2304,7 +2315,9 @@
       "twoFactorDisabled": "Double authentification désactivée",
       "passkeyAdded": "Clé d'accès ajoutée",
       "passkeyRemoved": "Clé d'accès supprimée",
-      "emailChanged": "Adresse e-mail modifiée"
+      "emailChanged": "Adresse e-mail modifiée",
+      "appDeviceLinked": "Application mobile liée",
+      "appDeviceReplayed": "Application mobile retirée par sécurité"
     },
     "credentialBody": {
       "passwordChanged": "Le mot de passe de votre compte vient d'être changé, et les autres sessions ont été fermées.",
@@ -2313,7 +2326,9 @@
       "twoFactorDisabled": "La double authentification par application vient d'être désactivée sur votre compte.",
       "passkeyAdded": "Une nouvelle clé d'accès vient d'être enregistrée sur votre compte.",
       "passkeyRemoved": "Une clé d'accès vient d'être retirée de votre compte.",
-      "emailChanged": "L'adresse e-mail de votre compte vient d'être remplacée. Ce message part vers l'ancienne adresse ; les suivants iront à la nouvelle."
+      "emailChanged": "L'adresse e-mail de votre compte vient d'être remplacée. Ce message part vers l'ancienne adresse ; les suivants iront à la nouvelle.",
+      "appDeviceLinked": "Un téléphone vient d'être lié à votre compte par l'application mobile. Vous le retrouvez, et pouvez le retirer, dans la sécurité du compte.",
+      "appDeviceReplayed": "Un secret de l'application mobile a été présenté une seconde fois : il a pu être copié. Le téléphone concerné a été délié de votre compte ; il faudra le lier de nouveau."
     },
     "credentialAdvice": "Si ce n'était pas vous, quelqu'un a peut-être pris la main sur votre compte : changez votre mot de passe, fermez les autres sessions et vérifiez votre double authentification :",
     "credentialReassure": "Si c'était vous, il n'y a rien à faire.",
@@ -2704,5 +2719,22 @@
       "op": "Nommer opérateur",
       "deop": "Retirer opérateur"
     }
+  },
+  "appLink": {
+    "title": "Autoriser l'application mobile ?",
+    "description": "« {device} » ({platform}) pourra gérer vos serveurs au nom de {email}, sur {host}. Vous pourrez le retirer à tout moment dans la sécurité du compte.",
+    "platform": {
+      "ios": "iPhone ou iPad",
+      "android": "Android"
+    },
+    "approve": "Autoriser ce téléphone",
+    "refuse": "Refuser",
+    "notice": "N'acceptez que si vous venez de lancer la liaison depuis l'application, sur ce téléphone.",
+    "sentTitle": "Téléphone autorisé",
+    "sentBody": "Revenez dans l'application : elle termine la liaison d'elle-même.",
+    "failedTitle": "Liaison impossible",
+    "failedBody": "Le panel a refusé la liaison. Recommencez depuis l'application.",
+    "expiredTitle": "Aucune liaison en cours",
+    "expiredBody": "La demande a expiré ou a déjà servi. Recommencez depuis l'application."
   }
 }

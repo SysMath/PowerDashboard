@@ -46,6 +46,8 @@ const NATIVES = new Set([
   "proxy_add_x_forwarded_for",
   "scheme",
   "http_upgrade",
+  // L'aiguillage du jeton d'appareil mobile (`$gd_mobile_upstream`, ADR 0010).
+  "http_authorization",
 ]);
 
 describe("infra/prod/panel.conf", () => {

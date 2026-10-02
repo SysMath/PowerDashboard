@@ -8,6 +8,7 @@ import {
 } from "@gamedashboard/ui";
 import { Gauge, HardDrive, MemoryStick, Plus, Server } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { BillingPanel } from "@/components/billing-panel";
 import { BillingSetupNotice } from "@/components/billing-setup-notice";
@@ -17,6 +18,7 @@ import { pageTitle } from "@/lib/page-title";
 import { CONFIGURATION_ROLES } from "@/lib/roles";
 import { toCardServer } from "@/lib/server-view";
 import { AutoRefresh } from "@/lib/use-auto-refresh";
+import { pendingAppLink } from "@/server/api/app-devices";
 import { fetchBilling, fetchNotice } from "@/server/api/billing";
 import { fetchMe, fetchMyServers } from "@/server/api/client";
 
@@ -35,6 +37,10 @@ export const generateMetadata = pageTitle("quickAccess", "title");
  * l'adresse — on reste sur « / » — mais fait passer la page par la coquille.
  */
 export default async function HomePage() {
+  // Une liaison de l'application mobile attendait la connexion : toutes les
+  // voies de connexion mènent ici, et c'est ici qu'on la reprend (ADR 0010).
+  if (await pendingAppLink()) redirect("/app-link");
+
   // Les lectures partent ensemble. Deux interrogent des services tiers ; les
   // enchaîner additionnerait leurs latences sur la page ouverte en premier.
   const [t, servers, billing, notice, me] = await Promise.all([

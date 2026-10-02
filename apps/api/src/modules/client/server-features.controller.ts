@@ -24,7 +24,6 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 import { singleQuery } from "../../common/query-param";
-import { requestOrigin } from "../../common/request-origin";
 import { ActivityService } from "../activity/activity.service";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { ImpersonationReadOnlyGuard, withImpersonator } from "../auth/impersonation.guard";
@@ -47,7 +46,7 @@ import {
   SUPPORTED_ACTIONS,
   type SupportedAction,
 } from "./schedules.service";
-import { ServerAccessService } from "./server-access.service";
+import { accessPrincipal, ServerAccessService } from "./server-access.service";
 import { ServerInvitesService } from "./server-invites.service";
 import { ServerSettingsService } from "./server-settings.service";
 import { ServerWebhooksService } from "./server-webhooks.service";
@@ -118,8 +117,7 @@ function readReleaseVersion(raw: unknown): string | undefined {
 const ENGINE_BACKUP_TIMEOUT_MS = 30 * 60_000;
 
 function principalOf(request: ClientRequest) {
-  // `origin` ne sert qu'au journal des refus : route et adresse de la demande.
-  return { id: request.user.id, scopes: request.scopes, origin: requestOrigin(request) };
+  return accessPrincipal(request);
 }
 
 /**

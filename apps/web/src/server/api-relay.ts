@@ -1,5 +1,7 @@
 import "server-only";
 import {
+  APP_ACCESS_TOKEN_PREFIX,
+  APP_PRESENCE_HEADER,
   NODE_AGENT_PREFIX,
   WINGS_CONFIGURE_PREFIX,
   WINGS_REMOTE_PREFIX,
@@ -42,11 +44,29 @@ const PREFIXES = [
 ];
 const EXACTS = ["/api/v1/openapi.json", "/api/v1/status", "/api/v1/updates/signal"];
 
-export function relayablePath(pathname: string): boolean {
+/**
+ * Application mobile (ADR 0010), sur le modèle de nginx : la liaison pour
+ * tous, l'espace client et le profil pour le seul jeton d'un appareil lié
+ * (`$gd_mobile_upstream` dans `panel.conf`). Une clé personnelle n'y passe
+ * pas, et aucun cookie n'est jamais relayé.
+ */
+const APP_PREFIXES = ["/api/v1/auth/app/"];
+const APP_DEVICE_PREFIXES = ["/api/v1/client/"];
+const APP_DEVICE_EXACTS = ["/api/v1/auth/me"];
+
+export function relayablePath(pathname: string, authorization: string | null = null): boolean {
   // Un chemin qui remonte (`/api/remote/../v1/admin`) serait normalisé par
   // l'API en une route qu'on n'a pas voulu ouvrir.
   if (/(^|\/)\.\.?(\/|$)|%2e|%2f|\\/i.test(pathname)) return false;
-  return EXACTS.includes(pathname) || PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  if (EXACTS.includes(pathname) || PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    return true;
+  }
+  if (APP_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
+  if (!authorization?.startsWith(`Bearer ${APP_ACCESS_TOKEN_PREFIX}`)) return false;
+  return (
+    APP_DEVICE_EXACTS.includes(pathname) ||
+    APP_DEVICE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  );
 }
 
 /**
@@ -66,6 +86,8 @@ const FORWARDED_REQUEST_HEADERS = [
   "content-type",
   "idempotency-key",
   "user-agent",
+  // La confirmation de présence d'un geste lourd venu de l'application.
+  APP_PRESENCE_HEADER,
   "x-gamedashboard-signature",
   "x-gamedashboard-timestamp",
   "x-gamedashboard-version",
@@ -92,7 +114,10 @@ const DROPPED_RESPONSE_HEADERS = new Set([
 
 export async function relayToApi(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  if (process.env.API_RELAY !== "1" || !relayablePath(url.pathname)) {
+  if (
+    process.env.API_RELAY !== "1" ||
+    !relayablePath(url.pathname, request.headers.get("authorization"))
+  ) {
     return Response.json({ message: "Introuvable." }, { status: 404 });
   }
 
