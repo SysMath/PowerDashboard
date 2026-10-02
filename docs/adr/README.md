@@ -17,7 +17,7 @@ tenu, puis pourquoi elle a cessé de tenir.
 | [0007](./0007-secrets-et-donnees-au-repos.md) | Données personnelles en clair, clé maître en fichier, sans coffre ni poivre : la machine protège le repos | Acceptée |
 | [0008](./0008-pare-feu-nftables.md) | Le pare-feu par serveur est tenu par un agent séparé, dans sa propre table nftables | Proposée |
 | [0009](./0009-instantanes-de-volumes.md) | Les instantanés portent sur tout le système de fichiers des serveurs d'un node, pris et restaurés par l'agent du node | Acceptée |
-| [0010](./0010-application-mobile.md) | L'application mobile est une application Expo de l'espace client, liée au panel par le navigateur et traitée comme un appareil révocable | Proposée |
+| [0010](./0010-application-mobile.md) | L'application mobile est une application Expo publique qui se lie à n'importe quel panel auto-hébergé et parle à son API comme un appareil révocable | Acceptée |
 
 ## Format
 
