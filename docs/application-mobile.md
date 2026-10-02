@@ -55,8 +55,19 @@ ne l'embarque pas.
   téléchargement suivant.
 - **Notifications poussées** : voir plus bas. Le toucher ouvre la cloche du
   panel qui les a envoyées.
+- **Espace revendeur**, pour un compte revendeur :
+  - son enveloppe et ce qu'il en reste ;
+  - ses clients, et les serveurs de chacun, qui s'ouvrent avec les écrans
+    du client ;
+  - la suspension et le rétablissement d'un serveur, avec la biométrie ;
+  - la consommation du mois ou du mois précédent, serveur par serveur.
+
+  L'application n'atteint que les trois routes de `APP_STAFF_ROUTES` :
+  aperçu, suspension et export de la consommation. Une route de revendeur
+  absente de cette liste lui est refusée, même par un appel fabriqué.
 - Restent au navigateur : bases de données, planificateur, permissions des
-  fichiers, sous-utilisateurs, réglages du compte.
+  fichiers, sous-utilisateurs, réglages du compte ; côté revendeur, marque,
+  domaines, clés, webhooks, limites et suppression des serveurs.
 
 ## Notifications poussées
 

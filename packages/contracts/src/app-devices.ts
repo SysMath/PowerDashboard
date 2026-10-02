@@ -258,12 +258,17 @@ interface AppRoute {
 /**
  * Routes de revendeur et d'administration ouvertes à l'application.
  *
- * Vide tant que les espaces revendeur (lot 5) et administration simple
- * (lot 6) n'existent pas dans l'application : aujourd'hui, le personnel n'y
- * fait que ce que fait un client. Toute écriture qui y entrera demandera la
- * confirmation de présence (`appNeedsPresence`).
+ * Toute écriture qui y figure demande la confirmation de présence
+ * (`appNeedsPresence`). Ce qui se règle reste au navigateur : marque,
+ * domaines, clés, webhooks, limites et suppression des serveurs.
  */
-export const APP_STAFF_ROUTES: readonly AppRoute[] = [];
+export const APP_STAFF_ROUTES: readonly AppRoute[] = [
+  // Espace revendeur (lot 5) : son enveloppe, ses clients et leurs serveurs,
+  // la suspension et le rétablissement, la consommation lue.
+  { method: "GET", path: "/api/v1/reseller/overview" },
+  { method: "POST", path: "/api/v1/reseller/servers/:serverId/suspension" },
+  { method: "GET", path: "/api/v1/reseller/consumption/export" },
+];
 
 /**
  * Gestes lourds de l'espace client : ils exigent la confirmation de présence

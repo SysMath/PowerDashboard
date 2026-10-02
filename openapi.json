@@ -49,6 +49,9 @@
       "name": "Double authentification"
     },
     {
+      "name": "Espace revendeur"
+    },
+    {
       "name": "Fichiers"
     },
     {
@@ -1522,6 +1525,175 @@
             "in": "path",
             "required": true,
             "description": "Identifiant de l'appareil mobile lié.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/reseller/overview": {
+      "get": {
+        "summary": "Espace revendeur : ses machines, ses serveurs et ses clients, son enveloppe et ce qu'il en consomme. Ouverte à l'application mobile.",
+        "description": "Session du panel.",
+        "tags": [
+          "Espace revendeur"
+        ],
+        "operationId": "session-get-reseller-overview",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/reseller/servers/{server}/suspension": {
+      "post": {
+        "summary": "Suspend (`suspended: true`, motif facultatif) ou rétablit un serveur de son parc. Depuis l'application, confirmation de présence exigée.",
+        "description": "Session du panel.",
+        "tags": [
+          "Espace revendeur"
+        ],
+        "operationId": "session-post-reseller-servers-by-server-suspension",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/reseller/consumption/export": {
+      "get": {
+        "summary": "Consommation journalière de son parc, en CSV ou JSONL ; sans période, le mois en cours. Consignée au journal.",
+        "description": "Session du panel.",
+        "tags": [
+          "Espace revendeur"
+        ],
+        "operationId": "session-get-reseller-consumption-export",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Premier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut le 1er du mois de « to ».",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Dernier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut aujourd'hui.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "« csv » (par défaut) ou « jsonl », un objet JSON par ligne.",
             "schema": {
               "type": "string"
             }

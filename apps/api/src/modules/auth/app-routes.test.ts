@@ -59,6 +59,6 @@ describe("routes de l'application mobile", () => {
       const [method = "", path = ""] = cle.split(" ");
       return /^\/api\/v1\/(admin|reseller)\//.test(path) && appMayReach(method, path);
     });
-    expect(ouvertes).toEqual(APP_STAFF_ROUTES.map((r) => `${r.method} ${r.path}`));
+    expect(ouvertes.sort()).toEqual(APP_STAFF_ROUTES.map((r) => `${r.method} ${r.path}`).sort());
   });
 });

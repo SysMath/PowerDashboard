@@ -68,6 +68,25 @@ describe("routes de l'application", () => {
     expect(appNeedsPresence("POST", "/api/v1/client/servers/:id/power")).toBe(false);
     expect(appNeedsPresence("GET", "/api/v1/client/servers/:id/backups")).toBe(false);
   });
+
+  it("n'ouvre au revendeur que ce que l'application lui montre", () => {
+    expect(appMayReach("GET", "/api/v1/reseller/overview")).toBe(true);
+    expect(appMayReach("GET", "/api/v1/reseller/consumption/export")).toBe(true);
+    expect(appMayReach("POST", "/api/v1/reseller/servers/:serverId/suspension")).toBe(true);
+    // Ce qui se règle reste au navigateur, même par un appel fabriqué.
+    for (const [method, path] of [
+      ["POST", "/api/v1/reseller/servers/:serverId/limits"],
+      ["DELETE", "/api/v1/reseller/servers/:serverId"],
+      ["GET", "/api/v1/reseller/keys"],
+      ["POST", "/api/v1/reseller/branding"],
+      ["POST", "/api/v1/reseller/platform-provisioning"],
+    ] as const) {
+      expect(appMayReach(method, path)).toBe(false);
+    }
+    // Une écriture du revendeur demande la présence, une lecture non.
+    expect(appNeedsPresence("POST", "/api/v1/reseller/servers/:serverId/suspension")).toBe(true);
+    expect(appNeedsPresence("GET", "/api/v1/reseller/overview")).toBe(false);
+  });
 });
 
 describe("messages signés", () => {

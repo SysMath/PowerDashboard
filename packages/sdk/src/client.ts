@@ -8,6 +8,7 @@ import {
   type ClientServerView,
   type ConsoleGrant,
   type PowerSignal,
+  type ResellerOverview,
   type ServerLimitsPatch,
   type UploadGrant,
 } from "@gamedashboard/contracts";
@@ -371,6 +372,51 @@ export class GameDashboardClient {
     return name ? `${base}/${encodeURIComponent(name)}/${action}` : base;
   }
 
+  /** Le compte du porteur : son rôle dit quels espaces lui montrer. */
+  me(): Promise<{ user: { id: string; email: string; role: string } }> {
+    return this.call("GET", "/api/v1/auth/me");
+  }
+
+  /* --- Espace revendeur, au nom du revendeur (ADR 0010, lot 5) ------------ */
+
+  /** Ses machines, ses serveurs, ses clients, son enveloppe. */
+  resellerOverview(): Promise<ResellerOverview> {
+    return this.call("GET", "/api/v1/reseller/overview");
+  }
+
+  /** Suspend ou rétablit un serveur de son parc ; un geste qui demande la présence. */
+  setResellerServerSuspended(
+    serverId: string,
+    suspended: boolean,
+    reason?: string,
+  ): Promise<{ serverId: string; suspended: boolean; sessionsNotClosed: number }> {
+    return this.call(
+      "POST",
+      `/api/v1/reseller/servers/${encodeURIComponent(serverId)}/suspension`,
+      reason ? { suspended, reason } : { suspended },
+      { protege: true },
+    );
+  }
+
+  /**
+   * La consommation journalière de son parc, lue dans l'export JSONL : une
+   * journée par ligne, colonnes de `CONSUMPTION_COLUMNS`. Sans période, le
+   * mois en cours. Une ligne illisible est ignorée, pas l'export entier.
+   */
+  async resellerConsumption(
+    query: Omit<ConsumptionRequest, "page"> = {},
+  ): Promise<Record<string, unknown>[]> {
+    const search = new URLSearchParams({ format: "jsonl" });
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) search.set(key, String(value));
+    }
+    const texte = await this.texte("GET", `/api/v1/reseller/consumption/export?${search}`);
+    return texte.split("\n").flatMap((ligne) => {
+      const jour = lireJson(ligne);
+      return jour ? [jour] : [];
+    });
+  }
+
   /* --- Espace applicatif, pour un système tiers ---------------------------- */
 
   createServer(input: Record<string, unknown>): Promise<unknown> {
@@ -516,6 +562,17 @@ export class GameDashboardClient {
     entetes: Record<string, string> = {},
     delai = this.timeoutMs,
   ): Promise<Record<string, unknown> | null> {
+    return lireJson(await this.texte(method, path, body, entetes, delai));
+  }
+
+  /** Le corps en texte, pour un export qui n'est pas un seul objet JSON. */
+  private async texte(
+    method: string,
+    path: string,
+    body?: unknown,
+    entetes: Record<string, string> = {},
+    delai = this.timeoutMs,
+  ): Promise<string> {
     try {
       return await this.once(method, path, body, entetes, delai);
     } catch (error) {
@@ -536,7 +593,7 @@ export class GameDashboardClient {
     body: unknown,
     entetes: Record<string, string>,
     delai: number,
-  ): Promise<Record<string, unknown> | null> {
+  ): Promise<string> {
     const token = typeof this.token === "string" ? this.token : await this.token();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), delai);
@@ -564,10 +621,8 @@ export class GameDashboardClient {
        * perdant au passage le code HTTP, qui est la seule chose exploitable.
        */
       const brut = await response.text();
-      const corps = lireJson(brut);
-
-      if (!response.ok) throw probleme(response.status, corps);
-      return corps;
+      if (!response.ok) throw probleme(response.status, lireJson(brut));
+      return brut;
     } finally {
       clearTimeout(timer);
     }

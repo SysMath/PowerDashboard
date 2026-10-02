@@ -621,6 +621,30 @@ export const SESSION_ROUTES: ApiRoute[] = [
     scope: null,
     group: "Application mobile",
   },
+  {
+    method: "GET",
+    path: "/reseller/overview",
+    summary:
+      "Espace revendeur : ses machines, ses serveurs et ses clients, son enveloppe et ce qu'il en consomme. Ouverte à l'application mobile.",
+    scope: null,
+    group: "Espace revendeur",
+  },
+  {
+    method: "POST",
+    path: "/reseller/servers/{server}/suspension",
+    summary:
+      "Suspend (`suspended: true`, motif facultatif) ou rétablit un serveur de son parc. Depuis l'application, confirmation de présence exigée.",
+    scope: null,
+    group: "Espace revendeur",
+  },
+  {
+    method: "GET",
+    path: "/reseller/consumption/export?from={jour}&to={jour}&format={format}",
+    summary:
+      "Consommation journalière de son parc, en CSV ou JSONL ; sans période, le mois en cours. Consignée au journal.",
+    scope: null,
+    group: "Espace revendeur",
+  },
 ];
 
 /**

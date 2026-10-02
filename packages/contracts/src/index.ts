@@ -39,6 +39,7 @@ export * from "./provisioning";
 export * from "./pterodactyl-egg";
 export * from "./push";
 export * from "./realtime";
+export * from "./reseller-space";
 export * from "./server";
 export * from "./server-reachability";
 export * from "./snapshots";

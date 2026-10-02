@@ -2756,6 +2756,7 @@
       "supprimerSauvegarde": "Confirm deleting the backup",
       "supprimerFichiers": "Confirm deleting the files",
       "restaurerInstantane": "Confirm restoring the snapshot",
+      "suspensionServeur": "Confirm suspending or unsuspending the server",
       "geste": "Confirm this action on the server"
     },
     "instances": {
@@ -2922,6 +2923,52 @@
       "nouvelle": "New notification",
       "lire": "Open the app to read it.",
       "canal": "Panel alerts"
+    },
+    "revendeur": {
+      "titre": "Reseller space",
+      "ouvrir": "Reseller",
+      "erreur": "Reseller space unavailable",
+      "enveloppe": "Allowance",
+      "dimension": {
+        "memoryMb": "Memory",
+        "diskMb": "Disk",
+        "servers": "Servers"
+      },
+      "sur": "{utilise} of {limite}",
+      "sansLimite": "{utilise}, no limit",
+      "reste": "{reste} left",
+      "depasse": "Over the allowance",
+      "estimee": "Figures overstated: {n, plural, one {# server could not be measured} other {# servers could not be measured}}.",
+      "clients": "Customers",
+      "aucunClient": "No customers yet.",
+      "nbServeurs": "{n, plural, =0 {no servers} one {# server} other {# servers}}",
+      "consommation": "Usage",
+      "webAide": "Branding, domains, keys and server limits are managed in the browser.",
+      "ouvrirPanel": "Open the panel's reseller space",
+      "aucunServeur": "No servers for this customer.",
+      "suspendu": "Suspended",
+      "occupe": "Installing or transferring",
+      "suspendre": "Suspend",
+      "retablir": "Unsuspend",
+      "suspendreTitre": "Suspend {nom}?",
+      "suspendreCorps": "The server stops and its owner can no longer use it until it is unsuspended.",
+      "retablirTitre": "Unsuspend {nom}?",
+      "retablirCorps": "The owner gets their server back.",
+      "sessionsOuvertes": "{n, plural, one {# SFTP session could not be closed} other {# SFTP sessions could not be closed}}: the daemon did not respond.",
+      "conso": {
+        "titre": "Usage",
+        "ceMois": "This month",
+        "moisDernier": "Last month",
+        "vide": "No readings for this period.",
+        "aide": "The panel's readings, day by day, in UTC.",
+        "jours": "{n, plural, one {# day} other {# days}}",
+        "disponibilite": "Availability: {pct}",
+        "processeur": "Average CPU: {pct}",
+        "memoire": "Peak memory: {taille}",
+        "reseau": "Network: {taille}",
+        "joueurs": "Peak players: {n}",
+        "incomplet": "Incomplete readings"
+      }
     }
   }
 }

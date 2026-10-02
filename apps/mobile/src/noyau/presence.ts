@@ -8,6 +8,7 @@ export type RaisonPresence =
   | "supprimerSauvegarde"
   | "supprimerFichiers"
   | "restaurerInstantane"
+  | "suspensionServeur"
   | "geste";
 
 export function raisonPresence(method: string, path: string): RaisonPresence {
@@ -16,5 +17,8 @@ export function raisonPresence(method: string, path: string): RaisonPresence {
   if (verbe === "DELETE" && /\/backups\/[^/]+$/.test(path)) return "supprimerSauvegarde";
   if (verbe === "POST" && path.endsWith("/files/delete")) return "supprimerFichiers";
   if (verbe === "POST" && /\/snapshots\/[^/]+\/restore$/.test(path)) return "restaurerInstantane";
+  if (verbe === "POST" && /^\/api\/v1\/reseller\/servers\/[^/]+\/suspension$/.test(path)) {
+    return "suspensionServeur";
+  }
   return "geste";
 }

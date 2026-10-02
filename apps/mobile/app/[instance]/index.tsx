@@ -3,16 +3,19 @@ import { useTranslations } from "use-intl";
 import { Bandeau, Bouton, Chargement, Ecran, Rangee } from "@/composants/base";
 import { CarteServeur } from "@/composants/serveurs";
 import { useInstance } from "@/etat/instance";
+import { useRole } from "@/hooks/useRevendeur";
 import { useCloche, useServeurs } from "@/hooks/useServeurs";
 
 /** Les serveurs du compte sur ce panel, y compris ceux où l'on est invité. */
 export default function Serveurs() {
   const t = useTranslations("mobile.serveurs");
+  const tr = useTranslations("mobile.revendeur");
   const router = useRouter();
   const { instance } = useInstance();
   const { donnees, erreur, chargement } = useServeurs();
   const cloche = useCloche();
   const nonLues = cloche.donnees?.unread ?? 0;
+  const role = useRole();
 
   return (
     <Ecran>
@@ -28,6 +31,13 @@ export default function Serveurs() {
           variante="secondaire"
           onPress={() => router.push(`/${instance.id}/compte`)}
         />
+        {role === "reseller" ? (
+          <Bouton
+            titre={tr("ouvrir")}
+            variante="secondaire"
+            onPress={() => router.push(`/${instance.id}/revendeur`)}
+          />
+        ) : null}
       </Rangee>
       {erreur ? (
         <Bandeau titre={t("erreur")} niveau="danger">

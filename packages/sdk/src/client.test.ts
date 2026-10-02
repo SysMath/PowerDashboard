@@ -272,6 +272,10 @@ describe("GameDashboardClient", () => {
     await c.terminateServer(id);
     await c.ssoLink({ externalId: "client-42" });
     await c.consumption({ from: "2026-09-01", to: "2026-09-30" });
+    await c.me();
+    await c.resellerOverview();
+    await c.setResellerServerSuspended(id, true, "impayé");
+    await c.resellerConsumption({ from: "2026-09-01" });
     await c.openapi();
 
     const visees = appel.mock.calls.map(
@@ -318,6 +322,45 @@ describe("GameDashboardClient", () => {
       else expect(entete, gabarit).toBeUndefined();
     });
     expect(presence).toHaveBeenCalledTimes(4);
+  });
+
+  it("suspend un serveur du revendeur en présence, et lit son parc sans", async () => {
+    const appel = espion(() => fausseReponse({ data: {} }));
+    const presence = vi.fn(async (method: string, path: string) => ({
+      [APP_PRESENCE_HEADER]: `defi.${method} ${path}`,
+    }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: "gd_mob_essai",
+      fetch: appel,
+      presence,
+    });
+    await c.resellerOverview();
+    await c.setResellerServerSuspended("31201e0c", false);
+    expect(entetes(appel, 0)[APP_PRESENCE_HEADER]).toBeUndefined();
+    expect(entetes(appel, 1)[APP_PRESENCE_HEADER]).toBe(
+      "defi.POST /api/v1/reseller/servers/31201e0c/suspension",
+    );
+    expect(JSON.parse(String(initDe(appel, 1).body))).toEqual({ suspended: false });
+  });
+
+  it("lit la consommation du revendeur ligne à ligne, sans échouer sur une ligne", async () => {
+    const jsonl = `${JSON.stringify({ day: "2026-09-01", serverId: "s1" })}\nnon json\n${JSON.stringify({ day: "2026-09-02", serverId: "s1" })}\n`;
+    const appel = espion(
+      () => new Response(jsonl, { headers: { "content-type": "application/x-ndjson" } }),
+    );
+    const jours = await client(appel).resellerConsumption({ from: "2026-09-01", to: "2026-09-30" });
+    expect(jours).toEqual([
+      { day: "2026-09-01", serverId: "s1" },
+      { day: "2026-09-02", serverId: "s1" },
+    ]);
+    const url = new URL(String(appel.mock.calls[0]?.[0]));
+    expect(url.pathname).toBe("/api/v1/reseller/consumption/export");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      format: "jsonl",
+      from: "2026-09-01",
+      to: "2026-09-30",
+    });
   });
 
   /*

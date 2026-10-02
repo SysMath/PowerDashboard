@@ -93,6 +93,8 @@ describe("relayablePath", () => {
     expect(relayablePath("/api/v1/auth/app/refresh")).toBe(true);
     expect(relayablePath("/api/v1/client/servers", "Bearer gd_mob_jeton")).toBe(true);
     expect(relayablePath("/api/v1/auth/me", "Bearer gd_mob_jeton")).toBe(true);
+    expect(relayablePath("/api/v1/reseller/overview", "Bearer gd_mob_jeton")).toBe(true);
+    expect(relayablePath("/api/v1/reseller/overview")).toBe(false);
     // Une clé personnelle, ou rien : la porte reste fermée, comme dans nginx.
     expect(relayablePath("/api/v1/client/servers", "Bearer gd_live_abc_secret")).toBe(false);
     expect(relayablePath("/api/v1/auth/me")).toBe(false);
@@ -117,7 +119,7 @@ describe("relayablePath", () => {
     expect(vhost).toMatch(
       /map \$http_authorization \$gd_mobile_upstream \{\s*"~\^Bearer gd_mob_"\s+127\.0\.0\.1:3211;/,
     );
-    for (const chemin of ["/api/v1/client/", "= /api/v1/auth/me"]) {
+    for (const chemin of ["/api/v1/client/", "/api/v1/reseller/", "= /api/v1/auth/me"]) {
       const bloc = new RegExp(`location ${echapper(chemin)} \\{([^}]*)\\}`).exec(vhost)?.[1];
       expect(bloc, chemin).toMatch(/proxy_pass http:\/\/\$gd_mobile_upstream;/);
       expect(bloc, chemin).toMatch(/proxy_set_header Cookie\s+"";/);

@@ -11,9 +11,9 @@ import type { SessionRepository, SessionUser } from "./session.repository";
  * Le jeton d'un appareil mobile devant `SessionGuard` (ADR 0010).
  *
  * Il porte les droits du compte, mais seulement sur les routes que
- * l'application emploie : jamais l'administration ni l'espace revendeur
- * (`APP_STAFF_ROUTES` est vide), jamais la sécurité du compte, et un geste
- * lourd exige la confirmation de présence.
+ * l'application emploie : de l'administration et de l'espace revendeur,
+ * seulement `APP_STAFF_ROUTES` ; jamais la sécurité du compte ; et un geste
+ * lourd, comme toute écriture du personnel, exige la confirmation de présence.
  */
 
 const personnel = { id: "u-1", email: "admin@exemple.fr", role: "admin" } as unknown as SessionUser;
@@ -37,7 +37,7 @@ function garde(options: { presence?: boolean } = {}) {
 function requete(method: string, route: string, extra: Record<string, string> = {}) {
   const req: Record<string, unknown> = {
     method,
-    url: route.replace(":id", "abc").replace(":backupId", "def"),
+    url: route.replace(":id", "abc").replace(":backupId", "def").replace(":serverId", "srv"),
     routeOptions: { url: route },
     headers: { authorization: "Bearer gd_mob_valide", ...extra },
     cookies: {},
@@ -72,6 +72,35 @@ describe("SessionGuard — appareil mobile", () => {
     for (const route of ["/api/v1/admin/users", "/api/v1/reseller/servers"]) {
       const { ctx } = requete("GET", route);
       await expect(guard.canActivate(ctx), route).rejects.toThrow(ForbiddenException);
+    }
+  });
+
+  it("ouvre au revendeur son espace en lecture, et la suspension en présence", async () => {
+    const { guard } = garde();
+    await expect(guard.canActivate(requete("GET", "/api/v1/reseller/overview").ctx)).resolves.toBe(
+      true,
+    );
+
+    const route = "/api/v1/reseller/servers/:serverId/suspension";
+    await expect(guard.canActivate(requete("POST", route).ctx)).rejects.toMatchObject({
+      response: { code: "presence_required" },
+    });
+    const accepte = garde({ presence: true });
+    const { ctx } = requete("POST", route, { "x-gd-presence": "defi.signature" });
+    await expect(accepte.guard.canActivate(ctx)).resolves.toBe(true);
+    expect(accepte.devices.consumePresence).toHaveBeenCalledWith("d-1", "defi.signature", {
+      method: "POST",
+      path: "/api/v1/reseller/servers/srv/suspension",
+    });
+
+    // Ce qui se règle reste au navigateur.
+    for (const [method, ferme] of [
+      ["POST", "/api/v1/reseller/servers/:serverId/limits"],
+      ["GET", "/api/v1/reseller/keys"],
+    ] as const) {
+      await expect(guard.canActivate(requete(method, ferme).ctx), ferme).rejects.toThrow(
+        ForbiddenException,
+      );
     }
   });
 

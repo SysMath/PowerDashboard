@@ -2756,6 +2756,7 @@
       "supprimerSauvegarde": "Confirmer la suppression de la sauvegarde",
       "supprimerFichiers": "Confirmer la suppression des fichiers",
       "restaurerInstantane": "Confirmer la restauration de l'instantané",
+      "suspensionServeur": "Confirmer la suspension ou le rétablissement du serveur",
       "geste": "Confirmer cette action sur le serveur"
     },
     "instances": {
@@ -2922,6 +2923,52 @@
       "nouvelle": "Nouvelle notification",
       "lire": "Ouvrez l'application pour la lire.",
       "canal": "Alertes des panels"
+    },
+    "revendeur": {
+      "titre": "Espace revendeur",
+      "ouvrir": "Revendeur",
+      "erreur": "Espace revendeur indisponible",
+      "enveloppe": "Enveloppe",
+      "dimension": {
+        "memoryMb": "Mémoire",
+        "diskMb": "Disque",
+        "servers": "Serveurs"
+      },
+      "sur": "{utilise} sur {limite}",
+      "sansLimite": "{utilise}, sans limite",
+      "reste": "reste {reste}",
+      "depasse": "Au-delà de l'enveloppe",
+      "estimee": "Chiffres majorés : {n, plural, one {# serveur n'a pas pu être relevé} other {# serveurs n'ont pas pu être relevés}}.",
+      "clients": "Clients",
+      "aucunClient": "Aucun client pour l'instant.",
+      "nbServeurs": "{n, plural, =0 {aucun serveur} one {# serveur} other {# serveurs}}",
+      "consommation": "Consommation",
+      "webAide": "Marque, domaines, clés et limites des serveurs se règlent dans le navigateur.",
+      "ouvrirPanel": "Ouvrir l'espace revendeur du panel",
+      "aucunServeur": "Aucun serveur pour ce client.",
+      "suspendu": "Suspendu",
+      "occupe": "Installation ou transfert en cours",
+      "suspendre": "Suspendre",
+      "retablir": "Rétablir",
+      "suspendreTitre": "Suspendre {nom} ?",
+      "suspendreCorps": "Le serveur s'arrête et son titulaire ne peut plus y agir jusqu'au rétablissement.",
+      "retablirTitre": "Rétablir {nom} ?",
+      "retablirCorps": "Le titulaire retrouve son serveur.",
+      "sessionsOuvertes": "{n, plural, one {# session SFTP n'a pas pu être coupée} other {# sessions SFTP n'ont pas pu être coupées}} : le daemon ne répondait pas.",
+      "conso": {
+        "titre": "Consommation",
+        "ceMois": "Ce mois-ci",
+        "moisDernier": "Mois dernier",
+        "vide": "Aucun relevé sur cette période.",
+        "aide": "Les relevés du panel, jour par jour, en temps universel.",
+        "jours": "{n, plural, one {# jour} other {# jours}}",
+        "disponibilite": "Disponibilité : {pct}",
+        "processeur": "Processeur moyen : {pct}",
+        "memoire": "Mémoire au plus haut : {taille}",
+        "reseau": "Réseau : {taille}",
+        "joueurs": "Joueurs au plus : {n}",
+        "incomplet": "Relevés incomplets"
+      }
     }
   }
 }
