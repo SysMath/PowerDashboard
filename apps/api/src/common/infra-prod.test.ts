@@ -692,7 +692,7 @@ describe("actions GitHub des workflows", () => {
     const outils = readFileSync(join(RACINE, "infra", "ci", "outils.env"), "utf8");
     const linux = readFileSync(join(RACINE, "infra", "ci", "linux.sh"), "utf8");
     const images = [...`${outils}\n${linux}`.matchAll(/^IMAGE_\w+=(.+)$/gm)].map((m) => m[1]);
-    expect(images.length).toBe(4);
+    expect(images.length).toBe(5);
     for (const image of images) {
       expect(image).toMatch(/^[\w./-]+@sha256:[0-9a-f]{64} # \S+$/);
     }
@@ -700,7 +700,12 @@ describe("actions GitHub des workflows", () => {
     expect(outils).toMatch(
       /^IMAGE_TRIVY=aquasec\/trivy@sha256:[0-9a-f]{64} # 0\.(7[4-9]|[89]\d)\./m,
     );
+    // L'agent de node (Go) se vérifie dans l'image Go épinglée, pas dans une
+    // action setup-go qui tournerait directement sur Windows.
+    expect(outils).toMatch(/^IMAGE_GO=golang@sha256:[0-9a-f]{64} # 1\.\d+\.\d+-bookworm$/m);
     const texte = workflows.join("\n");
+    expect(texte).toContain('linux.sh outil "$IMAGE_GO" sh -euc');
+    expect(texte).not.toContain("setup-go@");
     expect(texte).not.toContain("trivy-action@");
     expect(texte).not.toContain("semgrep-action@");
   });
@@ -736,7 +741,7 @@ describe("actions GitHub des workflows", () => {
     );
     // Un envoi par langage : deux analyses de même catégorie dans un envoi
     // sont refusées.
-    for (const langage of ["javascript", "actions"]) {
+    for (const langage of ["javascript", "actions", "go"]) {
       expect(codeql).toContain(`sarif_file: codeql-resultats/${langage}.sarif`);
       expect(codeql).toContain(`category: /language:${langage}`);
     }
@@ -752,6 +757,17 @@ describe("actions GitHub des workflows", () => {
     expect(script.indexOf("tar -xzf")).toBeGreaterThan(script.indexOf("sha256sum -c"));
     expect(script).toContain("--build-mode=none");
     expect(script).toContain("langages=(javascript-typescript actions)");
+    // L'agent Go est analysé aussi, compilé avec la chaîne de l'image
+    // épinglée, qui quitte le dépôt avant l'extraction JavaScript.
+    expect(script).toContain(`for langage in "\${langages[@]}" go; do`);
+    expect(script).toContain("--language=go --build-mode=autobuild");
+    expect(script.indexOf('mv .chaine-go "$chaine_go/go"')).toBeLessThan(
+      script.indexOf('--language="$(IFS=,'),
+    );
+    expect(codeql).toContain(
+      'bash infra/ci/linux.sh outil "$IMAGE_GO" cp -a /usr/local/go /w/.chaine-go',
+    );
+    expect(codeql.indexOf("name: Chaîne Go")).toBeLessThan(codeql.indexOf("name: Analyser"));
   });
 
   /*

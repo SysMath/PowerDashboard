@@ -1,0 +1,52 @@
+# Fonction « instantanés » de l'agent de node (ADR 0009).
+#
+# Un service par fonction, chacun avec ses seuls privilèges : celui-ci lit et
+# écrit tous les fichiers des serveurs et pilote btrfs ou ZFS, l'équivalent de
+# root sur ces données. Il n'écoute rien, ne voit jamais le socket de Docker,
+# et ne sort que vers le panel et les liens signés du compartiment S3.
+#
+# Chemins par défaut de Wings (system.data, backup_directory) : à adapter dans
+# ReadWritePaths/ReadOnlyPaths si /etc/pterodactyl/config.yml les change
+# (`gamedashboard-agent instantanes verifier` le signale).
+[Unit]
+Description=GameDashboard, agent de node : instantanés de volumes
+Documentation=https://github.com/SysMath/PowerDashboard/blob/main/docs/adr/0009-instantanes-de-volumes.md
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/gamedashboard-agent/config.yml
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/gamedashboard-agent instantanes
+Restart=on-failure
+RestartSec=10s
+
+User=root
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FSETID
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/pterodactyl/volumes /var/lib/gamedashboard-agent
+ReadOnlyPaths=/etc/gamedashboard-agent -/etc/pterodactyl
+# Jamais la conteneurisation (ADR 0009, exigence de Matheo).
+InaccessiblePaths=-/var/run/docker.sock -/run/docker.sock -/run/containerd -/var/lib/docker
+# ZFS passe par /dev/zfs ; btrfs, par des ioctl sur les fichiers.
+DevicePolicy=closed
+DeviceAllow=/dev/zfs rw
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

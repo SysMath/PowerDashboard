@@ -223,8 +223,10 @@ de son utilisateur**, sur notre réseau.
 
 ## Analyse CodeQL
 
-`codeql.yml` analyse le TypeScript et les workflows à chaque PR, à chaque
-push sur `main` et chaque lundi. Le CLI tourne dans le conteneur du job
+`codeql.yml` analyse le TypeScript, l'agent de node (Go) et les workflows à
+chaque PR, à chaque push sur `main` et chaque lundi. L'agent se compile pour
+être analysé, avec la chaîne Go de l'image épinglée `IMAGE_GO`, recopiée dans
+le volume du job puis sortie du dépôt avant l'extraction. Le CLI tourne dans le conteneur du job
 (`infra/ci/codeql.sh`, archive épinglée par `CODEQL_VERSION` et
 `CODEQL_SHA256` dans `infra/ci/outils.env`) ; le runner ne fait que
 téléverser les fichiers SARIF, lisibles dans **Security → Code scanning**.

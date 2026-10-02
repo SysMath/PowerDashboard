@@ -1,0 +1,21 @@
+# /etc/gamedashboard-agent/config.yml — mode 0600, propriétaire root.
+#
+# Rempli par `gamedashboard-agent configure --panel-url … --token … --node …`
+# (commande affichée dans Administration › Nodes), comme `wings configure`.
+# Mêmes clés que le config.yml de Wings quand elles ont un sens ici.
+debug: false
+uuid: 00000000-0000-0000-0000-000000000000   # le node, le même que pour Wings
+token_id: ""                                  # propre à l'agent, distinct de Wings
+token: ""
+remote: https://panel.exemple.fr              # le même panel que Wings
+remote_query:
+  timeout: 30     # secondes par appel
+  interval: 15    # secondes entre deux relevés
+system:
+  root_directory: /var/lib/gamedashboard-agent   # base agent.db, fichiers temporaires
+  wings_config: /etc/pterodactyl/config.yml      # lu seulement
+# Une section par fonction ; chacune se coupe ici, et le panel la retire.
+instantanes:
+  enabled: false
+  # btrfs seulement : sur le même système de fichiers que system.data, hors de lui.
+  directory: /var/lib/gamedashboard-agent/instantanes

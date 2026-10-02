@@ -131,6 +131,16 @@ jobs:
             [ -n "${DATABASE_URL:-}" ] || { echo "::error::DATABASE_URL absente : les tests d intégration seraient sautés."; exit 1; }
             pnpm test'
 
+      # L'agent de node (ADR 0008, 0009) est un module Go à part, hors de
+      # l'espace pnpm : format, vet et tests dans l'image Go épinglée, sur le
+      # même volume. Le banc btrfs réel (GD_BTRFS_REEL) demande un noyau avec
+      # btrfs et reste hors de ce job.
+      - name: Agent de node (Go)
+        run: |
+          source infra/ci/outils.env
+          bash infra/ci/linux.sh outil "$IMAGE_GO" sh -euc \
+            'cd agent && test -z "$(gofmt -l .)" && go vet ./... && go test ./...'
+
       # Le build a besoin des variables d'environnement, mais aucun secret
       # n'est requis pour compiler : les clés ne sont lues qu'à l'exécution.
       - name: Build

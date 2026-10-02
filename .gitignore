@@ -38,3 +38,6 @@ zap-rapport/
 
 # Cache incrémental de TypeScript, réécrit à chaque construction.
 *.tsbuildinfo
+
+# Binaire de l'agent de node, construit dans agent/.
+/agent/gamedashboard-agent

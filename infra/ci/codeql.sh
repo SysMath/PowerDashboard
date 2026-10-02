@@ -3,8 +3,12 @@
 #
 #   bash infra/ci/codeql.sh <dossier de sortie>
 #
-# Écrit un fichier SARIF par langage (`javascript.sarif`, `actions.sarif`),
-# que le workflow téléverse ensuite vers GitHub depuis le runner.
+# Écrit un fichier SARIF par langage (`javascript.sarif`, `actions.sarif`,
+# `go.sarif`), que le workflow téléverse ensuite vers GitHub depuis le runner.
+#
+# L'agent de node (`agent/`, Go) se compile pour être analysé : la chaîne Go
+# vient de l'image épinglée `IMAGE_GO`, recopiée dans `.chaine-go` par l'étape
+# précédente du workflow, puis sortie du dépôt avant toute extraction.
 #
 # Pourquoi pas la « configuration par défaut » de GitHub : elle ne tourne que
 # sur les runners de GitHub, jamais sur l'auto-hébergé. Et
@@ -51,6 +55,15 @@ tar -xzf "$archive" -C "$outils"
 codeql=$outils/codeql/codeql
 "$codeql" version --format=terse
 
+# La chaîne Go quitte le dépôt avant tout : laissée sous la racine, elle
+# serait lue par l'extracteur JavaScript (misc/wasm) comme du code à nous.
+[ -x .chaine-go/bin/go ] || {
+  echo "::error::Chaîne Go absente (.chaine-go) : l'étape « Chaîne Go » de codeql.yml doit précéder l'analyse." >&2
+  exit 1
+}
+chaine_go=$(mktemp -d)
+mv .chaine-go "$chaine_go/go"
+
 # TypeScript et JavaScript sans compilation (`--build-mode=none`), comme la
 # configuration par défaut ; `actions` relit les workflows eux-mêmes
 # (injection d'expressions, permissions, actions non épinglées).
@@ -60,6 +73,14 @@ base=$(mktemp -d)
 "$codeql" database create "$base" --db-cluster --overwrite \
   --language="$(IFS=,; echo "${langages[*]}")" --build-mode=none \
   --source-root=. --threads=0
+
+# Go se compile (`autobuild`, soit `go build ./...` dans `agent/`), avec la
+# chaîne de l'image épinglée et hors de tout cache partagé ; sans l'état de
+# Git, que la copie du dépôt n'a pas toujours pour son propriétaire.
+PATH="$chaine_go/go/bin:$PATH" GOTOOLCHAIN=local GOFLAGS=-buildvcs=false \
+  GOPATH="$chaine_go/gopath" GOCACHE="$chaine_go/cache" \
+  "$codeql" database create "$base/go" --overwrite --language=go --build-mode=autobuild \
+  --source-root=agent --threads=0
 
 # Mémoire de l'évaluateur, en Mo. Sans `--ram`, le CLI part du tas par défaut
 # de sa JVM (le quart de la mémoire vue), relevé à 2 Gio au plus bas : dans la
@@ -85,7 +106,7 @@ ram=$(memoire_evaluateur "")
 echo "CodeQL : $ram Mo pour l'évaluateur, $(nproc) fils."
 
 mkdir -p "$sortie"
-for langage in "${langages[@]}"; do
+for langage in "${langages[@]}" go; do
   # Le dossier de la base et la catégorie portent le nom court (javascript),
   # celui que GitHub affiche pour cette analyse.
   court=${langage%%-*}
@@ -93,4 +114,4 @@ for langage in "${langages[@]}"; do
     --format=sarif-latest --output="$sortie/$court.sarif" \
     --sarif-category="/language:$court"
 done
-rm -rf "$base" "$outils"
+rm -rf "$base" "$outils" "$chaine_go"
