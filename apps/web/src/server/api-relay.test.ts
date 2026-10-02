@@ -15,6 +15,11 @@ const amont = vi.fn(async (..._args: unknown[]) =>
   Response.json({ ok: true }, { headers: { "content-encoding": "gzip", "set-cookie": "a=b" } }),
 );
 
+/** Un texte lu tel quel dans une expression régulière, antislash compris. */
+function echapper(texte: string): string {
+  return texte.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
+}
+
 function appel(chemin: string, init: RequestInit & { duplex?: "half" } = {}): Request {
   return new Request(`https://panel.example.fr${chemin}`, init);
 }
@@ -96,6 +101,13 @@ describe("relayablePath", () => {
     expect(relayablePath("/api/v1/client/../admin/users", "Bearer gd_mob_jeton")).toBe(false);
   });
 
+  it("échappe tout le chemin cité dans une expression régulière", () => {
+    for (const texte of ["= /api/v1/auth/me", "a\\b.c", "^(x)+[y]{1}|$?*"]) {
+      expect(new RegExp(`^${echapper(texte)}$`).test(texte), texte).toBe(true);
+    }
+    expect(new RegExp(echapper("a.c")).test("abc")).toBe(false);
+  });
+
   it("relaie l'espace client nginx pour le jeton d'appareil, comme le vhost", () => {
     const vhost = readFileSync(
       fileURLToPath(new URL("../../../../infra/prod/panel.conf", import.meta.url)),
@@ -105,9 +117,7 @@ describe("relayablePath", () => {
       /map \$http_authorization \$gd_mobile_upstream \{\s*"~\^Bearer gd_mob_"\s+127\.0\.0\.1:3211;/,
     );
     for (const chemin of ["/api/v1/client/", "= /api/v1/auth/me"]) {
-      const bloc = new RegExp(`location ${chemin.replace(/[/.]/g, "\\$&")} \\{([^}]*)\\}`).exec(
-        vhost,
-      )?.[1];
+      const bloc = new RegExp(`location ${echapper(chemin)} \\{([^}]*)\\}`).exec(vhost)?.[1];
       expect(bloc, chemin).toMatch(/proxy_pass http:\/\/\$gd_mobile_upstream;/);
       expect(bloc, chemin).toMatch(/proxy_set_header Cookie\s+"";/);
     }

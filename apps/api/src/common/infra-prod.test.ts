@@ -75,6 +75,32 @@ describe("infra/prod/panel.conf", () => {
     }
   });
 
+  /*
+   * Régression (Semgrep, dynamic-proxy-host, `--error` dans la CI) :
+   * l'aiguillage du jeton d'appareil passe par une destination variable.
+   * Elle ne vient que d'un map à adresses locales fixes, et chaque
+   * `proxy_pass` variable porte l'exception motivée de la règle.
+   */
+  it("n'envoie une destination variable que vers des adresses locales fixes", () => {
+    const local = readFileSync(join(RACINE, "infra", "local", "gamedashboard.local.conf"), "utf8");
+    for (const texte of [vhost, local]) {
+      const variables = [...texte.matchAll(/^.*proxy_pass http:\/\/\$(\w+);(.*)$/gm)];
+      expect(variables.length).toBe(2);
+      for (const [, nom, suite] of variables) {
+        expect(suite).toMatch(
+          /^ # nosemgrep: generic\.nginx\.security\.dynamic-proxy-host\.dynamic-proxy-host -- \S/,
+        );
+        const map = new RegExp(`^map \\$\\w+ \\$${nom} \\{\\n((?: {4}.*\\n)+)\\}`, "m").exec(
+          texte,
+        )?.[1];
+        expect(map, nom).toBeDefined();
+        for (const ligne of (map ?? "").trim().split("\n")) {
+          expect(ligne).toMatch(/\s127\.0\.0\.1:\d+;$/);
+        }
+      }
+    }
+  });
+
   it("ne déclare que des variables à son préfixe, pour ne heurter aucun autre vhost", () => {
     const declarees = [...directives.matchAll(/^\s*map\s+\$\w+\s+\$(\w+)/gm)].map(
       (m) => m[1] ?? "",
