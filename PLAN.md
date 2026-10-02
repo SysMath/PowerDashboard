@@ -1,6 +1,6 @@
 # GameDashboard Game Dashboard — Plan complet
 
-> Panel de gestion de serveurs de jeu (et plus tard VPS) basé sur Docker, au niveau de qualité de Pterodactyl / WISP.gg, avec une stack 2026, une sécurité renforcée et une bibliothèque de composants 100 % réutilisables.
+> Panel de gestion de serveurs de jeu basé sur Docker, au niveau de qualité de Pterodactyl / WISP.gg, avec une stack 2026, une sécurité renforcée et une bibliothèque de composants 100 % réutilisables.
 >
 > Ce document est la référence unique du projet. Il est organisé en 12 parties :
 >
@@ -722,7 +722,7 @@ Marque blanche : un revendeur peut surcharger `--gd-accent-*`, logo, nom, favico
 - **Firewall par serveur** (nftables sur le node) — **proposé, sans code** : [ADR 0008](./docs/adr/0008-pare-feu-nftables.md). Un agent facultatif sur chaque node tire du panel les règles de ses serveurs, les valide et les pose dans sa propre table nftables, avant le DNAT de Docker, sans toucher Wings ni les tables de Docker. Rien ne s'écrit avant que Matheo accepte l'ADR et tranche ses questions ouvertes.
 - **Snapshots de volumes** (btrfs/zfs) pour backups instantanés — **livré** ([ADR 0009](./docs/adr/0009-instantanes-de-volumes.md), acceptée). Instantanés du système de fichiers entier des serveurs d'un node, pris et restaurés par l'agent de node ; la restauration recopie le seul dossier du serveur arrêté, Wings n'est pas modifié. Panel : `apps/api/src/modules/snapshots` (politique, ordres, restauration, sauvegarde S3 cohérente tirée d'un instantané, migrations `0059`, `0060`) et écran Instantanés du serveur. Les sauvegardes locales et S3 restent la seule copie hors de la machine. Restent les bancs réels sur une machine d'essai : btrfs et ZFS, et une vraie restauration par Wings d'une archive de l'agent.
 - **Agent de node** (socle du pare-feu et des instantanés) — **livré** (`agent/`, Go, [README](./agent/README.md)). Facultatif : authentification `token_id.token` comme Wings, `/etc/gamedashboard-agent/config.yml` écrit par `gamedashboard-agent configure`, journal SQLite local, annonce de ses fonctions au battement de cœur. Le panel (`apps/api/src/modules/node-agent`, migration `0058`) en déduit les capacités de chaque node (`nodeCapabilities()`, `packages/contracts/src/node-agent.ts`) et grise, avec la raison, les fonctions qui en dépendent. Il ne l'appelle jamais : l'agent tire ses ordres. Format, vet et tests en CI dans l'image Go épinglée ; CodeQL analyse aussi le Go.
-- Module VPS (via Proxmox API) réutilisant le même AppShell et les mêmes composants — à concevoir.
+- ~~Module VPS (via Proxmox API)~~ — **abandonné** (décision de Matheo, 2026-10-02) : Wings et la configuration avancée du panel couvrent ce besoin. Ne pas le réintroduire sans sa demande.
 - App mobile React Native partageant `@gamedashboard/contracts` et `@gamedashboard/sdk` — à concevoir.
 
 ---
@@ -781,7 +781,7 @@ GameDashboard/
 | **5 : Admin & API application** | 3 sem. | Admin complet, API application documentée (provisioning externe), webhooks sortants, script de migration Pterodactyl |
 | **6 : Polish & bêta** | 2 sem. | i18n complet, responsive, PWA, accessibilité (WCAG AA), perf (Lighthouse > 90), doc utilisateur, bêta fermée |
 | **v1.5** | +4 sem. | Marketplace, health checks, status page, console avancée, marque blanche, facturation multi-fournisseur. **Livrée** |
-| **v2** | itératif | DNS auto, export de la consommation, agent de node et snapshots **livrés** ; firewall **proposé** (ADR 0008) ; VPS, mobile à concevoir |
+| **v2** | itératif | DNS auto, export de la consommation, agent de node et snapshots **livrés** ; firewall **proposé** (ADR 0008) ; mobile à concevoir ; VPS abandonné |
 
 **Total v1 : environ 19 semaines.** Chaque phase se termine par une démo, une revue sécurité et une mise à jour de ce plan.
 
