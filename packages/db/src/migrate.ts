@@ -82,12 +82,18 @@ export function adaptStatements(
   return { outside, inside };
 }
 
+/** Longueur au-delà de laquelle une instruction n'est pas un simple `ADD VALUE`. */
+const ADD_VALUE_MAX_LENGTH = 1024;
+
 function isAddValueOnly(statement: string): boolean {
   const code = statement
     .split("\n")
     .filter((line) => !line.trim().startsWith("--"))
     .join("\n")
     .trim();
+  // Un `ADD VALUE` tient en une ligne. La borne garde la regex, quadratique
+  // sur « ALTER TYPE » suivi de milliers d'espaces, loin de ce cas.
+  if (code.length > ADD_VALUE_MAX_LENGTH) return false;
   return /^ALTER\s+TYPE\s+[^;]+\s+ADD\s+VALUE\s+[^;]+;?$/i.test(code);
 }
 

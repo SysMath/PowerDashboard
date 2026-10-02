@@ -81,7 +81,11 @@ export class InvalidBase32Error extends Error {
  * sans que rien ne dise pourquoi.
  */
 export function base32Decode(input: string): Uint8Array {
-  const cleaned = input.replace(/=+$/, "").replace(/\s+/g, "").toUpperCase();
+  // Le remplissage final est retiré par une boucle : `replace(/=+$/, "")` est
+  // quadratique sur « ====…x », et CodeQL le signale.
+  let fin = input.length;
+  while (fin > 0 && input[fin - 1] === "=") fin--;
+  const cleaned = input.slice(0, fin).replace(/\s+/g, "").toUpperCase();
   const bytes: number[] = [];
   let bits = 0;
   let value = 0;

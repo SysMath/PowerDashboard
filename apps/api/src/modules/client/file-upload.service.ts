@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import {
   BadRequestException,
@@ -316,7 +316,12 @@ export class FileUploadService {
     // L'identifiant est produit ici et vérifié à la lecture : un identifiant
     // reçu tel quel composerait un chemin, et `../..` en ferait sortir.
     if (!/^[0-9a-f]{32}$/.test(id)) throw new NotFoundException("Session d'envoi inconnue.");
-    return join(this.racine, id);
+    // Seconde garde, redondante avec la première mais lisible par CodeQL :
+    // le chemin résolu doit rester sous la racine des envois.
+    const racine = resolve(this.racine);
+    const chemin = resolve(racine, id);
+    if (!chemin.startsWith(racine + sep)) throw new NotFoundException("Session d'envoi inconnue.");
+    return chemin;
   }
 
   /**

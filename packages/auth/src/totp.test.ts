@@ -43,6 +43,13 @@ describe("base32", () => {
     expect(base32Decode("mz xw6 ytb oi==")).toEqual(base32Decode("MZXW6YTBOI"));
   });
 
+  it("retire le remplissage en temps linéaire", () => {
+    // `replace(/=+$/, "")` était quadratique sur « ====…x » (CodeQL).
+    const debut = performance.now();
+    expect(() => base32Decode(`${"=".repeat(100_000)}1`)).toThrow(InvalidBase32Error);
+    expect(performance.now() - debut).toBeLessThan(200);
+  });
+
   it("refuse un caractère hors alphabet au lieu de l'ignorer", () => {
     // L'ignorer donnerait une clé différente de celle qu'on croit avoir
     // saisie, et des codes toujours faux sans que rien ne dise pourquoi.

@@ -1,6 +1,6 @@
 # 0009 — Les instantanés portent sur tout le système de fichiers des serveurs d'un node, pris et restaurés par l'agent du node, sans toucher au répertoire que Wings gère
 
-- **État** : proposée
+- **État** : acceptée (2026-09-30, avec les précisions de Matheo : dernière section)
 - **Date** : 2026-09
 - **Références** : PLAN §5.5, §6.5 (`backups`), §10.3 ; [ADR 0001](./0001-wings-conserve.md)
   et son amendement, [ADR 0005](./0005-machine-muette.md),
@@ -14,8 +14,12 @@
   `router/router_transfer.go`, `environment/docker/power.go`
   (`OnBeforeStart`), `internal/ufs/fs_unix.go` (`safePath`)
 
-> Cette ADR est **proposée** : aucune ligne de code ne s'écrit avant que
-> Matheo l'accepte et tranche les questions de la dernière section.
+> Proposée puis **acceptée** par Matheo le 2026-09-30. Ses réponses aux sept
+> questions sont consignées dans la dernière section ; quatre d'entre elles
+> précisent la décision, et le texte ci-dessous les intègre (conteneurisation
+> hors de portée de l'agent, réglages entièrement dans l'interface, contrôle
+> complet par l'API applicative, sauvegardes S3 cohérentes dès la première
+> version).
 
 ## Contexte
 
@@ -66,9 +70,23 @@ sous-volume btrfs ou un seul dataset ZFS. L'agent du node (ADR 0008) en prend
 des instantanés en lecture seule, du système de fichiers entier, sur ordre du
 panel et selon une cadence réglée par node. Restaurer un serveur, c'est
 recopier son seul sous-dossier depuis l'instantané vers son dossier vivant,
-serveur arrêté, sans jamais remplacer ni recréer ce dossier.** Les
-sauvegardes de Wings, locales ou S3, restent inchangées et restent la seule
-copie hors de la machine.
+serveur arrêté, sans jamais remplacer ni recréer ce dossier. L'agent ne touche
+jamais à la conteneurisation.** Sur un node qui a des instantanés, une
+sauvegarde S3 est tirée d'un instantané par l'agent, donc cohérente ; ailleurs,
+et pour les sauvegardes locales, Wings continue de les faire comme aujourd'hui.
+Les sauvegardes restent la seule copie hors de la machine.
+
+### L'agent ne touche jamais à la conteneurisation
+
+Exigence de Matheo. L'agent n'ouvre pas le socket de Docker, ne crée, n'arrête,
+ne supprime ni n'inspecte aucun conteneur, aucune image, aucun réseau ni aucun
+volume Docker, et ne lit ni n'écrit la configuration de Docker ou de Wings
+(seulement `config.yml` en lecture, pour connaître `system.data` et
+`backup_directory`). Tout ce qui concerne un conteneur, à commencer par
+l'arrêt du serveur avant une restauration, passe par le panel et l'API
+habituelle de Wings, comme aujourd'hui. L'agent ne voit que des fichiers et
+le système de fichiers qui les porte ; son service systemd n'a pas accès à
+`/var/run/docker.sock` (`InaccessiblePaths=`), et un test le vérifie.
 
 ### Pourquoi le système de fichiers entier, et pas un volume par serveur
 
@@ -96,15 +114,16 @@ Un onglet **Instantanés** à côté de **Sauvegardes**, jamais mélangé avec
 elles, parce que ce n'est pas la même promesse :
 
 - **La liste** des instantanés du node qui contiennent ce serveur :
-  automatiques (« toutes les heures, gardés 24 h », « tous les jours, gardés
-  7 jours », selon le réglage du node), manuels, et « de sûreté » (pris juste
+  automatiques (par défaut « toutes les heures, gardés 24 h » et « tous les
+  jours, gardés 7 jours », selon le réglage du node), manuels, et « de
+  sûreté » (pris juste
   avant une restauration). Chaque ligne dit sa date et sa cause.
 - **« Prendre un instantané »** : pris dans les 15 secondes (relevé de
   l'agent), en une fraction de seconde sur la machine, quelle que soit la
   taille du serveur.
 - **« Épingler »** : l'instantané échappe à la rotation automatique, dans la
-  limite du serveur et jamais au-delà de la durée maximale du node
-  (question 7).
+  limite du serveur et jamais au-delà de la durée maximale du node (30 jours
+  par défaut).
 - **« Restaurer »** : le serveur s'arrête, son dossier revient exactement à
   l'état de l'instantané (fichiers ajoutés depuis supprimés, fichiers
   modifiés rendus), puis il reste arrêté. Un instantané de sûreté est pris
@@ -116,10 +135,31 @@ elles, parce que ce n'est pas la même promesse :
   fonction est grisée), « agent muet depuis … », « espace disque
   insuffisant : instantanés suspendus ».
 - **Droits** : `snapshots.read`, `snapshots.create`, `snapshots.restore`,
-  rangées dans le preset « Owner », attribuables aux sous-utilisateurs
-  (question 4) ; chaque action consignée au journal d'activité.
-  L'administration voit tout, règle la cadence, la rétention et le seuil
-  d'espace libre par node, et peut couper la fonction par node.
+  rangées dans le preset « Owner », attribuables aux sous-utilisateurs ;
+  chaque action consignée au journal d'activité. L'administration voit tout.
+
+### Tout se règle dans l'interface
+
+Exigence de Matheo : aucun réglage n'exige d'éditer un fichier ni de relancer
+un service. **Administration › Nodes › *node* › Instantanés** porte, node par
+node (avec des valeurs par défaut globales dans Administration › Paramètres) :
+
+| Réglage | Défaut |
+|---|---|
+| Fonction active sur ce node | oui dès que l'agent la rapporte possible |
+| Niveaux automatiques : autant qu'on veut, chacun avec son intervalle et sa rétention, chacun désactivable | toutes les heures gardés 24 h ; tous les jours gardés 7 jours |
+| Instantanés manuels permis aux clients | oui |
+| Délai minimal entre deux demandes manuelles d'un même serveur | 5 min |
+| Fenêtre de regroupement des demandes manuelles | 1 min |
+| Durée maximale d'un instantané, épinglé compris | 30 jours |
+| Seuil d'espace libre sous lequel on n'en prend plus et on détruit les plus anciens | 15 % |
+| Nombre d'épinglés par serveur (`snapshot_limit`, par défaut des nouveaux serveurs) | 3 |
+| Sauvegardes S3 tirées d'un instantané | oui |
+
+Chaque valeur est bornée et validée (Zod dans `contracts`), chaque changement
+consigné au journal d'audit avec l'avant et l'après, et relevé par l'agent en
+moins de 15 s. La limite d'un serveur se règle aussi sur sa fiche, comme
+`backup_limit`.
 
 ### Ce que fait l'agent
 
@@ -157,11 +197,15 @@ elles, parce que ce n'est pas la même promesse :
   bâtit pas dessus, ce n'est pas un contrat.)
 - **Supprimer et faire tourner** : un instantané est détruit quand la
   rotation du node ne le garde plus **et** qu'aucun serveur ne l'épingle.
-  L'agent applique aussi, **de lui-même**, deux gardes que le panel ne peut
-  pas lever : aucun instantané au-delà de la durée maximale du node, et plus
-  aucun nouvel instantané sous le seuil d'espace libre (15 % par défaut) ;
-  sous ce seuil, il détruit d'abord les plus anciens non épinglés et le
-  signale.
+  L'agent applique aussi, **de lui-même**, les deux gardes réglées dans
+  l'interface, même si le panel se tait ou lui envoie autre chose ensuite :
+  aucun instantané au-delà de la durée maximale, et plus aucun nouvel
+  instantané sous le seuil d'espace libre ; sous ce seuil, il détruit d'abord
+  les plus anciens non épinglés, puis les épinglés les plus anciens, et le
+  signale. Il garde la dernière valeur reçue sur disque et n'accepte que des
+  valeurs dans les bornes des contrats (seuil de 5 % au moins, durée de
+  90 jours au plus) : un panel compromis ne peut pas lui faire remplir le
+  disque.
 - **Où les instantanés vivent** : btrfs, sur le même système de fichiers,
   **hors** de `system.data` (un instantané btrfs est un sous-volume du même
   système) ; ZFS, dans le dataset, avec `snapdir=hidden`. Dans les deux cas,
@@ -186,7 +230,8 @@ Même chemin que le pare-feu (ADR 0008), même agent, même jeton :
   machine ; le préfixe `/api/node-agent/`, que l'ADR 0008 ajoute au vhost et
   au relais cPanel, suffit.
 - **Des données, pas des commandes** : un ordre porte un identifiant, un
-  type fermé, un UUID de serveur et un nom d'instantané. L'agent vérifie le
+  type fermé (prendre, restaurer, détruire, archiver vers S3), un UUID de
+  serveur et un nom d'instantané. L'agent vérifie le
   format de l'UUID, que `volumes/<uuid>` existe, et que le nom désigne un
   instantané qu'il a lui-même créé (préfixe `gd-`). Il ne reçoit jamais de
   chemin. Chaque ordre est idempotent : rejoué, il ne refait rien de plus.
@@ -203,13 +248,31 @@ Même chemin que le pare-feu (ADR 0008), même agent, même jeton :
   (ZFS seulement), état, expiration.
 - `volume_snapshot_pins` : serveur, instantané, libellé, auteur ; sa
   présence est l'épinglage.
-- `servers.snapshot_limit` : nombre d'instantanés épinglés (question 5).
-- Réglages par node : cadence, rétention, durée maximale, seuil d'espace
-  libre. La capacité « instantanés » du node est **rapportée par l'agent**
-  (btrfs, ZFS ou rien), jamais cochée à la main.
-- Le catalogue d'API (`api-catalogue.ts`) reçoit les routes client et admin.
-  Rien dans l'API applicative en v2 (question 5), et **rien qui touche à la
-  facturation** : la fonction n'a ni prix, ni option vendue dans le panel.
+- `servers.snapshot_limit` : nombre d'instantanés épinglés.
+- `node_snapshot_settings` : les réglages du tableau plus haut, une ligne par
+  node (et une ligne globale de valeurs par défaut). La capacité
+  « instantanés » du node est **rapportée par l'agent** (btrfs, ZFS ou rien),
+  jamais cochée à la main.
+- `backups` gagne `source` (`wings` | `instantane`) et, pour la seconde,
+  l'instantané d'origine.
+
+### Contrôle par l'API
+
+Exigence de Matheo : tout ce que l'interface permet se fait aussi par l'API.
+Le catalogue (`api-catalogue.ts`, puis `openapi.json`) et le SDK reçoivent :
+
+- **API client** (jeton personnel, mêmes permissions `snapshots.*` que
+  l'interface) : lister, prendre, épingler, désépingler, restaurer.
+- **API d'administration** : lire et modifier les réglages d'un node et les
+  valeurs par défaut, lister et détruire les instantanés d'un node.
+- **API applicative** (facturation externe et automatisation) : `snapshots`
+  rejoint les ressources d'un serveur à la création et au redimensionnement
+  (`ResourceRequest`, à côté de `backups`), et les routes de liste, prise et
+  restauration d'un serveur y sont ouvertes comme pour les sauvegardes.
+
+**Rien qui touche à la facturation** : le panel ne donne ni prix ni option
+vendue ; un facturier tiers peut seulement poser la limite qu'il a vendue,
+comme il le fait pour `backups`.
 
 ## Effet sur les sauvegardes S3 existantes
 
@@ -229,12 +292,35 @@ Même chemin que le pare-feu (ADR 0008), même agent, même jeton :
   supprime et recrée un dossier ordinaire dans un système de fichiers
   ordinaire pour Wings ; c'est la raison du choix d'un système de fichiers
   unique.
-- **Pas de sauvegarde S3 tirée d'un instantané en v2** : Wings archive
-  toujours le dossier vivant et ne peut pas être pointé sur un instantané
-  sans modification. Obtenir des archives cohérentes demanderait que l'agent
-  produise et téléverse lui-même un `tar.gz` au format que Wings sait
-  restaurer (lien signé, `application/x-gzip`) : un second chemin de
-  sauvegarde, à traiter plus tard si le besoin se confirme (question 6).
+- **Sauvegardes S3 cohérentes, tirées d'un instantané, dès la première
+  version** (réponse de Matheo à la question 6). Wings archive toujours le
+  dossier vivant et ne peut pas être pointé sur un instantané sans
+  modification ; c'est donc l'agent qui produit l'archive, sur un node qui a
+  des instantanés et un compartiment S3 réglé :
+  1. `BackupsService.create` crée la ligne comme aujourd'hui (`disk = s3`,
+     `backup_limit`, rotation, verrouillage inchangés), avec
+     `source = instantane`, puis donne l'ordre « archiver » à l'agent au lieu
+     d'appeler Wings ;
+  2. l'agent prend un instantané (ou réutilise celui de la minute), écrit en
+     flux un `tar.gz` de `<instantané>/<uuid>/` en appliquant la même liste
+     d'exclusions que Wings (`ignored_files`, syntaxe `.pteroignore`), et le
+     téléverse par les liens signés que `S3Service` produit déjà (mêmes
+     parties, `application/x-gzip`, aucune empreinte signée) ;
+  3. il rend compte par le même contenu que le compte rendu de Wings
+     (réussite, SHA-1, taille, parties et ETag), traité par le même code de
+     clôture du téléversement fractionné ;
+  4. **la restauration ne change pas** : elle passe par Wings, par lien signé
+     (`download_url`), exactement comme une sauvegarde S3 faite par Wings. Le
+     format est le même ; un test de concordance le prouve en faisant
+     restaurer par le code de Wings une archive produite par l'agent.
+
+  L'archive est **cohérente** : tous les fichiers du serveur y sont pris au
+  même instant, au lieu d'être lus un par un pendant que le jeu écrit. Si
+  l'agent est muet, n'a pas d'instantané possible ou échoue avant d'avoir
+  commencé le dépôt, la sauvegarde retombe sur Wings, comme aujourd'hui, et
+  la ligne le dit. Les sauvegardes **locales** restent faites par Wings :
+  écrire dans son `backup_directory` dépendrait de sa façon de nommer ses
+  fichiers, qui n'est pas un contrat.
 - **Transfert d'un serveur** : ses instantanés restent sur l'ancien node, où
   ils ne peuvent plus servir. Le panel les retire de sa liste à la fin du
   transfert ; ils disparaissent avec la rotation de l'ancien node. Les
@@ -262,11 +348,15 @@ Même chemin que le pare-feu (ADR 0008), même agent, même jeton :
   données. La partie « instantanés » tourne donc dans **son propre service
   systemd**, séparé de celui du pare-feu (qui garde `CAP_NET_ADMIN` seul) :
   même binaire, `ProtectSystem=strict`, écriture limitée à `system.data` et
-  au dossier des instantanés, `NoNewPrivileges`, aucune écoute réseau. Une
-  faille du pare-feu ne donne pas les fichiers, et inversement.
+  au dossier des instantanés, `NoNewPrivileges`, aucune écoute réseau,
+  aucun accès au socket de Docker. Ses seules sorties réseau sont le panel et
+  les liens signés du compartiment S3, ceux que Wings reçoit déjà : un panel
+  compromis pourrait y faire envoyer les fichiers d'un serveur ailleurs, ce
+  que le jeton de Wings permet déjà. Une faille du pare-feu ne donne pas les
+  fichiers, et inversement.
 - **Données d'un serveur supprimé** : elles restent dans les instantanés du
   node jusqu'à ce que le dernier qui les contient expire, au plus la durée
-  maximale du node (question 7). Un instantané étant en lecture seule (et
+  maximale du node (30 jours par défaut). Un instantané étant en lecture seule (et
   immuable sous ZFS), on ne les en retire pas avant. La politique de
   confidentialité et le modèle de menace (`docs/securite/modele-de-menace.md`)
   le disent.
@@ -320,12 +410,17 @@ Même chemin que le pare-feu (ADR 0008), même agent, même jeton :
   Wings mesure le dossier vivant ; l'espace que retiennent les instantanés
   est à la charge du node, borné par la rétention et le seuil.
 - **Tests** :
-  - panel : permissions, ordres et idempotence, un instantané proposé
+  - panel : permissions, ordres et idempotence, réglages validés et
+    consignés, routes client, admin et applicatives au catalogue et dans le
+    SDK, repli sur Wings quand l'agent ne peut pas archiver, un instantané proposé
     seulement aux serveurs qu'il contient et encore sur le node, état
     `restoring` posé et relâché, retrait des instantanés au transfert, tests
     d'intégration PostgreSQL (9.6 compris : `uuid[]`) ;
   - agent : validation des ordres, refus d'un UUID ou d'un nom étranger,
-    gardes d'espace et de durée, restauration rejouée après une coupure, sur
+    gardes d'espace et de durée (y compris des valeurs hors bornes envoyées
+    par le panel), restauration rejouée après une coupure, archive S3 conforme
+    aux exclusions et restaurée par le code de Wings, aucun appel au socket
+    de Docker, sur
     une image btrfs en boucle et un pool ZFS sur fichier (root requis : runner
     Ubuntu hébergé ; ZFS y reste à confirmer) ;
   - banc réel `infra/local/verifier-instantanes.sh` : Wings + Docker +
@@ -344,24 +439,19 @@ Même chemin que le pare-feu (ADR 0008), même agent, même jeton :
   `system.data/<uuid>`, ou si l'on veut des instantanés facturés à la taille
   par serveur, qui demanderaient un volume par serveur.
 
-## Questions ouvertes pour Matheo
+## Réponses de Matheo (2026-09-30)
 
-1. **Accepter l'architecture** : un seul sous-volume ou dataset pour tout
-   `system.data`, instantanés du node entier, restauration par recopie dans
-   le dossier vivant, portée par l'agent de l'ADR 0008. *Recommandé.*
-2. **Systèmes pris en charge** : btrfs et ZFS dès la première version
-   *recommandé*, ou btrfs seul d'abord.
-3. **Cadence** : automatiques par node (toutes les heures gardés 24 h, tous
-   les jours gardés 7 jours, réglable) plus manuels par le client
-   *recommandé*, ou manuels seulement.
-4. **Qui a le droit** : permissions `snapshots.*` au propriétaire,
-   attribuables aux sous-utilisateurs *recommandé*, ou réservées à
-   l'administration.
-5. **Limite par serveur** : `snapshot_limit` (épinglés) réglée par
-   l'administration seulement en v2 *recommandé*, ou aussi par l'API
-   applicative dès maintenant.
-6. **Sauvegardes S3 cohérentes tirées d'un instantané** (l'agent téléverse
-   lui-même) : plus tard *recommandé*, ou dès la première version.
-7. **Durée maximale d'un instantané, épinglé compris** (donc délai
-   d'effacement des données d'un serveur supprimé) : 30 jours *recommandé*,
-   ou 7 jours.
+1. **Architecture** : acceptée, **à condition que l'agent ne touche pas à la
+   conteneurisation** → section « L'agent ne touche jamais à la
+   conteneurisation ».
+2. **btrfs et ZFS** dès la première version : oui.
+3. **Instantanés automatiques et manuels** : oui, **entièrement
+   configurables dans l'interface** → section « Tout se règle dans
+   l'interface ».
+4. **Permissions `snapshots.*`** au propriétaire, attribuables aux
+   sous-utilisateurs : oui.
+5. **Limite par serveur** : oui, **toujours contrôlable par l'API** →
+   section « Contrôle par l'API » (client, administration et applicative).
+6. **Sauvegardes S3 cohérentes tirées d'un instantané** : dès la première
+   version → « Effet sur les sauvegardes S3 existantes ».
+7. **Durée maximale** : 30 jours par défaut (réglable, au plus 90 jours).

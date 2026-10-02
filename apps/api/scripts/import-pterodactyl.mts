@@ -40,7 +40,7 @@
  * le réécrit en Argon2id. Personne n'a à changer de mot de passe, et aucun
  * bcrypt ne survit à sa première utilisation.
  */
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { assertEncryptionKey } from "@gamedashboard/auth";
 import {
   allocations,
@@ -780,10 +780,10 @@ async function importerPlanifications(
  */
 function jetonDeDaemon(): { id: string; secret: string } {
   const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  // `randomInt` tire sans biais ; `octet % 62` favorisait les huit premiers
+  // caractères de l'alphabet (5 chances sur 256 au lieu de 4).
   const tirer = (taille: number) =>
-    Array.from(crypto.getRandomValues(new Uint8Array(taille)))
-      .map((octet) => alphabet[octet % alphabet.length])
-      .join("");
+    Array.from({ length: taille }, () => alphabet[randomInt(alphabet.length)]).join("");
   return { id: tirer(16), secret: tirer(64) };
 }
 
