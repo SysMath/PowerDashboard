@@ -5,10 +5,12 @@ import { Bandeau, Bouton, Champ, Chargement, Ecran, Texte } from "@/composants/b
 import { FicheInstance } from "@/composants/instances";
 import { useAjout } from "@/hooks/useAjout";
 import { nomParDefaut } from "@/natif/appareil";
+import { ouvrirConfidentialite } from "@/natif/navigateur";
 
 /** Ajouter un panel : son adresse (ou son code QR), sa fiche, puis la liaison. */
 export default function Ajouter() {
   const t = useTranslations("mobile.ajout");
+  const ti = useTranslations("mobile.instances");
   const router = useRouter();
   const { adresse: scannee } = useLocalSearchParams<{ adresse?: string }>();
   const { etape, verifier, relier, recommencer } = useAjout();
@@ -42,6 +44,11 @@ export default function Ajouter() {
             titre={t("scanner")}
             variante="secondaire"
             onPress={() => router.push("/scanner")}
+          />
+          <Bouton
+            titre={ti("confidentialite")}
+            variante="secondaire"
+            onPress={ouvrirConfidentialite}
           />
         </>
       ) : etape.etape === "verification" ? (

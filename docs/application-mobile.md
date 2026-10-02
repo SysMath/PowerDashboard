@@ -145,7 +145,8 @@ sert à rien). Un panel le dit dans son descripteur (`notifications`) :
 
 `.github/workflows/mobile.yml` construit, signe et envoie l'application sur
 les **pistes de test** : piste interne de Google Play et TestFlight. La
-publication au public se fait ensuite à la main, dans chaque console.
+publication au public se fait ensuite à la main, dans chaque console (voir
+« Publication au public »).
 
 ### Une fois pour toutes
 
@@ -234,3 +235,102 @@ dans un trousseau jetable, détruit même en échec. Le code des dépendances
 tourne dans le conteneur où l'application se signe : c'est le cas de toute
 construction, et la signature par Google Play et la publication à la main
 bornent ce qu'une clé volée permettrait.
+
+## Publication au public
+
+`mobile.yml` s'arrête aux pistes de test. Le passage au public se fait dans
+chaque console, après le banc réel ci-dessous, avec ce que les consoles
+demandent et que le dépôt tient prêt.
+
+### Ce que demandent les consoles
+
+- **Fiche** (nom, sous-titre, descriptions, mots-clés, nouveautés), en
+  français et en anglais : `apps/mobile/magasins/fiche.ts`, à recopier.
+  Ses longueurs sont vérifiées par `fiche.test.ts`. Elle ne cite aucune
+  marque d'autrui, ni nom de jeu ni logiciel tiers.
+- **Catégorie** : *Utilitaires* chez Apple, *Outils* chez Google.
+- **Politique de confidentialité** :
+  `https://github.com/SysMath/PowerDashboard/blob/main/docs/confidentialite-application.md`.
+  C'est aussi la page qu'ouvre le bouton « Politique de confidentialité »
+  de l'application, avant toute liaison (`src/noyau/editeur.ts`).
+- **Assistance** : `https://github.com/SysMath/PowerDashboard/issues`, et
+  une adresse de contact de l'éditeur, que la politique renvoie à la fiche.
+- **Chiffrement** : rien à déclarer. L'application n'emploie que le HTTPS
+  et le chiffrement du système (`usesNonExemptEncryption: false` dans
+  `app.config.ts`).
+- **Manifeste de confidentialité d'iOS** : écrit par `expo prebuild` depuis
+  `apps/mobile/magasins/confidentialite.ts` (aucun pistage, aucune collecte
+  par l'éditeur, raisons des interfaces de React Native et d'Expo).
+- **Âge** : 4+ chez Apple (aucune des catégories de contenu, pas d'accès
+  web libre : l'application n'ouvre que les pages du panel relié). Chez
+  Google, questionnaire IARC en catégorie « Utilitaire » : non à toutes les
+  questions. La console montre les journaux d'un serveur, chat des joueurs
+  compris : ce n'est pas un échange entre utilisateurs de l'application.
+- **Accès pour les vérificateurs** : Apple (règle 2.1) et Google (*Accès à
+  l'application*) doivent pouvoir essayer toute l'application, sans panel à
+  eux. Mode démo dans l'application ou panel de démonstration : à décider
+  avant la première soumission.
+
+### Déclarations de données
+
+Recommandation, à confirmer par Matheo dans chaque console : ce que
+l'application envoie va au panel que la personne relie, pas à l'éditeur,
+comme pour les applications d'autres logiciels auto-hébergés.
+
+| Question | Apple (*App Privacy*) | Google (*Sécurité des données*) |
+|---|---|---|
+| Données collectées par l'éditeur | Aucune (*Data Not Collected*) | Construction sans notifications : aucune. Avec : « Identifiants de l'appareil ou autres » (jeton de notification, identifiant d'installation de Firebase), pour le fonctionnement de l'application, facultatif |
+| Partage avec des tiers | Non | Non |
+| Pistage, publicité | Non | Non |
+| Chiffrement en transit | — | Oui |
+| Suppression à la demande | — | Oui : délier le téléphone ou désinstaller l'application efface l'inscription |
+
+Le jeton de notification qu'Apple ne range dans aucun de ses types de
+données n'est pas une « donnée collectée » au sens d'Apple. Firebase Cloud
+Messaging, lui, est déclaré chez Google comme Firebase le demande.
+
+### Captures
+
+À prendre au banc, sur des données de démonstration :
+
+- **Apple** : iPhone 6,9 pouces (1320 × 2868) et, l'application acceptant
+  l'iPad, iPad 13 pouces (2064 × 2752) ; trois à dix chacune.
+- **Google** : deux à huit captures de téléphone (1080 × 1920 au moins),
+  la bannière 1024 × 500 et l'icône 512 × 512.
+- Écrans conseillés : la liste des serveurs, un serveur et sa console, les
+  sauvegardes, les fichiers, l'espace revendeur, l'aperçu de
+  l'administration.
+
+### Banc réel, avant chaque publication
+
+Sur un iPhone et un téléphone Android, avec la version de la piste de test :
+
+1. Lier un panel par son code QR, puis un second par son adresse ; les deux
+   restent séparés.
+2. Fermer et rouvrir l'application : la biométrie est demandée ; la
+   refuser n'ouvre rien.
+3. Démarrer, arrêter un serveur ; lire et écrire dans sa console.
+4. Créer une sauvegarde, la restaurer (biométrie), la supprimer.
+5. Envoyer un fichier depuis le téléphone, en modifier un, en télécharger
+   un vers le partage du système.
+6. Notifications : en mode direct, puis par le relais ; toucher une
+   notification ouvre la cloche du bon panel.
+7. Compte revendeur : enveloppe, clients, suspension d'un serveur,
+   consommation.
+8. Compte administrateur : aperçu, suspension d'un compte avec motif,
+   incident ouvert puis clos ; compte support : rien ne s'écrit.
+9. Retirer le téléphone depuis le panel : l'application le dit et propose
+   de relier.
+10. Délier depuis l'application : le panel ne montre plus l'appareil.
+11. Installer la version suivante par-dessus : les liaisons restent.
+12. Restaurer le téléphone depuis une sauvegarde, ou passer à un autre
+    téléphone : les liaisons sont à refaire, aucun secret n'a suivi.
+
+### Promouvoir
+
+- **Google Play** : *Tests › Test interne*, *Promouvoir la version* vers
+  *Production*, en déploiement progressif (20 %, puis 100 %). Après la
+  toute première publication, retirer la variable `PLAY_STATUT`.
+- **Apple** : dans App Store Connect, nouvelle version, choisir le build
+  venu de TestFlight, puis *Soumettre pour vérification*, en publication
+  manuelle une fois acceptée.

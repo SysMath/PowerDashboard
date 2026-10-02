@@ -1,5 +1,6 @@
 import { APP_REDIRECT_URI } from "@gamedashboard/contracts";
 import * as WebBrowser from "expo-web-browser";
+import { POLITIQUE_CONFIDENTIALITE } from "@/noyau/editeur";
 
 /**
  * Ouvre la page de liaison dans le navigateur système
@@ -20,4 +21,9 @@ export async function ouvrirLiaison(url: string): Promise<string | null> {
 /** Ouvre une page du panel dans le navigateur (ce qui reste sur le web). */
 export function ouvrirPanel(adresse: string, chemin = "/"): Promise<unknown> {
   return WebBrowser.openBrowserAsync(`${adresse}${chemin}`);
+}
+
+/** La politique de confidentialité de l'application, la même que dans les magasins. */
+export function ouvrirConfidentialite(): Promise<unknown> {
+  return WebBrowser.openBrowserAsync(POLITIQUE_CONFIDENTIALITE);
 }

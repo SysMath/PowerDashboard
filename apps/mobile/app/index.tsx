@@ -4,6 +4,7 @@ import { useTranslations } from "use-intl";
 import { Bouton, Chargement, Ecran } from "@/composants/base";
 import { ListeInstances } from "@/composants/instances";
 import { useApplis } from "@/etat/applis";
+import { ouvrirConfidentialite } from "@/natif/navigateur";
 import type { InstanceLiee } from "@/noyau/instances";
 
 /** Au lancement, un seul panel lié s'ouvre directement ; ensuite, la liste. */
@@ -34,6 +35,7 @@ export default function Accueil() {
       <Stack.Screen options={{ title: t("titre") }} />
       <ListeInstances instances={instances} onOuvrir={(i) => router.push(`/${i.id}`)} />
       <Bouton titre={t("ajouter")} variante="secondaire" onPress={() => router.push("/ajouter")} />
+      <Bouton titre={t("confidentialite")} variante="secondaire" onPress={ouvrirConfidentialite} />
     </Ecran>
   );
 }

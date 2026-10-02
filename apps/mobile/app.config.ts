@@ -1,5 +1,6 @@
 import type { ExpoConfig } from "expo/config";
 import { IDENTIFIANT } from "./identifiant.ts";
+import { MANIFESTE_CONFIDENTIALITE } from "./magasins/confidentialite.ts";
 import { avecSignature } from "./plugins/signature.ts";
 
 /**
@@ -68,6 +69,8 @@ const config: ExpoConfig = {
     buildNumber: String(construction),
     supportsTablet: true,
     config: { usesNonExemptEncryption: false },
+    // Exigé par Apple depuis 2024 : voir magasins/confidentialite.ts.
+    privacyManifests: MANIFESTE_CONFIDENTIALITE,
     infoPlist: {
       NSFaceIDUsageDescription:
         "Face ID ouvre la clé qui relie ce téléphone à vos panels et confirme les gestes importants.",

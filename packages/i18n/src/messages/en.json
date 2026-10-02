@@ -2770,7 +2770,8 @@
         "liee": "Linked",
         "a-confirmer": "Check needed",
         "a-relier": "Link again"
-      }
+      },
+      "confidentialite": "Privacy policy"
     },
     "ajout": {
       "titre": "Add a panel",
