@@ -104,6 +104,17 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "backup.restore_expired": { category: "backups", label: "Restauration sans nouvelles" },
   "backup.delete": { category: "backups", label: "Sauvegarde supprimée" },
   "backup.lock": { category: "backups", label: "Verrou de sauvegarde modifié" },
+  // Instantanés de volumes (ADR 0009).
+  "snapshot.create": { category: "backups", label: "Instantané demandé" },
+  "snapshot.pin": { category: "backups", label: "Instantané épinglé" },
+  "snapshot.unpin": { category: "backups", label: "Instantané désépinglé" },
+  "snapshot.restore": { category: "backups", label: "Restauration d'instantané demandée" },
+  "snapshot.restore_completed": { category: "backups", label: "Instantané restauré" },
+  "snapshot.restore_failed": { category: "backups", label: "Restauration d'instantané échouée" },
+  "backup.restore_safety": {
+    category: "backups",
+    label: "Instantané de sûreté avant restauration",
+  },
   /**
    * Emporter une archive, c'est emporter tout le serveur — fichiers de
    * configuration, mots de passe RCON et clés d'API compris. La route le
@@ -213,6 +224,7 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "access.denied": { category: "access", label: "Accès refusé" },
   "application.key_rejected": { category: "access", label: "Clé applicative refusée" },
   "node.token_rejected": { category: "access", label: "Jeton de node refusé" },
+  "node.agent_token_rejected": { category: "access", label: "Jeton d'agent de node refusé" },
 
   /**
    * Gestes d'administration de la plateforme.
@@ -289,6 +301,15 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   "admin.server_suspended": { category: "power", label: "Serveur suspendu par l'administration" },
   "admin.server_resumed": { category: "power", label: "Serveur rétabli par l'administration" },
   "admin.server_deleted": { category: "settings", label: "Serveur supprimé par l'administration" },
+  "admin.snapshot_defaults_updated": {
+    category: "settings",
+    label: "Réglages par défaut des instantanés modifiés",
+  },
+  "admin.snapshot_policy_updated": {
+    category: "settings",
+    label: "Réglages des instantanés d'un node modifiés",
+  },
+  "admin.snapshot_destroyed": { category: "backups", label: "Instantané détruit" },
   "admin.node_category_created": { category: "settings", label: "Catégorie de nodes créée" },
   "admin.node_category_removed": { category: "settings", label: "Catégorie de nodes supprimée" },
   "admin.node_subcategory_created": {
@@ -436,6 +457,15 @@ export const ACTIVITY_EVENTS: Record<string, ActivityDescriptor> = {
   // Nommés par une condition, ils échappaient au contrôle de couverture et
   // s'affichaient sous leur identifiant brut.
   "node.token_rotated": { category: "access", label: "Jeton d'un node renouvelé" },
+  // Agent de node (ADR 0008) : sa mise en service, son retrait, et son
+  // journal local, rangé ici au nom du node.
+  "node.agent_configured": { category: "access", label: "Agent de node configuré" },
+  "node.agent_revoked": { category: "access", label: "Agent de node retiré" },
+  "node.agent_journal": { category: "settings", label: "Journal de l'agent de node" },
+  "node.agent_journal_gap": {
+    category: "settings",
+    label: "Journal de l'agent : entrées perdues sur la machine (30 jours ou 50 Mo)",
+  },
   "node.token_rotation_failed": {
     category: "access",
     label: "Renouvellement du jeton d'un node : daemon injoignable, rien changé",

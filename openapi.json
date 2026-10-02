@@ -52,6 +52,9 @@
       "name": "Infrastructure"
     },
     {
+      "name": "Instantanés"
+    },
+    {
       "name": "Mise en service"
     },
     {
@@ -2511,7 +2514,7 @@
     },
     "/api/v1/client/servers/{server}/backups/{backup}/restore": {
       "post": {
-        "summary": "Restaurer une sauvegarde sur le serveur. Le serveur reste fermé (démarrage, fichiers, SFTP) jusqu'au compte rendu du daemon ; refusé (409) sur un serveur déjà occupé ou pour une sauvegarde en cours ou ratée.",
+        "summary": "Restaurer une sauvegarde sur le serveur. Le serveur reste fermé (démarrage, fichiers, SFTP) jusqu'au compte rendu du daemon ; refusé (409) sur un serveur déjà occupé ou pour une sauvegarde en cours ou ratée. Sur un node qui prend des instantanés, un instantané de sûreté est pris d'abord (40 s d'attente au plus).",
         "description": "Clé personnelle. Portée requise : `backups.restore`.",
         "tags": [
           "Sauvegardes"
@@ -2637,6 +2640,314 @@
           },
           "2XX": {
             "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/snapshots": {
+      "get": {
+        "summary": "Lister les instantanés du serveur sur son node (nom, date, cause, expiration, épingle) et l'état de la fonction (meta : système de fichiers, espace libre, écritures acceptées, épingles, prochaine demande manuelle possible). 404 si aucun agent du node n'offre les instantanés.",
+        "description": "Clé personnelle. Portée requise : `snapshots.read`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-get-servers-by-server-snapshots",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.read"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.read",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.read », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      },
+      "post": {
+        "summary": "Demander un instantané manuel. Répond 202 avec l'ordre : l'agent du node le prend à son relevé suivant, et une demande déjà en attente est rendue telle quelle. Refusé (409) si l'agent ne répond plus, si la fonction ou les demandes manuelles sont coupées sur ce node ou si l'espace libre manque, (429) avant la fin du délai entre deux demandes.",
+        "description": "Clé personnelle. Portée requise : `snapshots.create`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-post-servers-by-server-snapshots",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.create"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.create",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/snapshots/{snapshot}/pin": {
+      "post": {
+        "summary": "Épingler un instantané : { label? }. La rotation ne le détruit plus, jusqu'à la durée maximale du node. Refusé (409) au-delà de la limite d'épingles du serveur.",
+        "description": "Clé personnelle. Portée requise : `snapshots.create`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-post-servers-by-server-snapshots-by-snapshot-pin",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "description": "Valeur de « snapshot ».",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.create"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.create",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Désépingler un instantané : la rotation le reprend.",
+        "description": "Clé personnelle. Portée requise : `snapshots.create`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-delete-servers-by-server-snapshots-by-snapshot-pin",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "description": "Valeur de « snapshot ».",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.create"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.create",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/snapshots/{snapshot}/restore": {
+      "post": {
+        "summary": "Restaurer le serveur depuis un instantané. Répond 202 : le serveur passe en restauration (démarrage, fichiers, SFTP refusés), s'arrête, puis l'agent prend un instantané de sûreté et recopie le dossier ; le serveur reste arrêté. Abandonné et rendu s'il ne s'arrête pas en 3 min. Refusé (409) sur un serveur occupé, quand l'agent se tait ou sous le seuil d'espace libre.",
+        "description": "Clé personnelle. Portée requise : `snapshots.restore`.",
+        "tags": [
+          "Instantanés"
+        ],
+        "operationId": "client-post-servers-by-server-snapshots-by-snapshot-restore",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshot",
+            "in": "path",
+            "required": true,
+            "description": "Valeur de « snapshot ».",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "snapshots.restore"
+            ]
+          }
+        ],
+        "x-gd-scope": "snapshots.restore",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « snapshots.restore », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
           }
         }
       }
@@ -3696,7 +4007,7 @@
         }
       },
       "post": {
-        "summary": "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte Idempotency-Key. Une clé de revendeur ne le donne qu'à un compte client non suspendu, entièrement chez elle, ou encore sans serveur et créé par sa propre clé (POST /users) ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs.",
+        "summary": "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte Idempotency-Key. Une clé de revendeur ne le donne qu'à un compte client non suspendu, entièrement chez elle, ou encore sans serveur et créé par sa propre clé (POST /users) ; sans serveur, il ne doit être invité sur aucun serveur d'ailleurs. resources.snapshots (facultatif) fixe le nombre d'instantanés épinglés, la limite du node sinon.",
         "description": "Clé de plateforme. Portée requise : `servers.create`.",
         "tags": [
           "Serveurs"
@@ -3797,7 +4108,7 @@
         }
       },
       "patch": {
-        "summary": "Changer les limites d'un serveur (mémoire, disque, CPU, swap, allocations, sauvegardes, bases). Seuls les champs envoyés changent.",
+        "summary": "Changer les limites d'un serveur (mémoire, disque, CPU, swap, allocations, sauvegardes, bases, instantanés épinglés). Seuls les champs envoyés changent ; snapshots: null rend la limite par défaut du node.",
         "description": "Clé de plateforme. Portée requise : `servers.resize`.",
         "tags": [
           "Serveurs"

@@ -12,6 +12,7 @@ import { DATABASE } from "../../common/database.provider";
 import { S3Service } from "../storage/s3.service";
 import { WingsClientService, WingsUnavailableError } from "../wings/wings-client.service";
 import { WingsTokenService } from "../wings/wings-token.service";
+import { BackupHooks } from "./backup-hooks";
 
 /** Intervalle de relecture d'une sauvegarde attendue. */
 const BACKUP_POLL_MS = 3000;
@@ -24,6 +25,11 @@ export interface ClientBackup {
   /** `null` tant que le daemon n'a pas rendu compte : la sauvegarde est en cours. */
   isSuccessful: boolean | null;
   isLocked: boolean;
+  /**
+   * `snapshot` : archive tirée d'un instantané par l'agent de node, donc
+   * cohérente (ADR 0009) ; `wings` sinon. Elle se restaure pareil.
+   */
+  source: "wings" | "snapshot";
   createdAt: string;
   completedAt: string | null;
 }
@@ -43,6 +49,7 @@ export class BackupsService {
     @Inject(WingsClientService) private readonly wings: WingsClientService,
     @Inject(WingsTokenService) private readonly tokens: WingsTokenService,
     @Inject(S3Service) private readonly s3: S3Service,
+    @Inject(BackupHooks) private readonly hooks: BackupHooks,
   ) {}
 
   /**
@@ -156,6 +163,16 @@ export class BackupsService {
     });
 
     if (!row) throw new BadRequestException("Sauvegarde non enregistrée.");
+
+    /*
+     * Une archive distante, sur un node qui prend des instantanés, est
+     * tirée d'un instantané par l'agent (ADR 0009) : cohérente, au même
+     * format, déposée par les mêmes liens signés. S'il ne peut pas la
+     * faire, Wings la fait, comme sans agent.
+     */
+    if (disk === "s3" && (await this.hooks.archiveElsewhere(serverId, row.id))) {
+      return project({ ...row, source: "snapshot" });
+    }
 
     try {
       // `wings` : le nom que le daemon donne à son adaptateur local.
@@ -322,6 +339,10 @@ export class BackupsService {
     }
 
     try {
+      // Sur un node qui prend des instantanés, un instantané de sûreté d'abord
+      // (ADR 0009) : une restauration de sauvegarde se défait alors. Le
+      // serveur est déjà en `restoring`, rien ne l'écrit pendant l'attente.
+      await this.hooks.beforeRestore(serverId, backupId);
       await this.wings.restoreBackup(serverId, backupId, truncate, downloadUrl);
     } catch (error) {
       // Refusée par le daemon, la restauration n'a pas commencé : aucun
@@ -375,6 +396,7 @@ function project(row: typeof backups.$inferSelect): ClientBackup {
     checksum: row.checksum,
     isSuccessful: row.isSuccessful,
     isLocked: row.isLocked,
+    source: row.source === "snapshot" ? "snapshot" : "wings",
     createdAt: row.createdAt,
     completedAt: row.completedAt,
   };

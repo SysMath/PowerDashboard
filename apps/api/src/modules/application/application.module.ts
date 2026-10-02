@@ -5,6 +5,7 @@ import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { AuthModule } from "../auth/auth.module";
 import { ClientModule } from "../client/client.module";
 import { ConsumptionModule } from "../consumption/consumption.module";
+import { NodeAgentModule } from "../node-agent/node-agent.module";
 import { ResellerModule } from "../reseller/reseller.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { WingsModule } from "../wings/wings.module";
@@ -16,6 +17,7 @@ import { ApplicationKeyRepository } from "./application-key.repository";
 import { ApplicationKeysController } from "./application-keys.controller";
 import { ApplicationKeysService } from "./application-keys.service";
 import { IdempotencyService } from "./idempotency.service";
+import { NodeAgentConfigurationController } from "./node-agent-configuration.controller";
 import { NodeConfigurationController } from "./node-configuration.controller";
 import { ResellerScopeService } from "./reseller-scope.service";
 import { WebhooksController } from "./webhooks.controller";
@@ -43,6 +45,8 @@ import { WebhooksController } from "./webhooks.controller";
     WebhooksModule,
     // La consommation journalière, pour la facturation à l'usage.
     ConsumptionModule,
+    // Le jeton de l'agent de node, tiré par `gamedashboard-agent configure`.
+    NodeAgentModule,
   ],
   controllers: [
     ApplicationController,
@@ -51,6 +55,8 @@ import { WebhooksController } from "./webhooks.controller";
     WebhooksController,
     // Sur `/api/application`, le préfixe que Wings impose — pas le nôtre.
     NodeConfigurationController,
+    // `gamedashboard-agent configure`, sur le même préfixe et la même clé.
+    NodeAgentConfigurationController,
   ],
   providers: [
     ApplicationService,

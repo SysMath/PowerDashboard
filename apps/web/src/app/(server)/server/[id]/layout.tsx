@@ -79,7 +79,9 @@ export default async function ServerLayout({
 
   return (
     <PanelShell
-      sections={enCours ? [] : serverNav(id, t, features)}
+      sections={
+        enCours ? [] : serverNav(id, t, { ...features, snapshots: courant.snapshots === true })
+      }
       serverId={id}
       /*
        * Le serveur regardé est ajouté s'il n'est pas déjà dans la liste.

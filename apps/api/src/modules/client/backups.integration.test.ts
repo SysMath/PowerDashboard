@@ -14,6 +14,7 @@ import { RESTORE_STALE_MS, RemoteBackupService } from "../remote/remote-backup.s
 import type { S3Service } from "../storage/s3.service";
 import { type WingsClientService, WingsUnavailableError } from "../wings/wings-client.service";
 import type { WingsTokenService } from "../wings/wings-token.service";
+import { BackupHooks } from "./backup-hooks";
 import { BackupsService } from "./backups.service";
 
 /**
@@ -34,6 +35,7 @@ describe.skipIf(!HAS_DATABASE)("BackupsService (intégration)", () => {
   let compartimentRegle: boolean;
   let lienSigne: string | null;
 
+  const hooks = new BackupHooks();
   const wings = {
     createBackup: vi.fn(async () => undefined),
     deleteBackup: vi.fn(async () => undefined),
@@ -57,6 +59,7 @@ describe.skipIf(!HAS_DATABASE)("BackupsService (intégration)", () => {
         backupDownloadGrant: async () => "https://node.test/grant",
       } as unknown as WingsTokenService,
       s3 as unknown as S3Service,
+      hooks,
     );
   }, 60_000);
 
@@ -112,6 +115,41 @@ describe.skipIf(!HAS_DATABASE)("BackupsService (intégration)", () => {
     expect((await ligne(creee.id))?.disk).toBe("local");
   });
 
+  /*
+   * ADR 0009 : sur un node qui prend des instantanés, l'archive distante est
+   * tirée d'un instantané par l'agent, et Wings n'est pas appelé. Jamais une
+   * archive locale, et jamais au prix de la sauvegarde : un agent en échec
+   * rend la main à Wings.
+   */
+  it("confie l'archive distante à l'agent quand il la prend, à Wings sinon", async () => {
+    const vues: string[] = [];
+    hooks.registerArchive(async (_serveur, sauvegarde) => {
+      vues.push(sauvegarde);
+      return true;
+    });
+    try {
+      const confiee = await service.create(serverId, "Nuit", []);
+      expect(confiee.source).toBe("snapshot");
+      expect(vues).toEqual([confiee.id]);
+      expect(wings.createBackup).not.toHaveBeenCalled();
+
+      compartimentRegle = false;
+      const locale = await service.create(serverId, "Locale", []);
+      expect(vues).toHaveLength(1);
+      expect(wings.createBackup).toHaveBeenCalledWith(serverId, locale.id, [], "wings");
+
+      compartimentRegle = true;
+      hooks.registerArchive(async () => {
+        throw new Error("agent muet");
+      });
+      const repli = await service.create(serverId, "Repli", []);
+      expect(repli.source).toBe("wings");
+      expect(wings.createBackup).toHaveBeenCalledWith(serverId, repli.id, [], "s3");
+    } finally {
+      hooks.registerArchive(async () => false);
+    }
+  });
+
   it("restaure une archive distante par le lien signé", async () => {
     const id = await terminee("s3");
     await service.restore(serverId, id, true);
@@ -130,6 +168,34 @@ describe.skipIf(!HAS_DATABASE)("BackupsService (intégration)", () => {
 
     expect(wings.restoreBackup).toHaveBeenCalledWith(serverId, id, false, undefined);
     expect(s3.presignDownload).not.toHaveBeenCalled();
+  });
+
+  /*
+   * ADR 0009 : sur un node qui prend des instantanés, un instantané de sûreté
+   * est pris avant que Wings ne touche aux fichiers, serveur déjà fermé. Un
+   * agent en échec ne retient pas la restauration.
+   */
+  it("passe par l'instantané de sûreté avant de rendre l'archive à Wings", async () => {
+    const id = await terminee("local");
+    const vu: { state: string | null; wingsAppele: boolean }[] = [];
+    hooks.register(async (serveur) => {
+      const [row] = await db
+        .select({ state: servers.state })
+        .from(servers)
+        .where(eq(servers.id, serveur));
+      vu.push({
+        state: row?.state ?? null,
+        wingsAppele: wings.restoreBackup.mock.calls.length > 0,
+      });
+      throw new Error("agent muet");
+    });
+    try {
+      await service.restore(serverId, id, false);
+    } finally {
+      hooks.register(async () => undefined);
+    }
+    expect(vu).toEqual([{ state: "restoring", wingsAppele: false }]);
+    expect(wings.restoreBackup).toHaveBeenCalledWith(serverId, id, false, undefined);
   });
 
   it("refuse de restaurer une archive distante quand le compartiment n'est plus réglé", async () => {

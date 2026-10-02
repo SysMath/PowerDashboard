@@ -8,6 +8,8 @@ import { ConsumptionModule } from "../consumption/consumption.module";
 import { DnsModule } from "../dns/dns.module";
 import { MailerService } from "../mail/mailer.service";
 import { MarketplaceModule } from "../marketplace/marketplace.module";
+import { NodeAgentRepository } from "../node-agent/node-agent.repository";
+import { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { ResellerModule } from "../reseller/reseller.module";
 import { StorageModule } from "../storage/storage.module";
@@ -17,6 +19,7 @@ import { AccountController } from "./account.controller";
 import { AccountPreferencesService } from "./account-preferences.service";
 import { AllocationsService } from "./allocations.service";
 import { ApiKeysService } from "./api-keys.service";
+import { BackupHooks } from "./backup-hooks";
 import { BackupsService } from "./backups.service";
 import { CatalogueService } from "./catalogue.service";
 import { ClientController } from "./client.controller";
@@ -94,6 +97,7 @@ import { SubusersService } from "./subusers.service";
     // Les rappels sortants que le client déclare sur son serveur.
     ServerWebhooksService,
     BackupsService,
+    BackupHooks,
     DatabasesService,
     MysqlProvisionerService,
     AllocationsService,
@@ -110,6 +114,11 @@ import { SubusersService } from "./subusers.service";
     ServerResizeService,
     // Pour le défaut du tueur de mémoire, décidé par la plateforme.
     PlatformSettingsService,
+    // Fournis ici et non importés : le module de l'agent importe
+    // l'administration, qui importe ce module. Sans état, deux instances ne
+    // divergent pas.
+    NodeAgentRepository,
+    NodeCapabilitiesService,
     // L'écran des notifications doit pouvoir dire si le courriel partira :
     // proposer une case qui n'enverra rien fait attendre des messages qui ne
     // viendront jamais.
@@ -134,9 +143,14 @@ import { SubusersService } from "./subusers.service";
     // regardée.
     ServerResizeService,
     BackupsService,
+    // Le module des instantanés s'y inscrit (sûreté avant une restauration).
+    BackupHooks,
     // Pour le changement de titulaire : les mots de passe des bases changent
     // avec lui, par le même chemin que le bouton du client.
     DatabasesService,
+    // Le contrôle d'accès d'un serveur, pour les routes client des fonctions
+    // de l'agent de node (instantanés) : une seule règle des permissions.
+    ServerAccessService,
   ],
 })
 export class ClientModule {}

@@ -1,10 +1,12 @@
 import { relations, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
+  bigint,
   boolean,
   char,
   index,
   integer,
+  jsonb,
   pgTable,
   real,
   text,
@@ -249,6 +251,58 @@ export const nodeOutages = pgTable(
     ...timestamps,
   },
   (table) => [index("node_outage_node_started_idx").on(table.nodeId, table.startedAt)],
+);
+
+/**
+ * Agent de node (ADR 0008, ADR 0009) : au plus un par node, **facultatif**.
+ *
+ * L'agent vit à côté de Wings, qu'il ne remplace ni ne modifie. Il s'annonce
+ * comme le daemon : `Authorization: Bearer <token_id>.<token>`, identifiant
+ * lisible pour la recherche, secret chiffré lié à la ligne
+ * (`node_agents.token_enc:<node>`), comparaison à temps constant. Le panel
+ * n'appelle jamais l'agent : seule la moitié « la machine appelle le panel »
+ * du modèle de Wings est reprise.
+ *
+ * Pas de ligne, pas d'agent : `nodeCapabilities()` retire alors tout ce qui
+ * en dépend, et rien d'autre ne change.
+ */
+export const nodeAgents = pgTable(
+  "node_agents",
+  {
+    nodeId: uuid("node_id")
+      .primaryKey()
+      .references(() => nodes.id, { onDelete: "cascade" }),
+    tokenId: varchar("token_id", { length: 32 }).notNull(),
+    tokenEnc: text("token_enc").notNull(),
+    /** Émis par `gamedashboard-agent configure` : chaque appel en tire un neuf. */
+    tokenIssuedAt: moment("token_issued_at").notNull(),
+    version: varchar("version", { length: 32 }),
+    /**
+     * Fonctions actives dans le `config.yml` de l'agent, telles qu'annoncées.
+     *
+     * Ce que l'agent annonce **est** la capacité du node : personne ne coche
+     * une case qui pourrait mentir.
+     */
+    functions: text("functions").array().notNull().default([]),
+    /**
+     * Dernier signe de vie de chaque fonction, `{ fonction: instant }`.
+     *
+     * Chaque fonction tourne dans son propre service : l'une peut s'être tue
+     * pendant que l'autre parle encore.
+     */
+    functionsSeen: jsonb("functions_seen").$type<Record<string, string>>().notNull().default({}),
+    lastSeenAt: moment("last_seen_at"),
+    /**
+     * Dernière entrée du journal de l'agent déjà rangée au journal d'activité.
+     *
+     * Une entrée renvoyée (accusé perdu, deux services qui envoient en même
+     * temps) n'est pas consignée deux fois. Remis à zéro par `configure` : une
+     * base locale neuve recommence sa numérotation.
+     */
+    journalAckedId: bigint("journal_acked_id", { mode: "number" }).notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("node_agent_token_id_unique").on(table.tokenId)],
 );
 
 export const allocations = pgTable(

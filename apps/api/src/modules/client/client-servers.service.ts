@@ -243,6 +243,16 @@ export class ClientServersService {
     return rows[0] ?? null;
   }
 
+  /** La machine du serveur, pour ce qu'elle offre. Gardée hors de la vue client. */
+  async nodeOf(serverId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ nodeId: servers.nodeId })
+      .from(servers)
+      .where(eq(servers.id, serverId))
+      .limit(1);
+    return row?.nodeId ?? null;
+  }
+
   /**
    * Les commandes que l'egg du serveur propose à la console.
    *

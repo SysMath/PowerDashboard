@@ -178,6 +178,8 @@ export interface RekeyTarget {
  */
 export const REKEY_TARGETS: readonly RekeyTarget[] = [
   { table: "nodes", key: "id", column: "daemon_token_enc" },
+  // Clé de ligne : le node, la table n'ayant pas d'autre identifiant.
+  { table: "node_agents", key: "node_id", column: "token_enc" },
   { table: "database_hosts", key: "id", column: "password_enc" },
   { table: "databases", key: "id", column: "password_enc" },
   { table: "user_credentials_totp", key: "id", column: "secret_enc" },

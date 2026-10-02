@@ -15,6 +15,7 @@ import {
   HardDrive,
   History,
   Key,
+  Layers,
   LayoutDashboard,
   Megaphone,
   Network,
@@ -192,7 +193,7 @@ export function serverNav(
   id: string,
   t: Translate,
   /** Drapeaux levés. Une entrée retirée ici l'est aussi côté API. */
-  features: { marketplace: boolean } = { marketplace: true },
+  features: { marketplace: boolean; snapshots?: boolean } = { marketplace: true },
 ): NavSection[] {
   const base = `/server/${id}`;
   return [
@@ -217,6 +218,10 @@ export function serverNav(
       items: [
         { label: t("databases"), href: `${base}/databases`, icon: <Database /> },
         { label: t("backups"), href: `${base}/backups`, icon: <Archive /> },
+        // Seulement là où la machine les offre (agent de node, ADR 0009).
+        ...(features.snapshots
+          ? [{ label: t("snapshots"), href: `${base}/snapshots`, icon: <Layers /> }]
+          : []),
         { label: t("subusers"), href: `${base}/users`, icon: <Users /> },
         { label: t("network"), href: `${base}/network`, icon: <Network /> },
       ],

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SNAPSHOT_BOUNDS } from "./snapshots";
 
 /**
  * États de gestion, propres au panel et stockés en base.
@@ -194,6 +195,11 @@ export const ServerLimitsPatch = z
     allocations: z.number().int().nonnegative().optional(),
     backups: z.number().int().nonnegative().optional(),
     databases: z.number().int().nonnegative().optional(),
+    /**
+     * Instantanés épinglés au plus (ADR 0009). `null` rend le serveur à la
+     * limite par défaut de son node.
+     */
+    snapshots: z.number().int().min(0).max(SNAPSHOT_BOUNDS.pinLimitMax).nullable().optional(),
   })
   // Un corps vide ne changerait rien tout en ayant l'air d'avoir agi : mieux
   // vaut le refuser que rendre 200 sur un geste qui n'a pas eu lieu.

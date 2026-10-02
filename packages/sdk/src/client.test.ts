@@ -171,6 +171,12 @@ describe("GameDashboardClient", () => {
     await c.command(id, "say bonjour");
     await c.players(id);
     await c.playerAction(id, { action: "kick", player: "Steve" });
+    const nom = "gd-20260930T120000.000Z";
+    await c.snapshots(id);
+    await c.takeSnapshot(id);
+    await c.pinSnapshot(id, nom, "avant la mise à jour");
+    await c.unpinSnapshot(id, nom);
+    await c.restoreSnapshot(id, nom);
     await c.createServer({});
     await c.suspendServer(id, "impayé");
     await c.unsuspendServer(id);
@@ -183,7 +189,7 @@ describe("GameDashboardClient", () => {
 
     const visees = appel.mock.calls.map(
       ([url, init]) =>
-        `${init?.method ?? "GET"} ${forme(new URL(String(url)).pathname.replace(id, "{x}"))}`,
+        `${init?.method ?? "GET"} ${forme(new URL(String(url)).pathname.replace(id, "{x}").replace(nom, "{x}"))}`,
     );
     expect(visees.filter((route) => !connues.has(route))).toEqual([]);
   });

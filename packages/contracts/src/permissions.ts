@@ -22,6 +22,11 @@ export const SERVER_PERMISSIONS = [
   "backups.download",
   "backups.restore",
   "backups.delete",
+  // Instantanés de volumes (ADR 0009) : pris par l'agent de node, sur les
+  // seules machines qui en ont un. Épingler compte comme prendre.
+  "snapshots.read",
+  "snapshots.create",
+  "snapshots.restore",
   "databases.read",
   "databases.create",
   "databases.update",
@@ -59,7 +64,14 @@ export const SubuserRolePreset = z.enum(["viewer", "moderator", "developer", "ow
 export type SubuserRolePreset = z.infer<typeof SubuserRolePreset>;
 
 export const ROLE_PRESETS: Record<SubuserRolePreset, readonly ServerPermission[]> = {
-  viewer: ["console.read", "files.read", "backups.read", "activity.read", "players.read"],
+  viewer: [
+    "console.read",
+    "files.read",
+    "backups.read",
+    "snapshots.read",
+    "activity.read",
+    "players.read",
+  ],
   moderator: [
     "console.read",
     "console.send",
@@ -68,6 +80,7 @@ export const ROLE_PRESETS: Record<SubuserRolePreset, readonly ServerPermission[]
     "power.restart",
     "files.read",
     "backups.read",
+    "snapshots.read",
     "activity.read",
     "players.read",
     "players.manage",
@@ -304,6 +317,20 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     ],
   },
   {
+    key: "snapshots",
+    label: "Instantanés",
+    permissions: [
+      { value: "snapshots.read", label: "Lister" },
+      { value: "snapshots.create", label: "Prendre et épingler" },
+      {
+        value: "snapshots.restore",
+        label: "Restaurer",
+        warning:
+          "Arrête le serveur et remet ses fichiers dans l'état de l'instantané ; un instantané de sûreté est pris juste avant.",
+      },
+    ],
+  },
+  {
     key: "databases",
     label: "Bases de données",
     permissions: [
@@ -423,6 +450,7 @@ export const SUPPORT_SERVER_PERMISSIONS: readonly ServerPermission[] = [
   "console.read",
   "files.read",
   "backups.read",
+  "snapshots.read",
   "databases.read",
   "schedules.read",
   "subusers.read",

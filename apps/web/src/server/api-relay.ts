@@ -1,5 +1,9 @@
 import "server-only";
-import { WINGS_CONFIGURE_PREFIX, WINGS_REMOTE_PREFIX } from "@gamedashboard/contracts";
+import {
+  NODE_AGENT_PREFIX,
+  WINGS_CONFIGURE_PREFIX,
+  WINGS_REMOTE_PREFIX,
+} from "@gamedashboard/contracts";
 
 /**
  * Relais vers l'API des chemins qu'elle sert **au monde**, quand aucun proxy
@@ -29,7 +33,13 @@ const API_URL = process.env.API_URL ?? "http://127.0.0.1:3201";
  * plus le signal de release, qui n'existe que sur un hébergement autonome
  * (src/modules/updates dans l'API) et y reste inerte sans son secret.
  */
-const PREFIXES = [`${WINGS_REMOTE_PREFIX}/`, `${WINGS_CONFIGURE_PREFIX}/`, "/api/v1/application/"];
+const PREFIXES = [
+  `${WINGS_REMOTE_PREFIX}/`,
+  `${WINGS_CONFIGURE_PREFIX}/`,
+  // L'agent de node facultatif (ADR 0008), sur le modèle du daemon.
+  `${NODE_AGENT_PREFIX}/`,
+  "/api/v1/application/",
+];
 const EXACTS = ["/api/v1/openapi.json", "/api/v1/status", "/api/v1/updates/signal"];
 
 export function relayablePath(pathname: string): boolean {

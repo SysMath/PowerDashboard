@@ -22,8 +22,8 @@ Apache ─► Passenger ─► interface (Next) ──► https://api.<domaine>
 ```
 
 Deux applications Node.js, chacune sur son nom. L'adresse du panel ne sert
-que l'interface : les appels de Wings (`/api/remote/…`, `/api/application/…`)
-et ceux de la facturation (`/api/v1/application/…`) y sont **relayés** vers
+que l'interface : les appels de Wings (`/api/remote/…`, `/api/application/…`),
+de l'agent de node facultatif (`/api/node-agent/…`) et ceux de la facturation (`/api/v1/application/…`) y sont **relayés** vers
 l'API par Next (`apps/web/src/server/api-relay.ts`), exactement pour les
 chemins que nginx aiguille en production. Wings reste inchangé.
 

@@ -137,11 +137,17 @@ export function buildWingsNodeConfiguration(
   };
 }
 
-/** L'origine sans ses barres finales, en temps linéaire (pas de regex `\/+$`). */
-function sansBarresFinales(origine: string): string {
-  let fin = origine.length;
-  while (fin > 0 && origine[fin - 1] === "/") fin--;
-  return origine.slice(0, fin);
+/**
+ * Retire les barres obliques finales d'une adresse.
+ *
+ * Sans expression régulière : `/\/+$/` est quadratique sur une longue suite
+ * de barres qui ne finit pas la chaîne (CodeQL `js/polynomial-redos`), et
+ * l'adresse vient d'une variable d'environnement.
+ */
+export function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
 }
 
 /**
@@ -159,7 +165,7 @@ export function wingsConfigureCommand(input: {
 }): string {
   return [
     "wings configure",
-    `--panel-url ${sansBarresFinales(input.panelOrigin)}`,
+    `--panel-url ${withoutTrailingSlashes(input.panelOrigin)}`,
     `--token ${input.token ?? "<clé applicative>"}`,
     // Toujours en option : l'invite interactive refuse un UUID.
     `--node ${input.nodeId}`,

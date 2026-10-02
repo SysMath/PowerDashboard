@@ -117,7 +117,7 @@ actif ou non.
 
 **nginx ne relaie vers l'API que ce qui doit sortir** : `/api/v1/application/`
 pour le système de facturation tiers, `/api/remote/` pour les daemons Wings,
-et `/api/v1/status` pour une supervision. Tout le reste de l'API — client,
+`/api/node-agent/` pour l'agent de node facultatif, et `/api/v1/status` pour une supervision. Tout le reste de l'API — client,
 revendeur, administration — n'est appelé que par l'interface, depuis la
 machine. Demandé de l'extérieur, `/api/v1/admin/...` tombe sur Next, qui
 répond 404.
@@ -130,7 +130,8 @@ l'utilisateur. Une faille de rendu ne donne pas la base.
 rien d'existant n'est modifié, et `nginx -t` précède chaque rechargement. Le
 code de refus des limitations (`limit_req_status`) est posé dans le bloc
 `server` et non au niveau `http`, où il entrerait en conflit avec un autre
-vhost qui le déclarerait déjà. `/api/remote/` le remplace par 503 : Wings
+vhost qui le déclarerait déjà. `/api/remote/` et `/api/node-agent/` le
+remplacent par 503 : Wings
 abandonne sur un 4xx, 429 compris, et ne rejoue que les 5xx.
 
 ## Premier administrateur

@@ -153,6 +153,41 @@ export class GameDashboardClient {
     );
   }
 
+  /**
+   * Instantanés du serveur sur son node (ADR 0009), avec l'état de la
+   * fonction dans `meta`. 404 là où aucun agent ne les offre.
+   */
+  snapshots(serverId: string): Promise<unknown> {
+    return this.call("GET", this.snapshotPath(serverId));
+  }
+
+  /** Demander un instantané manuel : l'agent le prend à son relevé suivant. */
+  takeSnapshot(serverId: string): Promise<unknown> {
+    return this.call("POST", this.snapshotPath(serverId));
+  }
+
+  /** Épingler, dans la limite du serveur : la rotation ne le détruit plus. */
+  pinSnapshot(serverId: string, name: string, label?: string): Promise<unknown> {
+    return this.call("POST", this.snapshotPath(serverId, name, "pin"), label ? { label } : {});
+  }
+
+  unpinSnapshot(serverId: string, name: string): Promise<unknown> {
+    return this.call("DELETE", this.snapshotPath(serverId, name, "pin"));
+  }
+
+  /**
+   * Restaurer depuis un instantané : le serveur s'arrête, un instantané de
+   * sûreté est pris, puis le dossier est recopié. Il reste arrêté.
+   */
+  restoreSnapshot(serverId: string, name: string): Promise<unknown> {
+    return this.call("POST", this.snapshotPath(serverId, name, "restore"));
+  }
+
+  private snapshotPath(serverId: string, name?: string, action?: string): string {
+    const base = `/api/v1/client/servers/${encodeURIComponent(serverId)}/snapshots`;
+    return name ? `${base}/${encodeURIComponent(name)}/${action}` : base;
+  }
+
   /* --- Espace applicatif, pour un système tiers ---------------------------- */
 
   createServer(input: Record<string, unknown>): Promise<unknown> {

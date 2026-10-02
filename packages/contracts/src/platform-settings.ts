@@ -229,6 +229,29 @@ export const PLATFORM_SETTINGS: readonly SettingGroup[] = [
     ],
   },
   {
+    /*
+     * Un interrupteur par fonction de l'agent de node (ADR 0008, « facultatif »).
+     *
+     * Coupée ici, une fonction disparaît de l'écran et de l'API partout, même
+     * sur les nodes dont l'agent l'a active : `nodeCapabilities()` lit ces
+     * valeurs. Allumée, elle n'apparaît encore que là où un agent l'annonce.
+     */
+    key: "agent",
+    label: "Agent de node",
+    description:
+      "Fonctions servies par l'agent facultatif installé à côté de Wings. Un node sans agent garde tout le reste ; ces fonctions n'y apparaissent simplement pas.",
+    settings: [
+      {
+        key: "agent.instantanes",
+        kind: "boolean",
+        label: "Instantanés de volumes (btrfs, ZFS)",
+        description:
+          "Instantanés des volumes des serveurs, pris par l'agent sur les nodes dont le stockage le permet. Coupé, l'onglet et les routes disparaissent partout ; les instantanés déjà pris restent sur les machines.",
+        fallback: true,
+      },
+    ],
+  },
+  {
     key: "sso",
     label: "Annuaire externe (équipe et sous-utilisateurs)",
     description:

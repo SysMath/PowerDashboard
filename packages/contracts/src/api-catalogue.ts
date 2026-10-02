@@ -197,7 +197,7 @@ export const CLIENT_ROUTES: ApiRoute[] = [
     method: "POST",
     path: "/servers/{server}/backups/{backup}/restore",
     summary:
-      "Restaurer une sauvegarde sur le serveur. Le serveur reste fermé (démarrage, fichiers, SFTP) jusqu'au compte rendu du daemon ; refusé (409) sur un serveur déjà occupé ou pour une sauvegarde en cours ou ratée.",
+      "Restaurer une sauvegarde sur le serveur. Le serveur reste fermé (démarrage, fichiers, SFTP) jusqu'au compte rendu du daemon ; refusé (409) sur un serveur déjà occupé ou pour une sauvegarde en cours ou ratée. Sur un node qui prend des instantanés, un instantané de sûreté est pris d'abord (40 s d'attente au plus).",
     scope: "backups.restore",
     group: "Sauvegardes",
   },
@@ -208,6 +208,45 @@ export const CLIENT_ROUTES: ApiRoute[] = [
       "Supprimer une sauvegarde non verrouillée. Refusé (409) pendant une restauration sur ce serveur, quelle que soit l'archive.",
     scope: "backups.delete",
     group: "Sauvegardes",
+  },
+  {
+    method: "GET",
+    path: "/servers/{server}/snapshots",
+    summary:
+      "Lister les instantanés du serveur sur son node (nom, date, cause, expiration, épingle) et l'état de la fonction (meta : système de fichiers, espace libre, écritures acceptées, épingles, prochaine demande manuelle possible). 404 si aucun agent du node n'offre les instantanés.",
+    scope: "snapshots.read",
+    group: "Instantanés",
+  },
+  {
+    method: "POST",
+    path: "/servers/{server}/snapshots",
+    summary:
+      "Demander un instantané manuel. Répond 202 avec l'ordre : l'agent du node le prend à son relevé suivant, et une demande déjà en attente est rendue telle quelle. Refusé (409) si l'agent ne répond plus, si la fonction ou les demandes manuelles sont coupées sur ce node ou si l'espace libre manque, (429) avant la fin du délai entre deux demandes.",
+    scope: "snapshots.create",
+    group: "Instantanés",
+  },
+  {
+    method: "POST",
+    path: "/servers/{server}/snapshots/{snapshot}/pin",
+    summary:
+      "Épingler un instantané : { label? }. La rotation ne le détruit plus, jusqu'à la durée maximale du node. Refusé (409) au-delà de la limite d'épingles du serveur.",
+    scope: "snapshots.create",
+    group: "Instantanés",
+  },
+  {
+    method: "DELETE",
+    path: "/servers/{server}/snapshots/{snapshot}/pin",
+    summary: "Désépingler un instantané : la rotation le reprend.",
+    scope: "snapshots.create",
+    group: "Instantanés",
+  },
+  {
+    method: "POST",
+    path: "/servers/{server}/snapshots/{snapshot}/restore",
+    summary:
+      "Restaurer le serveur depuis un instantané. Répond 202 : le serveur passe en restauration (démarrage, fichiers, SFTP refusés), s'arrête, puis l'agent prend un instantané de sûreté et recopie le dossier ; le serveur reste arrêté. Abandonné et rendu s'il ne s'arrête pas en 3 min. Refusé (409) sur un serveur occupé, quand l'agent se tait ou sous le seuil d'espace libre.",
+    scope: "snapshots.restore",
+    group: "Instantanés",
   },
   {
     method: "GET",
@@ -579,7 +618,8 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
       "Créer un serveur pour un client, par offre + localisation ou par node + ressources. Accepte " +
       "Idempotency-Key. Une clé de revendeur ne le donne qu'à un compte client non suspendu, " +
       "entièrement chez elle, ou encore sans serveur et créé par sa propre clé (POST /users) ; " +
-      "sans serveur, il ne doit être invité sur aucun serveur d'ailleurs.",
+      "sans serveur, il ne doit être invité sur aucun serveur d'ailleurs. resources.snapshots " +
+      "(facultatif) fixe le nombre d'instantanés épinglés, la limite du node sinon.",
     scope: "servers.create",
     group: "Serveurs",
   },
@@ -587,7 +627,7 @@ export const APPLICATION_ROUTES: ApiRoute[] = [
     method: "PATCH",
     path: "/servers/{server}",
     summary:
-      "Changer les limites d'un serveur (mémoire, disque, CPU, swap, allocations, sauvegardes, bases). Seuls les champs envoyés changent.",
+      "Changer les limites d'un serveur (mémoire, disque, CPU, swap, allocations, sauvegardes, bases, instantanés épinglés). Seuls les champs envoyés changent ; snapshots: null rend la limite par défaut du node.",
     scope: "servers.resize",
     group: "Serveurs",
   },

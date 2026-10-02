@@ -46,6 +46,7 @@ describe.skipIf(!HAS_DATABASE)("commandes de console d'un serveur (intégration)
       unused,
       unused,
       new ServerAccessService(db, silence),
+      unused,
     );
   }, 60_000);
 

@@ -286,6 +286,13 @@ describe("limitation des routes du daemon", () => {
   it("refuse en 503, que Wings rejoue, et non en 429, qu'il abandonne", () => {
     expect(bloc).toMatch(/^\s*limit_req_status\s+503;/m);
   });
+
+  it("limite l'agent de node comme le daemon, en 503 (ADR 0008)", () => {
+    const agent = /location \/api\/node-agent\/ \{([^}]*)\}/.exec(directives)?.[1] ?? "";
+    expect(agent).toMatch(/^\s*limit_req\s+zone=gd_remote\s/m);
+    expect(agent).toMatch(/^\s*limit_req_status\s+503;/m);
+    expect(agent).toMatch(/^\s*proxy_pass http:\/\/127\.0\.0\.1:3211;/m);
+  });
 });
 
 /**
