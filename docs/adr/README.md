@@ -16,7 +16,7 @@ tenu, puis pourquoi elle a cessé de tenir.
 | [0006](./0006-depot-sur-ext4.md) | Le dépôt vit sur ext4, pas sur `drvfs` | Acceptée |
 | [0007](./0007-secrets-et-donnees-au-repos.md) | Données personnelles en clair, clé maître en fichier, sans coffre ni poivre : la machine protège le repos | Acceptée |
 | [0008](./0008-pare-feu-nftables.md) | Le pare-feu par serveur est tenu par un agent séparé, dans sa propre table nftables | Proposée |
-| [0009](./0009-instantanes-de-volumes.md) | Les instantanés portent sur tout le système de fichiers des serveurs d'un node, pris et restaurés par l'agent du node | Proposée |
+| [0009](./0009-instantanes-de-volumes.md) | Les instantanés portent sur tout le système de fichiers des serveurs d'un node, pris et restaurés par l'agent du node | Acceptée |
 
 ## Format
 
