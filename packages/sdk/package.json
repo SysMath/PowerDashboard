@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./ansi": "./src/ansi.ts",
+    "./console-text": "./src/console-text.ts",
+    "./format": "./src/format.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

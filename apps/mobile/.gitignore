@@ -1,0 +1,8 @@
+# Projets natifs : produits par `expo prebuild` (mobile.yml), jamais versionnés.
+/android
+/ios
+/.expo
+/expo-env.d.ts
+/dist
+/modules/*/android/build
+/modules/*/android/.cxx

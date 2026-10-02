@@ -167,8 +167,18 @@ balayer() {
 }
 
 lancer() {
-  local code=0
-  docker exec -w /w "$NOM" bash -euo pipefail -c "$1" || code=$?
+  local code=0 options=() nom
+  # Variables données à cette seule commande, et non au conteneur entier :
+  # les secrets d'une étape (signature de mobile.yml) n'existent pas pendant
+  # l'installation des dépendances. `GD_LINUX_TRANSMETTRE="A B" … lancer …`.
+  for nom in ${GD_LINUX_TRANSMETTRE:-}; do
+    [[ "$nom" =~ ^[A-Z_][A-Z0-9_]*$ ]] || {
+      echo "Nom de variable refusé : $nom" >&2
+      return 2
+    }
+    if [ -n "${!nom+x}" ]; then options+=(-e "$nom"); fi
+  done
+  docker exec "${options[@]}" -w /w "$NOM" bash -euo pipefail -c "$1" || code=$?
   # 137 = tué par SIGKILL : dans un conteneur, presque toujours le manque de
   # mémoire de la machine virtuelle de Docker Desktop.
   if [ "$code" = 137 ]; then

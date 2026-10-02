@@ -1,8 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { AnsiSegment } from "../lib/ansi";
-import { cn } from "../lib/cn";
+import type { AnsiSegment } from "@gamedashboard/sdk/ansi";
 import {
   type ConsoleFilter,
   type ConsoleLevel,
@@ -10,7 +8,9 @@ import {
   matchesFilter,
   NO_FILTER,
   pushHistory,
-} from "../lib/console-text";
+} from "@gamedashboard/sdk/console-text";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "../lib/cn";
 import { ConsoleInput } from "./console-input";
 import { ConsoleLineView } from "./console-output";
 import { ConsoleToolbar } from "./console-toolbar";

@@ -2736,5 +2736,136 @@
     "failedBody": "The panel refused the link. Start again from the app.",
     "expiredTitle": "No link in progress",
     "expiredBody": "The request has expired or was already used. Start again from the app."
+  },
+  "mobile": {
+    "commun": {
+      "annuler": "Cancel"
+    },
+    "verrou": {
+      "raison": "Open the key that links this phone to the panel"
+    },
+    "instances": {
+      "titre": "My panels",
+      "ajouter": "Add a panel",
+      "etat": {
+        "liee": "Linked",
+        "a-confirmer": "Check needed",
+        "a-relier": "Link again"
+      }
+    },
+    "ajout": {
+      "titre": "Add a panel",
+      "intro": "Enter your panel's address, or scan the QR code shown in Account › Security › Mobile app.",
+      "adresse": {
+        "libelle": "Panel address",
+        "vide": "Enter the panel's address.",
+        "http": "Only https:// addresses are accepted: in clear text, the link code could be read on the network.",
+        "invalide": "This address is not valid."
+      },
+      "verdict": {
+        "injoignable": "This address does not respond. Check it, and your connection.",
+        "indisponible": "This panel is temporarily unavailable. Try again in a few minutes.",
+        "pas-un-panel": "This address does not respond like a GameDashboard panel.",
+        "panel-trop-ancien": "This panel is too old for the app. Its host needs to update it.",
+        "application-trop-ancienne": "This panel needs a newer version of the app. Update it from the store."
+      },
+      "verifier": "Continue",
+      "scanner": "Scan a QR code",
+      "ficheAide": "Check the domain: this is the site you are about to sign in to.",
+      "nomAppareil": "Name of this phone, as the panel will show it",
+      "seConnecter": "Sign in with the browser",
+      "autreAdresse": "Another address",
+      "raison": "Link this phone to the panel",
+      "liaison": {
+        "annulee": "Sign-in was interrupted before the end.",
+        "refusee": "You declined the link in the browser.",
+        "panel": "The panel could not complete the link. Try again.",
+        "etat": "This response does not match the link in progress: it was ignored.",
+        "invalide": "The browser's response could not be read. Try again.",
+        "echec": "Linking failed: expired code, lost connection or biometrics declined. Try again."
+      }
+    },
+    "cadre": {
+      "retirer": "Remove this panel from the phone",
+      "verrouille": {
+        "titre": "Phone locked",
+        "corps": "Unlock with biometrics or your phone's passcode to open this panel.",
+        "action": "Unlock"
+      },
+      "hors-ligne": {
+        "titre": "Panel unreachable",
+        "corps": "The panel does not respond. Check your connection, or try again in a moment.",
+        "action": "Try again"
+      },
+      "introuvable": {
+        "titre": "Unknown panel",
+        "corps": "This panel is no longer linked to this phone.",
+        "action": "My panels"
+      },
+      "a-confirmer": {
+        "titre": "This panel has changed",
+        "corps": "The address responds, but it is no longer the same panel: it was reinstalled, or the domain changed hands. Nothing was sent. Only link it again if you know why.",
+        "action": "Link this new panel"
+      },
+      "a-relier": {
+        "titre": "Link ended",
+        "corps": "This phone was removed from the panel, or its link expired (30 days without use, 90 days at most). Sign in again with the browser to link it.",
+        "action": "Link again"
+      }
+    },
+    "serveurs": {
+      "joueurs": "{n, plural, =0 {no players} one {# player} other {# players}}",
+      "memoire": "Memory: {utilise} of {max}",
+      "cloche": "Notifications",
+      "clocheNonLues": "Notifications ({n})",
+      "compte": "Account",
+      "erreur": "List unavailable",
+      "vide": "No servers on this account."
+    },
+    "serveur": {
+      "console": "Console",
+      "joueurs": "Players"
+    },
+    "alimentation": {
+      "refuse": "Order refused",
+      "confirmer": {
+        "restart": "Restart the server?",
+        "stop": "Stop the server?",
+        "kill": "Kill the process?"
+      },
+      "confirmerCorps": "Connected players will be disconnected.",
+      "signal": {
+        "start": "Start",
+        "restart": "Restart",
+        "stop": "Stop",
+        "kill": "Kill"
+      }
+    },
+    "console": {
+      "interrompue": "The connection to the server stopped.",
+      "reconnecter": "Reconnect",
+      "releve": "CPU {cpu}% · memory {memoire}"
+    },
+    "cloche": {
+      "titre": "Notifications",
+      "vide": "No notifications.",
+      "toutLire": "Mark all as read"
+    },
+    "compte": {
+      "titre": "This phone",
+      "lieeLe": "Linked on {date}",
+      "expire": "New sign-in required by {date} at the latest",
+      "webAide": "Databases, scheduler, files, backups and account settings stay in the panel, in the browser.",
+      "ouvrirPanel": "Open the panel in the browser",
+      "panels": "My panels",
+      "delier": "Unlink this phone",
+      "delierTitre": "Unlink this phone?",
+      "delierCorps": "The panel removes this phone, and the key that linked it is erased. You will need to sign in again to link it."
+    },
+    "scanner": {
+      "titre": "Panel QR code",
+      "permission": "The app needs the camera to read the QR code shown by your panel. It reads nothing else.",
+      "autoriser": "Allow the camera"
+    }
   }
 }

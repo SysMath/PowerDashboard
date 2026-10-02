@@ -31,6 +31,9 @@ données au repos dans l'[ADR 0007](../adr/0007-secrets-et-donnees-au-repos.md).
 - **Serveurs de jeu** : fichiers, consoles, bases, sauvegardes.
 - **Clés d'API** personnelles et applicatives ; **appareils mobiles liés**
   (jeton d'accès, secret d'appareil, clé publique P-256).
+- **Clés de publication de l'application mobile** : clé d'envoi Android,
+  certificat et profil de distribution Apple, comptes d'API des deux
+  magasins (environnement GitHub `magasins`).
 - **Journal d'activité**, preuve en cas d'incident ; **données personnelles**
   (adresses, adresses IP).
 - **Disponibilité** du panel, dont dépend le pilotage de tous les nodes.
@@ -77,6 +80,7 @@ API ──▶ facturation (clé applicative), OIDC / Google, compartiment S3
 | Abus par la console ou les fichiers | Confinement par Wings (ADR 0001) ; jetons WebSocket courts et révocables | NC-14, NC-41, NC-46 |
 | Requête forgée côté serveur (SSRF) | `assertPublicDestination` sur les webhooks (`apps/api/src/common/public-url.ts`) | NC-47, NC-56 |
 | Fuite de la base ou d'une sauvegarde | Secrets chiffrés, mots de passe et jetons hachés ; sauvegardes chiffrées ; volume chiffré (ADR 0007) | NC-18, NC-19 |
+| Application piégée publiée sous le nom de l'éditeur | Secrets dans l'environnement `magasins`, approuvé par Matheo, jamais donné à une PR ; clé d'envoi donnée à la seule commande qui signe, hors du dépôt copié ; APK signé par la clé de débogage refusé ; signature finale par Google Play, clé d'envoi remplaçable ; pistes de test seulement, publication à la main ; binaires attestés avec leur inventaire (`mobile.yml`, `docs/application-mobile.md`) | Le code des dépendances tourne dans le conteneur où l'application se signe |
 | Chaîne d'approvisionnement | Lockfile gelé, audit bloquant dès *low*, Trivy, Semgrep, actions épinglées, SBOM attesté, jeton de CI en lecture | — |
 | Déni de service | `limit_req` de nginx, corps bornés, balayages de fond qui ne tuent pas le processus (`battre()`) | NC-17, NC-49 |
 | Répudiation | Journal d'activité en ajout seul (déclencheur), exportable (`activity.service.ts`) | NC-11, NC-12, NC-54 |

@@ -1,8 +1,8 @@
 "use client";
 
+import type { ConsoleFilter, ConsoleLevel } from "@gamedashboard/sdk/console-text";
 import { Search, X } from "lucide-react";
 import { cn } from "../lib/cn";
-import type { ConsoleFilter, ConsoleLevel } from "../lib/console-text";
 import type { ConsoleLabels } from "./console";
 
 const SOURCES = ["all", "server", "system"] as const;

@@ -10,6 +10,7 @@ export * from "./auth-cookies";
 export * from "./billing";
 export * from "./branding";
 export * from "./browser-provenance";
+export * from "./client-views";
 export * from "./client-webhooks";
 export * from "./console-command";
 export * from "./consumption";

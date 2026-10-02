@@ -139,6 +139,71 @@ describe("GameDashboardClient", () => {
     expect(entetes(appel, 0).Authorization).toBe("Bearer gd_live_essai");
   });
 
+  it("demande le jeton du moment à chaque appel quand on lui donne une fonction", async () => {
+    // Le jeton d'un appareil mobile change toutes les quinze minutes : le
+    // client ne doit jamais garder celui de sa construction.
+    const jetons = ["gd_mob_un", "gd_mob_deux"];
+    const appel = espion(() => fausseReponse({ data: [] }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: async () => jetons.shift() ?? "",
+      fetch: appel,
+    });
+    await c.servers();
+    await c.servers();
+    expect(entetes(appel, 0).Authorization).toBe("Bearer gd_mob_un");
+    expect(entetes(appel, 1).Authorization).toBe("Bearer gd_mob_deux");
+  });
+
+  it("rejoue un 401 une seule fois, après un renouvellement réussi", async () => {
+    let jeton = "gd_mob_perime";
+    const appel = espion((_url, init) =>
+      (init?.headers as Record<string, string> | undefined)?.Authorization === "Bearer gd_mob_frais"
+        ? fausseReponse({ data: [] })
+        : fausseReponse({ title: "Session expirée" }, 401),
+    );
+    const renouveler = vi.fn(async () => {
+      jeton = "gd_mob_frais";
+      return true;
+    });
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: async () => jeton,
+      onUnauthorized: renouveler,
+      fetch: appel,
+    });
+
+    await expect(c.servers()).resolves.toEqual([]);
+    expect(renouveler).toHaveBeenCalledTimes(1);
+    expect(appel).toHaveBeenCalledTimes(2);
+  });
+
+  it("laisse remonter le 401 quand le renouvellement échoue, sans boucler", async () => {
+    const appel = espion(() => fausseReponse({ title: "Session expirée" }, 401));
+    const renouveler = vi.fn(async () => false);
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: async () => "gd_mob_perime",
+      onUnauthorized: renouveler,
+      fetch: appel,
+    });
+
+    const echec = await c.servers().catch((error: unknown) => error);
+    expect((echec as ApiProblem).status).toBe(401);
+    expect(renouveler).toHaveBeenCalledTimes(1);
+    expect(appel).toHaveBeenCalledTimes(1);
+  });
+
+  it("lit la cloche avec son nombre de non lues", async () => {
+    const appel = espion(() =>
+      fausseReponse({ data: [{ id: "n1", title: "Survie : hors ligne" }], meta: { unread: 3 } }),
+    );
+    await expect(client(appel).notifications()).resolves.toEqual({
+      items: [{ id: "n1", title: "Survie : hors ligne" }],
+      unread: 3,
+    });
+  });
+
   /*
    * Non-régression : `suspendServer` et `unsuspendServer` appelaient
    * `…/suspend` et `…/unsuspend`, deux routes que l'API applicative n'a jamais
@@ -170,6 +235,8 @@ describe("GameDashboardClient", () => {
     await c.websocketGrant(id);
     await c.command(id, "say bonjour");
     await c.players(id);
+    await c.notifications();
+    await c.markNotificationsRead();
     await c.playerAction(id, { action: "kick", player: "Steve" });
     const nom = "gd-20260930T120000.000Z";
     await c.snapshots(id);

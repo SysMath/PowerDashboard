@@ -1,19 +1,11 @@
 "use server";
 
-import type { PlayerAction } from "@gamedashboard/contracts";
+import type { ClientPlayersView, PlayerAction } from "@gamedashboard/contracts";
 import { revalidatePath } from "next/cache";
 import { apiFetch, apiSend } from "./client";
 
 /** Ce que l'API rend pour la page Joueurs (voir `ServerPlayersService.view`). */
-export interface PlayersView {
-  online: number | null;
-  max: number | null;
-  /** Échantillon : Minecraft n'en donne qu'une douzaine au plus. */
-  sample: string[] | null;
-  complete: boolean;
-  observedAt: string | null;
-  actions: PlayerAction[];
-}
+export type PlayersView = ClientPlayersView;
 
 export async function getPlayers(serverId: string): Promise<PlayersView> {
   const { data } = await apiFetch<{ data: PlayersView }>(

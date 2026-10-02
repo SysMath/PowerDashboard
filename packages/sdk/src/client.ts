@@ -1,4 +1,11 @@
-import type { PowerSignal, ServerLimitsPatch } from "@gamedashboard/contracts";
+import type {
+  ClientNotificationView,
+  ClientPlayersView,
+  ClientServerView,
+  ConsoleGrant,
+  PowerSignal,
+  ServerLimitsPatch,
+} from "@gamedashboard/contracts";
 
 /**
  * Client TypeScript de l'API GameDashboard.
@@ -28,8 +35,18 @@ import type { PowerSignal, ServerLimitsPatch } from "@gamedashboard/contracts";
 export interface GameDashboardClientOptions {
   /** L'adresse du panel, sans barre finale : `https://panel.example`. */
   baseUrl: string;
-  /** Une clé personnelle ou une clé de plateforme, selon ce qu'on appelle. */
-  token: string;
+  /**
+   * Une clé personnelle ou une clé de plateforme, selon ce qu'on appelle. Ou
+   * une fonction qui rend le jeton du moment : celui d'un appareil mobile ne
+   * vaut que quinze minutes (ADR 0010), et se renouvelle entre deux appels.
+   */
+  token: string | (() => Promise<string>);
+  /**
+   * Appelée sur un 401. Si elle rend `true` (le jeton a pu être renouvelé),
+   * l'appel est rejoué **une fois** avec le jeton suivant ; sinon le 401
+   * remonte tel quel.
+   */
+  onUnauthorized?: () => Promise<boolean>;
   /** Au-delà, on cesse d'attendre. Dix secondes par défaut. */
   timeoutMs?: number;
   /** Pour les environnements sans `fetch` global, ou pour un client instrumenté. */
@@ -76,7 +93,8 @@ function sansBarresFinales(adresse: string): string {
 
 export class GameDashboardClient {
   private readonly baseUrl: string;
-  private readonly token: string;
+  private readonly token: string | (() => Promise<string>);
+  private readonly onUnauthorized: (() => Promise<boolean>) | undefined;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof globalThis.fetch;
 
@@ -86,17 +104,18 @@ export class GameDashboardClient {
     // réécrivent et d'autres refusent.
     this.baseUrl = sansBarresFinales(options.baseUrl);
     this.token = options.token;
+    this.onUnauthorized = options.onUnauthorized;
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.fetchImpl = options.fetch ?? globalThis.fetch;
   }
 
   /* --- Espace client, au nom du porteur de la clé -------------------------- */
 
-  servers(): Promise<unknown[]> {
-    return this.call<unknown[]>("GET", "/api/v1/client/servers");
+  servers(): Promise<ClientServerView[]> {
+    return this.call<ClientServerView[]>("GET", "/api/v1/client/servers");
   }
 
-  server(serverId: string): Promise<unknown> {
+  server(serverId: string): Promise<ClientServerView> {
     return this.call("GET", `/api/v1/client/servers/${encodeURIComponent(serverId)}`);
   }
 
@@ -118,7 +137,7 @@ export class GameDashboardClient {
    * transfert — et le jeton ne vaut que dix minutes, pour ce serveur et pour
    * les permissions du porteur de la clé.
    */
-  websocketGrant(serverId: string): Promise<unknown> {
+  websocketGrant(serverId: string): Promise<ConsoleGrant> {
     return this.call("POST", `/api/v1/client/servers/${encodeURIComponent(serverId)}/websocket`);
   }
 
@@ -134,7 +153,7 @@ export class GameDashboardClient {
   }
 
   /** Joueurs connectés, lus dans la dernière sonde de jeu, et actions proposées. */
-  players(serverId: string): Promise<unknown> {
+  players(serverId: string): Promise<ClientPlayersView> {
     return this.call("GET", `/api/v1/client/servers/${encodeURIComponent(serverId)}/players`);
   }
 
@@ -151,6 +170,23 @@ export class GameDashboardClient {
       `/api/v1/client/servers/${encodeURIComponent(serverId)}/players`,
       input,
     );
+  }
+
+  /**
+   * La cloche du compte : notifications, plus récentes d'abord, et le nombre
+   * de non lues. Le destinataire est le porteur du jeton, jamais un paramètre.
+   */
+  async notifications(): Promise<{ items: ClientNotificationView[]; unread: number }> {
+    const corps = await this.request("GET", "/api/v1/client/notifications");
+    const meta = corps?.meta as { unread?: unknown } | undefined;
+    return {
+      items: Array.isArray(corps?.data) ? (corps.data as ClientNotificationView[]) : [],
+      unread: typeof meta?.unread === "number" ? meta.unread : 0,
+    };
+  }
+
+  markNotificationsRead(): Promise<unknown> {
+    return this.call("POST", "/api/v1/client/notifications/read-all");
   }
 
   /**
@@ -315,6 +351,25 @@ export class GameDashboardClient {
     path: string,
     body?: unknown,
   ): Promise<Record<string, unknown> | null> {
+    try {
+      return await this.once(method, path, body);
+    } catch (error) {
+      // Un seul nouvel essai, et seulement si le jeton a vraiment changé :
+      // rejouer en boucle un 401 ferait tourner un renouvellement refusé.
+      if (!(error instanceof ApiProblem) || error.status !== 401 || !this.onUnauthorized) {
+        throw error;
+      }
+      if (!(await this.onUnauthorized())) throw error;
+      return this.once(method, path, body);
+    }
+  }
+
+  private async once(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<Record<string, unknown> | null> {
+    const token = typeof this.token === "string" ? this.token : await this.token();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -322,7 +377,7 @@ export class GameDashboardClient {
       const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
         method,
         headers: {
-          Authorization: `Bearer ${this.token}`,
+          Authorization: `Bearer ${token}`,
           Accept: "application/json",
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         },

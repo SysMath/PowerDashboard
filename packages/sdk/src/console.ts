@@ -25,8 +25,8 @@ import type { GameDashboardClient } from "./client";
  */
 
 export interface ConsoleEvent {
-  kind: "output" | "install" | "status" | "stats" | "error";
-  /** La ligne, l'état, ou le message d'erreur selon `kind`. */
+  kind: "output" | "install" | "status" | "stats" | "error" | "closed";
+  /** La ligne, l'état, ou le message d'erreur selon `kind` ; vide pour `closed`. */
   text: string;
 }
 
@@ -52,13 +52,15 @@ export async function openServerConsole(
   client: GameDashboardClient,
   serverId: string,
   onEvent: (event: ConsoleEvent) => void,
-  options: { WebSocketImpl?: typeof WebSocket } = {},
+  options: { WebSocketImpl?: typeof WebSocket; origin?: string } = {},
 ): Promise<ServerConsole> {
   const Impl = options.WebSocketImpl ?? globalThis.WebSocket;
   if (!Impl) throw new Error("Aucune implémentation de WebSocket dans cet environnement.");
 
-  const grant = (await client.websocketGrant(serverId)) as { token: string; socket: string };
-  const socket = new Impl(grant.socket);
+  const grant = await client.websocketGrant(serverId);
+  const socket = options.origin
+    ? ouvrirAvecOrigine(Impl, grant.socket, options.origin)
+    : new Impl(grant.socket);
 
   socket.addEventListener("open", () => {
     socket.send(JSON.stringify({ event: "auth", args: [grant.token] }));
@@ -102,10 +104,29 @@ export async function openServerConsole(
     }
   });
 
+  socket.addEventListener("close", () => onEvent({ kind: "closed", text: "" }));
+
   return {
     send: (command) => client.command(serverId, command).then(() => undefined),
     close: () => socket.close(),
   };
+}
+
+/**
+ * Ouvre la socket en présentant l'origine du panel.
+ *
+ * Wings refuse une connexion dont l'en-tête `Origin` n'est pas l'adresse du
+ * panel. Un navigateur la pose de lui-même ; l'application mobile, elle, la
+ * donne explicitement (ADR 0010) : React Native accepte des en-têtes en
+ * troisième argument du constructeur, ce que le type du DOM ignore.
+ */
+function ouvrirAvecOrigine(Impl: typeof WebSocket, url: string, origin: string): WebSocket {
+  const AvecEntetes = Impl as unknown as new (
+    url: string,
+    protocols: string[] | undefined,
+    options: { headers: Record<string, string> },
+  ) => WebSocket;
+  return new AvecEntetes(url, undefined, { headers: { Origin: origin } });
 }
 
 /**
@@ -120,7 +141,7 @@ async function renouveler(
   socket: WebSocket,
 ): Promise<void> {
   try {
-    const grant = (await client.websocketGrant(serverId)) as { token: string };
+    const grant = await client.websocketGrant(serverId);
     socket.send(JSON.stringify({ event: "auth", args: [grant.token] }));
   } catch {
     // Le daemon coupera de lui-même à l'échéance ; l'appelant le verra par un

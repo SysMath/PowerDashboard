@@ -45,7 +45,12 @@ const config: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
-  transpilePackages: ["@gamedashboard/ui", "@gamedashboard/contracts", "@gamedashboard/i18n"],
+  transpilePackages: [
+    "@gamedashboard/ui",
+    "@gamedashboard/contracts",
+    "@gamedashboard/i18n",
+    "@gamedashboard/sdk",
+  ],
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },

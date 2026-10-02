@@ -64,6 +64,9 @@
       "name": "Moteur"
     },
     {
+      "name": "Notifications"
+    },
+    {
       "name": "Planification"
     },
     {
@@ -3793,6 +3796,92 @@
           },
           "2XX": {
             "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/notifications": {
+      "get": {
+        "summary": "Notifications du compte, les plus récentes d'abord, avec le nombre de non lues (meta.unread).",
+        "description": "Clé personnelle.",
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "client-get-notifications",
+        "security": [
+          {
+            "clientKey": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/notifications/read-all": {
+      "post": {
+        "summary": "Marquer toutes les notifications du compte comme lues.",
+        "description": "Clé personnelle.",
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "client-post-notifications-read-all",
+        "security": [
+          {
+            "clientKey": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
           }
         }
       }

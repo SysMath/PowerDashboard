@@ -15,7 +15,12 @@
       "!**/playwright-report",
       "!.claude/worktrees",
       "!openapi.json",
-      "!infra/eggs/*/egg.json"
+      "!infra/eggs/*/egg.json",
+      "!apps/mobile/android",
+      "!apps/mobile/ios",
+      "!apps/mobile/.expo",
+      "!apps/mobile/modules/*/android/build",
+      "!dist-mobile"
     ]
   },
   "formatter": {

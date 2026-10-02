@@ -40,6 +40,12 @@ overrides:
   # monaco-editor publiera une version qui tire 3.4.16 ou plus.
   "monaco-editor>dompurify": "^3.4.16"
 
+  # xcode (amené par les greffons de configuration d'Expo, qui écrivent le
+  # projet iOS au `prebuild`) tire uuid 7, sans contrôle de taille du tampon
+  # en v3/v5/v6 (GHSA-w5hq-g745-h8pq). xcode n'appelle que `uuid.v4()`, que
+  # la 11 garde à l'identique en CommonJS. Outil de construction seulement.
+  "xcode>uuid": "^11.1.1"
+
 # Aucune dépendance transitive tirée d'une source hors du registre (dépôt git,
 # archive par URL) : seule une dépendance directe, écrite ici, peut le faire.
 blockExoticSubdeps: true
@@ -60,3 +66,20 @@ trustPolicyExclude:
   # recopiées avant affichage), aucun script d'installation, aucune dépendance
   # ajoutée. Amené par vitest 5.0.2 (outil de diagnostic des tests seulement).
   - why-is-node-running@3.2.2
+
+# Avis connus, sans correctif publiable dans l'arbre, et relus un par un.
+auditConfig:
+  ignoreGhsas:
+    # node-forge : vérification des signatures RSA PKCS#1 v1.5 trop permissive.
+    # Aucune version corrigée publiée. Amené par @expo/cli seul (certificats de
+    # signature des mises à jour à chaud, que l'application n'emploie pas :
+    # ADR 0010, aucune mise à jour hors des magasins). Jamais embarqué dans
+    # l'application ni dans le panel.
+    - GHSA-86w9-cpqp-85rv
+    # decode-uri-component 0.2 : décodage exponentiel d'une adresse mal formée.
+    # Amené par query-string 7 (expo-router, lecture des liens de
+    # l'application). La 0.5 corrigée n'est plus qu'en module ES, que
+    # query-string 7 ne sait pas charger. Seul le téléphone qui ouvre un lien
+    # piégé en pâtirait, et un lien de l'application n'est lu que s'il porte
+    # le schéma `gamedashboard://`.
+    - GHSA-vcc3-ghjq-m6fr

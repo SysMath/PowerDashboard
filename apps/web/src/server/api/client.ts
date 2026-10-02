@@ -1,3 +1,4 @@
+import type { ClientServerView } from "@gamedashboard/contracts";
 import { cookies } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { API_OFFLINE_DIGEST, API_TIMEOUT_DIGEST, type ApiFailureKind } from "@/lib/api-status";
@@ -222,36 +223,8 @@ export async function fetchOptionalMe(): Promise<SessionUser | null> {
   }
 }
 
-export interface ClientServer {
-  id: string;
-  shortId: string;
-  name: string;
-  description: string | null;
-  address: string;
-  nodeName: string;
-  /** Depuis quand la machine ne répond plus. `null` quand elle répond. */
-  nodeUnreachableSince: string | null;
-  game: string;
-  memoryMaxMb: number;
-  diskMaxMb: number;
-  cpuMaxPct: number;
-  state: string | null;
-  /** État du conteneur au dernier relevé, distinct de l'état de gestion. */
-  runtimeState: string | null;
-  /** Consommation au dernier relevé. `null` veut dire « pas mesuré », pas zéro. */
-  cpuPct: number | null;
-  memoryMb: number | null;
-  diskMb: number | null;
-  /** Dernière sonde de jeu. `null` veut dire « pas mesuré », jamais zéro. */
-  players: number | null;
-  maxPlayers: number | null;
-  isOwner: boolean;
-  /**
-   * La machine offre les instantanés (ADR 0009). Rendu par le détail d'un
-   * serveur seulement, jamais par la liste.
-   */
-  snapshots?: boolean;
-}
+/** Un serveur tel que l'espace client le rend (défini dans les contrats, partagé avec l'application). */
+export type ClientServer = ClientServerView;
 
 /**
  * Serveurs de l'utilisateur connecté.

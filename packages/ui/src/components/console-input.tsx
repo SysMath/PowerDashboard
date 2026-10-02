@@ -1,9 +1,9 @@
 "use client";
 
+import { cycleSuggestion, suggestCommands } from "@gamedashboard/sdk/console-text";
 import { History, SendHorizontal, Terminal, Upload } from "lucide-react";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { cn } from "../lib/cn";
-import { cycleSuggestion, suggestCommands } from "../lib/console-text";
 import type { ConsoleLabels } from "./console";
 
 export interface ConsoleInputProps {

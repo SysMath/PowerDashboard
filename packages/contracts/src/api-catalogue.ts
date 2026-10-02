@@ -320,6 +320,21 @@ export const CLIENT_ROUTES: ApiRoute[] = [
     scope: "activity.read",
     group: "Audit",
   },
+  {
+    method: "GET",
+    path: "/notifications",
+    summary:
+      "Notifications du compte, les plus récentes d'abord, avec le nombre de non lues (meta.unread).",
+    scope: null,
+    group: "Notifications",
+  },
+  {
+    method: "POST",
+    path: "/notifications/read-all",
+    summary: "Marquer toutes les notifications du compte comme lues.",
+    scope: null,
+    group: "Notifications",
+  },
 ];
 
 /**

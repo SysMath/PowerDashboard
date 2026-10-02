@@ -343,3 +343,25 @@ export interface InstanceDescriptor {
 
 /** Ce que l'API rend pour composer le descripteur (le nom vient de la marque). */
 export type InstanceIdentity = Omit<InstanceDescriptor, "nom">;
+
+/**
+ * Lecture du descripteur par l'application.
+ *
+ * Souple là où il faut l'être : les champs inconnus passent (la place
+ * réservée), et `notifications` accepte un mode qu'une version future
+ * ajouterait — l'application le traite alors comme `aucune`. Strict sur ce
+ * qui engage la liaison : le produit, l'identifiant et l'origine en
+ * `https://`.
+ */
+export const instanceDescriptorSchema = z.looseObject({
+  produit: z.literal("gamedashboard"),
+  api: z.number().int().nonnegative(),
+  version: z.string().max(64).nullable(),
+  version_app_minimale: z.string().regex(/^\d+\.\d+\.\d+$/),
+  instance: z.string().min(8).max(100),
+  nom: z.string().trim().min(1).max(191),
+  origine: z
+    .url()
+    .refine((value) => new URL(value).protocol === "https:", "Origine en https:// attendue."),
+  notifications: z.string().max(32),
+});

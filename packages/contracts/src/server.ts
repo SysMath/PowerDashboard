@@ -325,3 +325,44 @@ export function nodeOutageBlock(unreachableSince: string | null | undefined): Se
     transient: true,
   };
 }
+
+/**
+ * Quels ordres sont fermés, et pourquoi.
+ *
+ * Une fonction plutôt que quatre conditions dispersées dans le JSX : c'est
+ * justement leur dispersion qui a laissé passer un défaut. En fermant les
+ * boutons pendant un blocage, « Kill » — écrit `disabled || off` — s'est
+ * retrouvé **ouvert**, parce que `off` valait alors faux. Une condition
+ * exprimée par la négation d'une autre finit toujours par se retourner, et
+ * quatre endroits font quatre occasions de l'oublier.
+ *
+ * Partagée par l'interface web et l'application mobile : les deux ferment
+ * les mêmes boutons pour les mêmes raisons.
+ *
+ * Rend `true` pour « fermé ». Le nom des clés est celui des signaux, de sorte
+ * qu'aucune traduction mentale ne s'intercale entre la règle et le bouton.
+ */
+export function closedSignals(
+  state: string,
+  options: { disabled?: boolean; blocked?: boolean } = {},
+): { start: boolean; restart: boolean; stop: boolean; kill: boolean } {
+  const { disabled = false, blocked = false } = options;
+
+  // Un blocage ferme tout, sans exception à énumérer. L'écrire une fois ici
+  // vaut mieux que quatre fois plus bas.
+  if (disabled || blocked) return { start: true, restart: true, stop: true, kill: true };
+
+  const running = state === "running";
+  const transitioning = state === "starting" || state === "stopping";
+  const off = state === "offline" || state === "crash_loop";
+
+  return {
+    start: !off,
+    restart: !running,
+    // Arrêter pendant un démarrage est légitime : c'est même le seul moyen
+    // d'interrompre un démarrage qui s'éternise.
+    stop: !running && !transitioning,
+    // Tuer un serveur déjà à l'arrêt ne fait rien ; tout le reste l'autorise.
+    kill: off,
+  };
+}

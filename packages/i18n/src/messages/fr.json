@@ -2736,5 +2736,136 @@
     "failedBody": "Le panel a refusé la liaison. Recommencez depuis l'application.",
     "expiredTitle": "Aucune liaison en cours",
     "expiredBody": "La demande a expiré ou a déjà servi. Recommencez depuis l'application."
+  },
+  "mobile": {
+    "commun": {
+      "annuler": "Annuler"
+    },
+    "verrou": {
+      "raison": "Ouvrir la clé qui relie ce téléphone au panel"
+    },
+    "instances": {
+      "titre": "Mes panels",
+      "ajouter": "Ajouter un panel",
+      "etat": {
+        "liee": "Lié",
+        "a-confirmer": "À vérifier",
+        "a-relier": "À relier"
+      }
+    },
+    "ajout": {
+      "titre": "Ajouter un panel",
+      "intro": "Saisissez l'adresse de votre panel, ou scannez le code QR affiché dans Compte › Sécurité › Application mobile.",
+      "adresse": {
+        "libelle": "Adresse du panel",
+        "vide": "Saisissez l'adresse du panel.",
+        "http": "Seules les adresses en https:// sont acceptées : en clair, le code de liaison pourrait être lu sur le réseau.",
+        "invalide": "Cette adresse n'est pas valide."
+      },
+      "verdict": {
+        "injoignable": "Cette adresse ne répond pas. Vérifiez-la, ainsi que votre connexion.",
+        "indisponible": "Ce panel est momentanément indisponible. Réessayez dans quelques minutes.",
+        "pas-un-panel": "Cette adresse ne répond pas comme un panel GameDashboard.",
+        "panel-trop-ancien": "Ce panel est trop ancien pour l'application. Son hébergeur doit le mettre à jour.",
+        "application-trop-ancienne": "Ce panel demande une version plus récente de l'application. Mettez-la à jour depuis le magasin."
+      },
+      "verifier": "Continuer",
+      "scanner": "Scanner un code QR",
+      "ficheAide": "Vérifiez le domaine : c'est sur ce site que vous allez vous connecter.",
+      "nomAppareil": "Nom de ce téléphone, tel que le panel l'affichera",
+      "seConnecter": "Se connecter dans le navigateur",
+      "autreAdresse": "Autre adresse",
+      "raison": "Lier ce téléphone au panel",
+      "liaison": {
+        "annulee": "La connexion a été interrompue avant la fin.",
+        "refusee": "Vous avez refusé la liaison dans le navigateur.",
+        "panel": "Le panel n'a pas pu terminer la liaison. Réessayez.",
+        "etat": "Ce retour ne correspond pas à la liaison ouverte : il a été ignoré.",
+        "invalide": "Le retour du navigateur est illisible. Réessayez.",
+        "echec": "La liaison a échoué : code expiré, connexion perdue ou biométrie refusée. Réessayez."
+      }
+    },
+    "cadre": {
+      "retirer": "Retirer ce panel du téléphone",
+      "verrouille": {
+        "titre": "Téléphone verrouillé",
+        "corps": "Déverrouillez avec la biométrie ou le code du téléphone pour ouvrir ce panel.",
+        "action": "Déverrouiller"
+      },
+      "hors-ligne": {
+        "titre": "Panel injoignable",
+        "corps": "Le panel ne répond pas. Vérifiez votre connexion, ou réessayez dans un instant.",
+        "action": "Réessayer"
+      },
+      "introuvable": {
+        "titre": "Panel inconnu",
+        "corps": "Ce panel n'est plus lié à ce téléphone.",
+        "action": "Mes panels"
+      },
+      "a-confirmer": {
+        "titre": "Ce panel a changé",
+        "corps": "L'adresse répond, mais ce n'est plus le même panel : il a été réinstallé, ou le domaine a changé de mains. Rien n'a été envoyé. Ne le reliez que si vous savez pourquoi.",
+        "action": "Relier ce nouveau panel"
+      },
+      "a-relier": {
+        "titre": "Liaison terminée",
+        "corps": "Ce téléphone a été retiré du panel, ou sa liaison a expiré (30 jours sans usage, 90 jours au plus). Reconnectez-vous dans le navigateur pour le relier.",
+        "action": "Relier de nouveau"
+      }
+    },
+    "serveurs": {
+      "joueurs": "{n, plural, =0 {aucun joueur} one {# joueur} other {# joueurs}}",
+      "memoire": "Mémoire : {utilise} sur {max}",
+      "cloche": "Notifications",
+      "clocheNonLues": "Notifications ({n})",
+      "compte": "Compte",
+      "erreur": "Liste indisponible",
+      "vide": "Aucun serveur sur ce compte."
+    },
+    "serveur": {
+      "console": "Console",
+      "joueurs": "Joueurs"
+    },
+    "alimentation": {
+      "refuse": "Ordre refusé",
+      "confirmer": {
+        "restart": "Redémarrer le serveur ?",
+        "stop": "Arrêter le serveur ?",
+        "kill": "Tuer le processus ?"
+      },
+      "confirmerCorps": "Les joueurs connectés seront déconnectés.",
+      "signal": {
+        "start": "Démarrer",
+        "restart": "Redémarrer",
+        "stop": "Arrêter",
+        "kill": "Tuer"
+      }
+    },
+    "console": {
+      "interrompue": "La connexion au serveur s'est arrêtée.",
+      "reconnecter": "Reconnecter",
+      "releve": "Processeur {cpu} % · mémoire {memoire}"
+    },
+    "cloche": {
+      "titre": "Notifications",
+      "vide": "Aucune notification.",
+      "toutLire": "Tout marquer comme lu"
+    },
+    "compte": {
+      "titre": "Ce téléphone",
+      "lieeLe": "Lié le {date}",
+      "expire": "Nouvelle connexion nécessaire au plus tard le {date}",
+      "webAide": "Bases de données, planificateur, fichiers, sauvegardes et réglages du compte restent dans le panel, depuis le navigateur.",
+      "ouvrirPanel": "Ouvrir le panel dans le navigateur",
+      "panels": "Mes panels",
+      "delier": "Délier ce téléphone",
+      "delierTitre": "Délier ce téléphone ?",
+      "delierCorps": "Le panel retire ce téléphone, et la clé qui l'y reliait est effacée. Il faudra se reconnecter pour le relier de nouveau."
+    },
+    "scanner": {
+      "titre": "Code QR du panel",
+      "permission": "L'application a besoin de la caméra pour lire le code QR affiché par votre panel. Elle ne lit rien d'autre.",
+      "autoriser": "Autoriser la caméra"
+    }
   }
 }
