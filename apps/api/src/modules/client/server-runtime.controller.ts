@@ -586,7 +586,11 @@ export class ServerRuntimeController {
 
     // Fastify rend le corps brut tel quel pour `application/octet-stream` ;
     // tout autre type signifie que le navigateur n'a pas envoyé un morceau.
-    if (!Buffer.isBuffer(body)) throw new BadRequestException("Morceau illisible.");
+    // `typeof` en premier pour CodeQL, qui ne lit pas `Buffer.isBuffer` comme
+    // une garde et signalait chaque `.length` du service (voir `checkedImage`).
+    if (typeof body !== "object" || !Buffer.isBuffer(body)) {
+      throw new BadRequestException("Morceau illisible.");
+    }
 
     const resultat = await this.uploads.putChunk(
       uploadId,

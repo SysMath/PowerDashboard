@@ -266,7 +266,7 @@ export class EggImportService {
     // Même échéance que l'arbre : l'écran attend la réponse, et Next cesse
     // d'attendre l'API au bout de 10 s.
     const raw = await fetchJson<unknown>(
-      `https://raw.githubusercontent.com/${repo.owner}/${repo.name}/${source.branch}/${path}`,
+      `https://raw.githubusercontent.com/${repoPath(repo)}/${source.branch}/${path}`,
       TREE_TIMEOUT_MS,
     );
 
@@ -348,7 +348,7 @@ export class EggImportService {
       const tree = await fetchJson<{
         tree?: { path: string; type: string; size?: number }[];
       }>(
-        `https://api.github.com/repos/${repo.owner}/${repo.name}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+        `https://api.github.com/repos/${repoPath(repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
         TREE_TIMEOUT_MS,
       );
 
@@ -429,7 +429,7 @@ export class EggImportService {
       truncated?: boolean;
       tree?: { path: string; type: string; size?: number }[];
     }>(
-      `https://api.github.com/repos/${repo.owner}/${repo.name}/git/trees/${encodeURIComponent(source.branch)}?recursive=1`,
+      `https://api.github.com/repos/${repoPath(repo)}/git/trees/${encodeURIComponent(source.branch)}?recursive=1`,
       TREE_TIMEOUT_MS,
     );
 
@@ -460,7 +460,7 @@ export class EggImportService {
     for (const entry of candidates) {
       try {
         const raw = await fetchJson<unknown>(
-          `https://raw.githubusercontent.com/${repo.owner}/${repo.name}/${source.branch}/${entry.path}`,
+          `https://raw.githubusercontent.com/${repoPath(repo)}/${source.branch}/${entry.path}`,
         );
         const parsed = parsePterodactylEgg(raw);
 
@@ -661,6 +661,16 @@ function treeKey(repo: { owner: string; name: string }, branch: string): string 
   return `${repo.owner}/${repo.name}@${branch}`;
 }
 
+/**
+ * `owner/name`, chaque morceau encodé.
+ *
+ * `parseGitHubRepo` n'admet déjà que `[\w.-]+` : l'encodage ne change rien à
+ * un dépôt réel, mais c'est la garde que CodeQL lit dans une adresse.
+ */
+function repoPath(repo: { owner: string; name: string }): string {
+  return `${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
+}
+
 /** Découpe `https://github.com/owner/name` en ses deux morceaux. */
 function parseGitHubRepo(url: string): { owner: string; name: string } | null {
   const match = url
@@ -683,7 +693,7 @@ function parseGitHubRepo(url: string): { owner: string; name: string } | null {
 async function defaultBranchOf(repo: { owner: string; name: string }): Promise<string> {
   try {
     const info = await fetchJson<{ default_branch?: unknown }>(
-      `https://api.github.com/repos/${repo.owner}/${repo.name}`,
+      `https://api.github.com/repos/${repoPath(repo)}`,
       BRANCH_TIMEOUT_MS,
     );
     return typeof info.default_branch === "string" && info.default_branch.trim() !== ""

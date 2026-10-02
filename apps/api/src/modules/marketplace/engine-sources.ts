@@ -170,6 +170,18 @@ const PLATFORMS: Platform[] = [
   },
 ];
 
+/**
+ * Le projet PaperMC d'une option, s'il fait partie du catalogue.
+ *
+ * `optionId` vient de la requête : « paper:../../x » partait tel quel dans le
+ * chemin de l'adresse de PaperMC. Seules les options listées ici passent, et
+ * le projet est encodé en plus (seul l'encodage est lu par CodeQL).
+ */
+function paperProjectOf(optionId: string): string | null {
+  if (!PLATFORMS.some((platform) => platform.id === optionId)) return null;
+  return optionId.slice("paper:".length);
+}
+
 @Injectable()
 export class EngineSourcesService {
   private readonly logger = new Logger(EngineSourcesService.name);
@@ -220,7 +232,10 @@ export class EngineSourcesService {
 
   /** Versions installables d'une plateforme, la plus récente en tête. */
   async versionsOf(optionId: string): Promise<EngineVersion[]> {
-    if (optionId.startsWith("paper:")) return this.paperVersions(optionId.slice("paper:".length));
+    if (optionId.startsWith("paper:")) {
+      const project = paperProjectOf(optionId);
+      return project ? this.paperVersions(project) : [];
+    }
     if (optionId === "purpur:purpur") return this.purpurVersions();
     if (optionId === "fabric:fabric") return this.fabricVersions();
     if (optionId === "vanilla:vanilla") return this.vanillaVersions();
@@ -240,7 +255,8 @@ export class EngineSourcesService {
     signal?: AbortSignal,
   ): Promise<{ url: string; fileName: string } | null> {
     if (optionId.startsWith("paper:")) {
-      return this.paperDownload(optionId.slice("paper:".length), versionId, signal);
+      const project = paperProjectOf(optionId);
+      return project ? this.paperDownload(project, versionId, signal) : null;
     }
     if (optionId === "purpur:purpur") {
       return {
@@ -287,7 +303,7 @@ export class EngineSourcesService {
      * aplatir dans cet ordre suffit.
      */
     const { versions } = await this.get<{ versions: Record<string, string[]> }>(
-      `${PAPER_API}/projects/${project}`,
+      `${PAPER_API}/projects/${encodeURIComponent(project)}`,
     );
 
     return (
@@ -327,7 +343,10 @@ export class EngineSourcesService {
         channel: string;
         downloads: Record<string, { name: string; url: string } | undefined>;
       }[]
-    >(`${PAPER_API}/projects/${project}/versions/${encodeURIComponent(version)}/builds`, signal);
+    >(
+      `${PAPER_API}/projects/${encodeURIComponent(project)}/versions/${encodeURIComponent(version)}/builds`,
+      signal,
+    );
 
     // Les builds arrivent du plus récent au plus ancien. Seul le canal stable
     // va sur un serveur de joueurs ; le repli sert aux versions qui n'en ont

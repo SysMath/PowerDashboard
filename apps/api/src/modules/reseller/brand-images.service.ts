@@ -303,7 +303,10 @@ function checkedBrandImage(body: unknown): CheckedBrandImage {
  * autre type veut dire qu'on n'a pas reçu un fichier.
  */
 export function checkedImage(body: unknown): Buffer {
-  if (!Buffer.isBuffer(body) || body.length === 0) {
+  // `typeof` d'abord : c'est la garde que CodeQL reconnaît pour écarter un
+  // tableau venu de la requête. `Buffer.isBuffer` suffit à l'exécution, mais
+  // l'analyse ne le lit pas, et signalait chaque `.length` qui suit.
+  if (typeof body !== "object" || !Buffer.isBuffer(body) || body.length === 0) {
     throw new BadRequestException("Aucune image reçue.");
   }
   if (body.length > BRAND_IMAGE_MAX_BYTES) {

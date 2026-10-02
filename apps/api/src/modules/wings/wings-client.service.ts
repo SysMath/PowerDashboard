@@ -412,7 +412,9 @@ export class WingsClientService {
   ): Promise<void> {
     const endpoint = await this.endpointFor(serverId);
     const url = new URL(
-      `${endpoint.baseUrl}/api/servers/${serverId}/files/write?${new URLSearchParams({ file })}`,
+      // Encodé bien que ce soit un UUID déjà trouvé en base (`endpointFor`) :
+      // c'est la garde que CodeQL reconnaît dans une adresse composée.
+      `${endpoint.baseUrl}/api/servers/${encodeURIComponent(serverId)}/files/write?${new URLSearchParams({ file })}`,
     );
     const transport = url.protocol === "https:" ? https : http;
 
