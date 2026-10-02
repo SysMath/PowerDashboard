@@ -71,7 +71,8 @@ court, renouvelé par un secret d'appareil que seule une clé non exportable du
 téléphone sait présenter, déverrouillé par la biométrie ou le code du
 téléphone, et révocable depuis le panel. Les notifications arrivent par le
 service de notifications d'Expo, sans contenu sensible. La console parle à
-Wings comme le navigateur.** Rien de la facturation.
+Wings comme le navigateur. Les binaires sont construits, signés et envoyés
+aux magasins par GitHub Actions.** Rien de la facturation.
 
 ### Ce que fait l'application (première version)
 
@@ -209,10 +210,32 @@ occasion, pour le web et l'application.
   Biome, Vitest pour la logique, tests de composants avec React Native
   Testing Library ; lint, typecheck et tests de `apps/mobile` dans
   `ci.yml`, dans le même conteneur Linux que le reste.
-- **Compilation des binaires par EAS Build** (le service de compilation
-  d'Expo) : un binaire iOS exige macOS, que ni le runner Windows ni le
-  conteneur Linux n'ont. Les identifiants de signature restent chez Expo et
-  chez Matheo, jamais dans le dépôt.
+- **Binaires construits et signés par GitHub Actions**, pas par le service
+  de compilation d'Expo (souhait de Matheo) : un workflow `mobile.yml`
+  part d'une étiquette `mobile-v*` ou d'une exécution lancée à la main.
+  `expo prebuild` produit les projets natifs, puis :
+  - **Android** (APK pour les essais, AAB pour Google Play) : Gradle dans un
+    conteneur Linux épinglé, par `infra/ci/linux.sh`, sur le runner habituel
+    ou sa relève `ubuntu-latest` ;
+  - **iOS** (IPA) : `xcodebuild archive` puis `-exportArchive` sur un runner
+    **macOS hébergé par GitHub** (`macos-latest`, gratuit pour un dépôt
+    public). Un binaire iOS exige macOS et Xcode, que ni le runner Windows
+    ni un conteneur n'ont : c'est la seule exception à la règle du
+    conteneur Linux, écrite dans le workflow.
+- **Secrets de signature dans GitHub seulement** : clé de signature Android
+  (keystore en base64 et ses mots de passe), certificat de distribution et
+  profil Apple, clé de l'API App Store Connect, compte de service de
+  l'API Google Play Developer. Ils vivent dans un **environnement GitHub
+  `magasins`** dont chaque déploiement attend l'approbation de Matheo, ne
+  sont jamais exposés aux exécutions venues d'une PR (le dépôt est public),
+  et ne passent jamais par le chat ni par le dépôt. Les jobs suivent les
+  règles des autres workflows : actions épinglées par empreinte,
+  `persist-credentials: false` (`workflows-jetons.test.ts` les vérifie).
+- **Envoi aux magasins par le même workflow**, après approbation : piste de
+  test interne de Google Play et TestFlight, puis publication à la main
+  dans les consoles des magasins. Chaque binaire est attesté
+  (`actions/attest`) et sa nomenclature CycloneDX publiée, comme les
+  releases du panel.
 - **Publiée sous le compte de Matheo** sur l'App Store et Google Play
   (question 6). Pas de mise à jour « à chaud » du code (EAS Update) : chaque
   version passe par les magasins, donc par leur vérification ; une mise à
@@ -265,6 +288,24 @@ occasion, pour le web et l'application.
 - **Une application par revendeur** (marque blanche dans les magasins) :
   une publication et un compte de magasin par marque. L'application unique
   prend la marque du domaine auquel elle se lie.
+- **Tauri 2** (question de Matheo, 2026-10-02). Tauri affiche une interface
+  web dans la WebView du téléphone, avec un cœur en Rust. Il ne rendrait pas
+  l'interface du panel réutilisable : elle est rendue côté serveur par Next,
+  avec une CSP à nonce, et ne s'exporte pas en fichiers statiques. Il
+  faudrait réécrire les écrans comme avec React Native, ou charger le panel
+  distant dans la WebView, ce qui revient à emballer la PWA (Apple refuse
+  souvent ces applications, règle 4.2). Son mobile est plus jeune : les
+  notifications poussées n'existent que par des greffons communautaires
+  concurrents, le trousseau n'est pas couvert par un greffon officiel, et
+  la console devrait passer par le côté Rust, car la WebView ne peut pas
+  présenter à Wings l'origine du panel. Il ajouterait enfin un troisième
+  langage (Rust) au TypeScript et au Go. Son atout, une application de
+  bureau, est déjà couvert par le panel web et sa PWA. La construction par
+  GitHub Actions, l'autre souhait de Matheo, vaut pour Expo aussi et a été
+  retenue.
+- **Le service de compilation d'Expo (EAS Build)** : il évite de tenir les
+  projets natifs, mais les certificats de signature seraient gardés chez
+  Expo. GitHub Actions garde tout dans le dépôt et ses secrets.
 - **Flutter, natif Swift et Kotlin** : le PLAN veut partager `contracts` et
   le SDK, écrits en TypeScript.
 - **L'administration dans l'application** : surface sensible pour un usage
@@ -277,8 +318,10 @@ occasion, pour le web et l'application.
 - **Un deuxième client à tenir à jour** : chaque route qu'il emploie est
   vérifiée contre le catalogue par le SDK, comme aujourd'hui.
 - **Comptes et coûts chez des tiers**, à la charge de Matheo : compte
-  développeur Apple (annuel), compte Google Play, compte Expo (EAS Build,
-  Expo Push).
+  développeur Apple (annuel), compte Google Play, compte Expo (gratuit,
+  pour Expo Push seulement). Les minutes des runners macOS sont gratuites
+  tant que le dépôt reste public ; s'il devenait privé, elles seraient
+  décomptées à un tarif élevé, et il faudrait un Mac auto-hébergé.
 - **Tests** :
   - panel (intégration PostgreSQL, 9.6 compris) : code d'autorisation à
     usage unique et expiré, PKCE faux, `state` faux, échange signé par une
@@ -288,6 +331,9 @@ occasion, pour le web et l'application.
     borné et jeton périmé effacé, contenu des notifications sans détail ;
   - application : logique de liaison et de renouvellement, filtres de la
     console, rendu des écrans principaux, concordance des jetons de couleur ;
+  - workflow : `mobile.yml` vérifié comme les autres (actions épinglées,
+    `persist-credentials: false`, secrets réservés à l'environnement
+    `magasins`, aucun secret lu par un job déclenché par une PR) ;
   - banc réel sur un téléphone iOS et un Android contre un panel d'essai et
     un Wings : liaison, console (en-tête `Origin` accepté par Wings),
     notification reçue, appareil retiré. Il ne tourne pas en session
@@ -308,9 +354,11 @@ occasion, pour le web et l'application.
 
 Chaque question a un choix, marqué *recommandé*.
 
-1. **Accepter l'architecture** : application Expo de l'espace client,
-   liaison par le navigateur (PKCE), appareil révocable, console directe
-   chez Wings, aucune facturation. *Recommandé.*
+1. **Accepter l'architecture** : application Expo (React Native) de
+   l'espace client, plutôt que Tauri 2 (options écartées), liaison par le
+   navigateur (PKCE), appareil révocable, console directe chez Wings,
+   binaires construits, signés et envoyés aux magasins par GitHub Actions,
+   aucune facturation. *Recommandé.*
 2. **Périmètre** : espace client seulement, avec les écrans de « Ce que fait
    l'application » *recommandé* ; ou aussi un espace revendeur, ou une
    administration en lecture.
@@ -325,6 +373,8 @@ Chaque question a un choix, marqué *recommandé*.
    *recommandé* ; ou contenu complet ; ou pas de notifications poussées.
 6. **Publication** : sous ton compte, une seule application qui prend la
    marque du panel auquel elle se lie *recommandé* ; nom dans les
-   magasins : « GameDashboard ».
+   magasins : « GameDashboard ». Tu poses toi-même les secrets de
+   signature dans l'environnement GitHub `magasins` et tu approuves chaque
+   envoi.
 7. **Ordre de livraison** : les trois lots de « Conséquences » dans cet
    ordre *recommandé*.
