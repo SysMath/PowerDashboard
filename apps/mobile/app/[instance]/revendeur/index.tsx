@@ -3,8 +3,8 @@ import { useTranslations } from "use-intl";
 import { Bandeau, Bouton, Carte, Chargement, Ecran, Texte } from "@/composants/base";
 import { CarteEnveloppe } from "@/composants/revendeur";
 import { useInstance } from "@/etat/instance";
+import { usePanelWeb } from "@/hooks/usePanelWeb";
 import { useParc } from "@/hooks/useRevendeur";
-import { ouvrirPanel } from "@/natif/navigateur";
 import { trierClients } from "@/noyau/revendeur";
 
 /** L'espace revendeur : l'enveloppe, la consommation, les clients. */
@@ -12,6 +12,7 @@ export default function Revendeur() {
   const t = useTranslations("mobile.revendeur");
   const router = useRouter();
   const { instance } = useInstance();
+  const panelWeb = usePanelWeb();
   const { donnees, erreur } = useParc();
 
   return (
@@ -53,7 +54,7 @@ export default function Revendeur() {
       <Bouton
         titre={t("ouvrirPanel")}
         variante="secondaire"
-        onPress={() => ouvrirPanel(instance.adresse, "/reseller")}
+        onPress={() => panelWeb("/reseller")}
       />
     </Ecran>
   );

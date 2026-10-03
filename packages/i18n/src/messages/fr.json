@@ -2803,7 +2803,8 @@
         "etat": "Ce retour ne correspond pas à la liaison ouverte : il a été ignoré.",
         "invalide": "Le retour du navigateur est illisible. Réessayez.",
         "echec": "La liaison a échoué : code expiré, connexion perdue ou biométrie refusée. Réessayez."
-      }
+      },
+      "demo": "Essayer sans panel"
     },
     "cadre": {
       "retirer": "Retirer ce panel du téléphone",
@@ -3064,6 +3065,13 @@
         "vide": "Aucune entrée.",
         "plus": "Entrées plus anciennes"
       }
+    },
+    "demo": {
+      "titre": "Démonstration",
+      "nom": "Panel de démonstration",
+      "bandeau": "Démonstration : des données fictives, rien ne quitte le téléphone. Reliez votre panel pour agir pour de vrai.",
+      "web": "La démonstration n'a pas de site : sur un vrai panel, ce bouton ouvre ses pages dans le navigateur.",
+      "fichiers": "Indisponible en démonstration : sur un vrai panel, le fichier passe directement entre le téléphone et le serveur."
     }
   }
 }

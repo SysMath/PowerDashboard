@@ -2803,7 +2803,8 @@
         "etat": "This response does not match the link in progress: it was ignored.",
         "invalide": "The browser's response could not be read. Try again.",
         "echec": "Linking failed: expired code, lost connection or biometrics declined. Try again."
-      }
+      },
+      "demo": "Try without a panel"
     },
     "cadre": {
       "retirer": "Remove this panel from the phone",
@@ -3064,6 +3065,13 @@
         "vide": "No entry.",
         "plus": "Older entries"
       }
+    },
+    "demo": {
+      "titre": "Demo",
+      "nom": "Demo panel",
+      "bandeau": "Demo: made-up data, nothing leaves the phone. Link your panel to act for real.",
+      "web": "The demo has no website: on a real panel, this button opens its pages in the browser.",
+      "fichiers": "Not available in the demo: on a real panel, the file goes straight between the phone and the server."
     }
   }
 }

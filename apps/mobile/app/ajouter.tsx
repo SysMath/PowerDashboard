@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "use-intl";
 import { Bandeau, Bouton, Champ, Chargement, Ecran, Texte } from "@/composants/base";
 import { FicheInstance } from "@/composants/instances";
+import { ID_DEMO } from "@/etat/demo";
 import { useAjout } from "@/hooks/useAjout";
 import { nomParDefaut } from "@/natif/appareil";
 import { ouvrirConfidentialite } from "@/natif/navigateur";
@@ -44,6 +45,11 @@ export default function Ajouter() {
             titre={t("scanner")}
             variante="secondaire"
             onPress={() => router.push("/scanner")}
+          />
+          <Bouton
+            titre={t("demo")}
+            variante="secondaire"
+            onPress={() => router.push(`/${ID_DEMO}`)}
           />
           <Bouton
             titre={ti("confidentialite")}

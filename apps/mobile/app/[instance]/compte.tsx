@@ -3,7 +3,7 @@ import { Alert } from "react-native";
 import { useFormatter, useTranslations } from "use-intl";
 import { Bouton, Carte, Ecran, Texte } from "@/composants/base";
 import { useInstance } from "@/etat/instance";
-import { ouvrirPanel } from "@/natif/navigateur";
+import { usePanelWeb } from "@/hooks/usePanelWeb";
 import { domaineDe } from "@/noyau/adresse";
 
 /**
@@ -16,6 +16,7 @@ export default function Compte() {
   const format = useFormatter();
   const router = useRouter();
   const { instance, session } = useInstance();
+  const panelWeb = usePanelWeb();
 
   const delier = () =>
     Alert.alert(t("delierTitre"), t("delierCorps"), [
@@ -49,11 +50,7 @@ export default function Compte() {
         ) : null}
       </Carte>
       <Texte ton="discret">{t("webAide")}</Texte>
-      <Bouton
-        titre={t("ouvrirPanel")}
-        variante="secondaire"
-        onPress={() => ouvrirPanel(instance.adresse)}
-      />
+      <Bouton titre={t("ouvrirPanel")} variante="secondaire" onPress={() => panelWeb()} />
       <Bouton titre={t("panels")} variante="secondaire" onPress={() => router.navigate("/")} />
       <Bouton titre={t("delier")} variante="danger" onPress={delier} />
     </Ecran>

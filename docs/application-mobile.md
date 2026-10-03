@@ -86,6 +86,14 @@ ne l'embarque pas.
   second facteur du personnel reste exigé par l'API (`StaffTwoFactorGuard`).
   L'application n'atteint que les routes d'administration de
   `APP_STAFF_ROUTES` ; tout le reste de `/api/v1/admin/` lui est refusé.
+- **Mode démo** : « Essayer sans panel », sur l'écran d'ajout d'un panel,
+  ouvre les vrais écrans et le vrai SDK sur un panel fictif en mémoire
+  (`src/noyau/demo/`) : serveurs, console, sauvegardes, fichiers, cloche,
+  espace revendeur et administration. Ni liaison, ni clé, ni biométrie, ni
+  notification ; rien ne quitte le téléphone, et chaque ouverture repart
+  des mêmes données. Envoi et téléchargement de fichiers, et pages du
+  panel dans le navigateur, disent qu'ils manquent à la démo. C'est ce
+  qu'essaient les vérificateurs des magasins.
 - Restent au navigateur : bases de données, planificateur, permissions des
   fichiers, sous-utilisateurs, réglages du compte ; côté revendeur, marque,
   domaines, clés, webhooks, limites et suppression des serveurs ; côté
@@ -268,8 +276,15 @@ demandent et que le dépôt tient prêt.
   compris : ce n'est pas un échange entre utilisateurs de l'application.
 - **Accès pour les vérificateurs** : Apple (règle 2.1) et Google (*Accès à
   l'application*) doivent pouvoir essayer toute l'application, sans panel à
-  eux. Mode démo dans l'application ou panel de démonstration : à décider
-  avant la première soumission.
+  eux. C'est le mode démo (plus haut). Notes pour la vérification, chez
+  Apple comme chez Google (*Accès à l'application* : « Toutes les
+  fonctionnalités sont accessibles sans restriction », avec ces
+  instructions) :
+
+  > The app manages game servers on a self-hosted GameDashboard panel. To
+  > review it without a panel, tap “Try without a panel” on the first
+  > screen: every screen works on made-up data, offline. Linking a real
+  > panel opens its sign-in page in the browser.
 
 ### Déclarations de données
 

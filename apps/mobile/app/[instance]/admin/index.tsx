@@ -10,14 +10,15 @@ import {
 import { Bandeau, Bouton, Chargement, Ecran, Texte } from "@/composants/base";
 import { useInstance } from "@/etat/instance";
 import { useApercu } from "@/hooks/useAdministration";
+import { usePanelWeb } from "@/hooks/usePanelWeb";
 import { useRole } from "@/hooks/useRevendeur";
-import { ouvrirPanel } from "@/natif/navigateur";
 
 /** Ce qui ne va pas sur la plateforme ; chaque ligne mène à son écran. */
 export default function Administration() {
   const t = useTranslations("mobile.administration");
   const router = useRouter();
   const { instance } = useInstance();
+  const panelWeb = usePanelWeb();
   const ecrire = useRole() === "admin";
   const { donnees, erreur, verifier } = useApercu();
   const aller = (chemin: string) => router.push(`/${instance.id}/admin/${chemin}`);
@@ -58,11 +59,7 @@ export default function Administration() {
         <CarteMiseAJour statut={donnees.statut} ecrire={ecrire} verifier={verifier} />
       ) : null}
       <Texte ton="discret">{t("webAide")}</Texte>
-      <Bouton
-        titre={t("ouvrirPanel")}
-        variante="secondaire"
-        onPress={() => ouvrirPanel(instance.adresse, "/admin")}
-      />
+      <Bouton titre={t("ouvrirPanel")} variante="secondaire" onPress={() => panelWeb("/admin")} />
     </Ecran>
   );
 }

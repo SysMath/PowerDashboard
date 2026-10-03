@@ -11,7 +11,7 @@ export type PhaseConsole = "connexion" | "ouverte" | "fermee";
  * vérifie et les consigne.
  */
 export function useConsole(serveurId: string) {
-  const { client, instance, signaler } = useInstance();
+  const { client, instance, signaler, webSocket } = useInstance();
   const [lignes, setLignes] = useState<LigneConsole[]>([]);
   const [etat, setEtat] = useState<string | null>(null);
   const [releve, setReleve] = useState<Releve | null>(null);
@@ -40,7 +40,7 @@ export function useConsole(serveurId: string) {
           setPhase("fermee");
         }
       },
-      { origin: instance.origine },
+      { origin: instance.origine, WebSocketImpl: webSocket },
     ).then(
       (ouverte) => {
         if (fini) ouverte.close();
@@ -56,7 +56,7 @@ export function useConsole(serveurId: string) {
       ouverteRef.current?.close();
       ouverteRef.current = null;
     };
-  }, [client, serveurId, instance.origine, signaler, tour]);
+  }, [client, serveurId, instance.origine, signaler, webSocket, tour]);
 
   const envoyer = useCallback(async (commande: string) => {
     await ouverteRef.current?.send(commande);

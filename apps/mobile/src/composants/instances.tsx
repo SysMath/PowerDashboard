@@ -1,7 +1,12 @@
-import { useTranslations } from "use-intl";
+import { Stack } from "expo-router";
+import { useMemo } from "react";
+import { useLocale, useTranslations } from "use-intl";
+import { ouvrirDemo } from "@/etat/demo";
+import { ContexteInstance } from "@/etat/instance";
 import { domaineDe } from "@/noyau/adresse";
 import type { Descripteur } from "@/noyau/descripteur";
 import type { InstanceLiee } from "@/noyau/instances";
+import { useCouleurs } from "@/theme/theme";
 import { Bandeau, Bouton, Carte, Ecran, Pastille, Rangee, Texte } from "./base";
 
 /** Le nom et le domaine exact, en gros, avant toute connexion (ADR 0010). */
@@ -62,5 +67,35 @@ export function EcranCadre(props: {
         <Bouton titre={t("retirer")} variante="danger" onPress={props.onRetirer} />
       ) : null}
     </Ecran>
+  );
+}
+
+/** La pile des écrans d'un panel, aux couleurs du thème. */
+export function PileEcrans() {
+  const c = useCouleurs();
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: c.surface },
+        headerTintColor: c.text,
+        contentStyle: { backgroundColor: c.bg },
+      }}
+    />
+  );
+}
+
+/**
+ * Le panel de démonstration : les mêmes écrans, sur un panel fictif neuf à
+ * chaque ouverture.
+ */
+export function CadreDemo() {
+  const langue = useLocale();
+  const t = useTranslations("mobile.demo");
+  const nom = t("nom");
+  const ouverte = useMemo(() => ouvrirDemo(langue, nom), [langue, nom]);
+  return (
+    <ContexteInstance.Provider value={ouverte}>
+      <PileEcrans />
+    </ContexteInstance.Provider>
   );
 }

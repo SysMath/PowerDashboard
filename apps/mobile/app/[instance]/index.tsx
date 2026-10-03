@@ -11,8 +11,9 @@ export default function Serveurs() {
   const t = useTranslations("mobile.serveurs");
   const tr = useTranslations("mobile.revendeur");
   const ta = useTranslations("mobile.administration");
+  const td = useTranslations("mobile.demo");
   const router = useRouter();
-  const { instance } = useInstance();
+  const { instance, demo } = useInstance();
   const { donnees, erreur, chargement } = useServeurs();
   const cloche = useCloche();
   const nonLues = cloche.donnees?.unread ?? 0;
@@ -32,7 +33,7 @@ export default function Serveurs() {
           variante="secondaire"
           onPress={() => router.push(`/${instance.id}/compte`)}
         />
-        {role === "reseller" ? (
+        {role === "reseller" || demo ? (
           <Bouton
             titre={tr("ouvrir")}
             variante="secondaire"
@@ -47,6 +48,7 @@ export default function Serveurs() {
           />
         ) : null}
       </Rangee>
+      {demo ? <Bandeau titre={td("bandeau")} /> : null}
       {erreur ? (
         <Bandeau titre={t("erreur")} niveau="danger">
           {erreur}

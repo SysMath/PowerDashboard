@@ -1,24 +1,27 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Chargement } from "@/composants/base";
-import { EcranCadre } from "@/composants/instances";
+import { CadreDemo, EcranCadre, PileEcrans } from "@/composants/instances";
 import { useApplis } from "@/etat/applis";
+import { ID_DEMO } from "@/etat/demo";
 import { ContexteInstance } from "@/etat/instance";
 import { useCadreInstance } from "@/hooks/useCadreInstance";
 import { usePousse } from "@/hooks/usePousse";
 import { cle } from "@/natif/cle";
 import { aliasCle } from "@/noyau/instances";
-import { useCouleurs } from "@/theme/theme";
 
 /**
  * Le cadre d'un panel lié : biométrie à l'ouverture, panel toujours le même,
  * appareil toujours lié. Les écrans du panel ne s'affichent qu'une fois tout
  * cela vérifié.
  */
-export default function CadreInstance() {
+export default function Cadre() {
   const { instance: id } = useLocalSearchParams<{ instance: string }>();
+  return id === ID_DEMO ? <CadreDemo /> : <CadreInstance id={id} />;
+}
+
+function CadreInstance({ id }: { id: string }) {
   const { registre } = useApplis();
   const router = useRouter();
-  const c = useCouleurs();
   const { cadre, reessayer } = useCadreInstance(id);
   usePousse(cadre.etat === "ouvert" ? cadre.ouverte : null);
 
@@ -33,13 +36,7 @@ export default function CadreInstance() {
   if (cadre.etat === "ouvert") {
     return (
       <ContexteInstance.Provider value={cadre.ouverte}>
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: c.surface },
-            headerTintColor: c.text,
-            contentStyle: { backgroundColor: c.bg },
-          }}
-        />
+        <PileEcrans />
       </ContexteInstance.Provider>
     );
   }

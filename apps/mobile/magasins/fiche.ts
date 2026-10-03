@@ -47,6 +47,8 @@ const fr: Fiche = {
 
 Un panel GameDashboard est nécessaire : l'application n'héberge aucun serveur et ne crée aucun compte. Vous la reliez à votre panel en scannant le code affiché par celui-ci, ou en tapant son adresse, puis en vous y connectant comme d'habitude.
 
+Pas encore de panel ? « Essayer sans panel » ouvre une démonstration complète, sur des données fictives.
+
 VOS SERVEURS
 • État, mémoire, joueurs en ligne
 • Démarrer, redémarrer, arrêter
@@ -88,6 +90,8 @@ const en: Fiche = {
   description: `GameDashboard is the app for the GameDashboard game server panel. It links to your host's panel, or your own, and lets you act on your servers from your phone.
 
 A GameDashboard panel is required: the app hosts no server and creates no account. You link it to your panel by scanning the code the panel shows, or by typing its address, then signing in as usual.
+
+No panel yet? “Try without a panel” opens a full demo, on made-up data.
 
 YOUR SERVERS
 • Status, memory, players online

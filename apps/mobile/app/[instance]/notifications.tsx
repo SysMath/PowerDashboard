@@ -3,8 +3,8 @@ import { useTranslations } from "use-intl";
 import { Bandeau, Bouton, Chargement, Ecran } from "@/composants/base";
 import { ListeNotifications } from "@/composants/cloche";
 import { useInstance } from "@/etat/instance";
+import { usePanelWeb } from "@/hooks/usePanelWeb";
 import { useCloche } from "@/hooks/useServeurs";
-import { ouvrirPanel } from "@/natif/navigateur";
 import { cibleNotification } from "@/noyau/notifications";
 
 /** La cloche du panel, relue à l'ouverture (ADR 0010 : « notifications : aucune »). */
@@ -12,6 +12,7 @@ export default function Notifications() {
   const t = useTranslations("mobile.cloche");
   const router = useRouter();
   const { instance } = useInstance();
+  const panelWeb = usePanelWeb();
   const { donnees, erreur, toutLire } = useCloche();
 
   return (
@@ -31,7 +32,7 @@ export default function Notifications() {
               const cible = cibleNotification(notification.href);
               if (cible && "serveur" in cible)
                 router.push(`/${instance.id}/serveur/${cible.serveur}`);
-              else if (cible) void ouvrirPanel(instance.adresse, cible.chemin);
+              else if (cible) panelWeb(cible.chemin);
             }}
           />
         </>
