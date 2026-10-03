@@ -16,6 +16,12 @@
       "name": "Accès"
     },
     {
+      "name": "Administration"
+    },
+    {
+      "name": "Application mobile"
+    },
+    {
       "name": "Audit"
     },
     {
@@ -46,6 +52,9 @@
       "name": "Double authentification"
     },
     {
+      "name": "Espace revendeur"
+    },
+    {
       "name": "Fichiers"
     },
     {
@@ -59,6 +68,9 @@
     },
     {
       "name": "Moteur"
+    },
+    {
+      "name": "Notifications"
     },
     {
       "name": "Planification"
@@ -1168,6 +1180,1195 @@
         }
       }
     },
+    "/api/v1/auth/app/authorize": {
+      "post": {
+        "summary": "Accepte la liaison de l'application mobile depuis le navigateur du téléphone et rend un code de soixante secondes, à usage unique. Refusée à une prise en main.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-post-auth-app-authorize",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/token": {
+      "post": {
+        "summary": "Échange le code de liaison, le vérificateur PKCE et la clé publique de l'appareil (signature P-256 à l'appui) contre un jeton d'accès de quinze minutes et un secret d'appareil.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-post-auth-app-token",
+        "security": [],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/refresh": {
+      "post": {
+        "summary": "Renouvelle le jeton d'accès contre le secret d'appareil, signé par la clé de l'appareil. Le secret est remplacé ; présenter l'ancien retire l'appareil.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-post-auth-app-refresh",
+        "security": [],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/challenge": {
+      "post": {
+        "summary": "Défi de deux minutes à signer par la clé de l'appareil (en-tête x-gd-presence) avant un geste lourd : restauration, suppression, réinstallation.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-post-auth-app-challenge",
+        "security": [
+          {
+            "appDevice": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/device": {
+      "delete": {
+        "summary": "L'application se délie elle-même du panel.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-delete-auth-app-device",
+        "security": [
+          {
+            "appDevice": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/app/push": {
+      "put": {
+        "summary": "Dépose de quoi joindre l'appareil : son jeton Expo en mode direct, sa poignée du relais en mode relais. Refusé (409) quand le mode diffère de celui que sert le panel, que publie /.well-known/gamedashboard.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-put-auth-app-push",
+        "security": [
+          {
+            "appDevice": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      },
+      "delete": {
+        "summary": "L'appareil ne reçoit plus de notifications poussées.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-delete-auth-app-push",
+        "security": [
+          {
+            "appDevice": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/devices": {
+      "get": {
+        "summary": "Appareils mobiles liés au compte, le plus récemment vu en tête.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-get-auth-devices",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/auth/devices/{device}": {
+      "delete": {
+        "summary": "Retire un appareil mobile : ses jetons cessent de valoir sur-le-champ.",
+        "description": "Session du panel.",
+        "tags": [
+          "Application mobile"
+        ],
+        "operationId": "session-delete-auth-devices-by-device",
+        "parameters": [
+          {
+            "name": "device",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant de l'appareil mobile lié.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/reseller/overview": {
+      "get": {
+        "summary": "Espace revendeur : ses machines, ses serveurs et ses clients, son enveloppe et ce qu'il en consomme. Ouverte à l'application mobile.",
+        "description": "Session du panel.",
+        "tags": [
+          "Espace revendeur"
+        ],
+        "operationId": "session-get-reseller-overview",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/reseller/servers/{server}/suspension": {
+      "post": {
+        "summary": "Suspend (`suspended: true`, motif facultatif) ou rétablit un serveur de son parc. Depuis l'application, confirmation de présence exigée.",
+        "description": "Session du panel.",
+        "tags": [
+          "Espace revendeur"
+        ],
+        "operationId": "session-post-reseller-servers-by-server-suspension",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/reseller/consumption/export": {
+      "get": {
+        "summary": "Consommation journalière de son parc, en CSV ou JSONL ; sans période, le mois en cours. Consignée au journal.",
+        "description": "Session du panel.",
+        "tags": [
+          "Espace revendeur"
+        ],
+        "operationId": "session-get-reseller-consumption-export",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Premier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut le 1er du mois de « to ».",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Dernier jour, inclus (AAAA-MM-JJ, temps universel). Par défaut aujourd'hui.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "« csv » (par défaut) ou « jsonl », un objet JSON par ligne.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/nodes": {
+      "get": {
+        "summary": "Machines du parc : capacité, allocation, relevés et dernier signal du daemon. Personnel (support compris).",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-get-admin-nodes",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/nodes/{node}/agent": {
+      "get": {
+        "summary": "Agent de la machine : état, version, fonctions annoncées et capacités qui en découlent.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-get-admin-nodes-by-node-agent",
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant de la machine.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/servers": {
+      "get": {
+        "summary": "Tous les serveurs : titulaire, machine, egg, état de gestion et état du conteneur.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-get-admin-servers",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/servers/{server}/suspend": {
+      "post": {
+        "summary": "Suspend (`suspended: true`, motif facultatif) ou rétablit un serveur. Administration seulement ; depuis l'application, confirmation de présence exigée.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-post-admin-servers-by-server-suspend",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "summary": "Tous les comptes : rôle, second facteur, suspension, dernière connexion, serveurs.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-get-admin-users",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user}/suspend": {
+      "post": {
+        "summary": "Suspend un compte (`suspended: true`, motif exigé, sessions coupées) ou le rétablit. Administration seulement ; présence exigée depuis l'application.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-post-admin-users-by-user-suspend",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du compte.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user}/revoke-sessions": {
+      "post": {
+        "summary": "Déconnecte un compte partout : ses sessions et ses appareils mobiles liés. Administration seulement ; présence exigée depuis l'application.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-post-admin-users-by-user-revoke-sessions",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du compte.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/incidents": {
+      "get": {
+        "summary": "Incidents de la page /status, ouverts et clos, avec leurs mises à jour.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-get-admin-incidents",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      },
+      "post": {
+        "summary": "Ouvre et publie un incident (`title`, `impact`, `body`, `nodeIds`). Administration seulement ; présence exigée depuis l'application.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-post-admin-incidents",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/incidents/{incident}/updates": {
+      "post": {
+        "summary": "Ajoute une mise à jour (`state`, `body`) ; l'état `resolved` clôt l'incident. Administration seulement ; présence exigée depuis l'application.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-post-admin-incidents-by-incident-updates",
+        "parameters": [
+          {
+            "name": "incident",
+            "in": "path",
+            "required": true,
+            "description": "Valeur de « incident ».",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/updates": {
+      "get": {
+        "summary": "État de la mise à jour autonome du panel (hébergement cPanel) ; `actif: false` ailleurs.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-get-admin-updates",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/updates/check": {
+      "post": {
+        "summary": "Lance la recherche d'une nouvelle version, et son installation si elle paraît. Administration seulement ; présence exigée depuis l'application.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-post-admin-updates-check",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/admin/activity": {
+      "get": {
+        "summary": "Journal de la plateforme, le plus récent d'abord, par pages.",
+        "description": "Session du panel.",
+        "tags": [
+          "Administration"
+        ],
+        "operationId": "session-get-admin-activity",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "description": "Valeur de « query ».",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page demandée, à partir de 1.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
     "/api/v1/client/servers": {
       "get": {
         "summary": "Lister les serveurs auxquels la clé donne accès.",
@@ -2229,6 +3430,63 @@
         }
       }
     },
+    "/api/v1/client/servers/{server}/files/create-directory": {
+      "post": {
+        "summary": "Créer un dossier : `{ root, name }`, `name` relatif à `root`.",
+        "description": "Clé personnelle. Portée requise : `files.write`.",
+        "tags": [
+          "Fichiers"
+        ],
+        "operationId": "client-post-servers-by-server-files-create-directory",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "files.write"
+            ]
+          }
+        ],
+        "x-gd-scope": "files.write",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « files.write », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
     "/api/v1/client/servers/{server}/files/rename": {
       "post": {
         "summary": "Renommer ou déplacer un fichier ou un dossier.",
@@ -2498,6 +3756,72 @@
           },
           "403": {
             "description": "Authentifié, mais sans la portée « backups.create », ou refusé pour la ressource visée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
+          }
+        }
+      }
+    },
+    "/api/v1/client/servers/{server}/backups/{backup}/lock": {
+      "post": {
+        "summary": "Verrouiller ou déverrouiller une sauvegarde (`{ locked }`) : verrouillée, la rotation de rétention ne l'efface pas. Exige le droit de supprimer.",
+        "description": "Clé personnelle. Portée requise : `backups.delete`.",
+        "tags": [
+          "Sauvegardes"
+        ],
+        "operationId": "client-post-servers-by-server-backups-by-backup-lock",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant du serveur, ou son identifiant court.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "backup",
+            "in": "path",
+            "required": true,
+            "description": "Identifiant de la sauvegarde.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "clientKey": [
+              "backups.delete"
+            ]
+          }
+        ],
+        "x-gd-scope": "backups.delete",
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans la portée « backups.delete », ou refusé pour la ressource visée : la cause est dans le corps.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3486,6 +4810,92 @@
           },
           "2XX": {
             "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/notifications": {
+      "get": {
+        "summary": "Notifications du compte, les plus récentes d'abord, avec le nombre de non lues (meta.unread).",
+        "description": "Clé personnelle.",
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "client-get-notifications",
+        "security": [
+          {
+            "clientKey": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Résultat de la lecture."
+          }
+        }
+      }
+    },
+    "/api/v1/client/notifications/read-all": {
+      "post": {
+        "summary": "Marquer toutes les notifications du compte comme lues.",
+        "description": "Clé personnelle.",
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "client-post-notifications-read-all",
+        "security": [
+          {
+            "clientKey": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Demande refusée : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Aucune authentification recevable."
+          },
+          "403": {
+            "description": "Authentifié, mais sans le droit sur cette ressource : la cause est dans le corps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Effectué."
           }
         }
       }
@@ -4734,6 +6144,11 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Clé personnelle, créée depuis « Compte → Clés d'API ». Elle agit au nom de son propriétaire et ne porte jamais plus que les portées qu'on lui a données."
+      },
+      "appDevice": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Jeton d'accès d'un appareil mobile lié (gd_mob_…), quinze minutes. Il porte les droits du compte sur l'espace client, jamais la gestion de sa sécurité."
       },
       "applicationKey": {
         "type": "http",

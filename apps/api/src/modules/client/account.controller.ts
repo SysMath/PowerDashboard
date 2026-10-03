@@ -16,7 +16,7 @@ import {
 import { ImpersonationReadOnlyGuard } from "../auth/impersonation.guard";
 import { attemptOrigin, PasswordConfirmationService } from "../auth/password-confirmation.service";
 import type { AuthenticatedRequest } from "../auth/session.guard";
-import { SessionGuard } from "../auth/session.guard";
+import { isBrowserSession, SessionGuard } from "../auth/session.guard";
 import { AccountPreferencesService } from "./account-preferences.service";
 import { ApiKeysService } from "./api-keys.service";
 
@@ -156,5 +156,10 @@ function sessionOnly(request: AuthenticatedRequest): void {
     throw new ForbiddenException(
       "Les clés d'API ne peuvent pas gérer les clés d'API. Connectez-vous au panel.",
     );
+  }
+  // L'application mobile ne crée ni ne lit jamais de clé personnelle (ADR
+  // 0010) : un téléphone volé n'en ferait pas un accès sans fin.
+  if (!isBrowserSession(request)) {
+    throw new ForbiddenException("Les clés d'API se gèrent dans le panel, depuis un navigateur.");
   }
 }

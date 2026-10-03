@@ -1,3 +1,6 @@
+export * from "@gamedashboard/sdk/ansi";
+export * from "@gamedashboard/sdk/console-text";
+export * from "@gamedashboard/sdk/format";
 export * from "./components/alert-banner";
 export * from "./components/app-header";
 export * from "./components/app-shell";
@@ -43,8 +46,5 @@ export * from "./components/tabs";
 export * from "./components/templates";
 export * from "./components/theme-toggle";
 export * from "./components/wizard";
-export * from "./lib/ansi";
 export { cn } from "./lib/cn";
-export * from "./lib/console-text";
-export * from "./lib/format";
 export * from "./lib/theme-init";

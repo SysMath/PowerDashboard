@@ -10,6 +10,7 @@ import {
 } from "../../test/throwaway-database";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import type { Mail, MailerService } from "../mail/mailer.service";
+import { PushOutboxService } from "../push/push-outbox.service";
 import { BrandingService } from "../reseller/branding.service";
 import type { ClientWebhookEmitterService } from "../webhooks/client-webhook-emitter.service";
 import { NotificationPreferencesRepository } from "./notification-preferences.repository";
@@ -57,6 +58,7 @@ describe.skipIf(!HAS_DATABASE)("courriels de notification : marque (intégration
       { send } as unknown as MailerService,
       { emit: async () => {} } as unknown as ClientWebhookEmitterService,
       new BrandingService(db, settings),
+      new PushOutboxService(db),
     );
   }, 60_000);
 

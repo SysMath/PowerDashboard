@@ -123,7 +123,13 @@
     "noSmtpTitle": "No email will be sent",
     "noSmtpBody": "The platform has no outgoing mail server configured. Your choices are saved and will apply as soon as it has one.",
     "unverifiedTitle": "Your address is not confirmed",
-    "unverifiedBody": "Nothing will be written to an address nobody has confirmed. Confirm it from the panel banner to receive these messages."
+    "unverifiedBody": "Nothing will be written to an address nobody has confirmed. Confirm it from the panel banner to receive these messages.",
+    "channelEmail": "Email",
+    "channelPush": "Phone",
+    "noPushTitle": "No notification will reach a phone",
+    "noPushBody": "This panel does not send notifications to the mobile app. Your choices are saved and will apply as soon as it does; the bell in the app stays up to date.",
+    "noDeviceTitle": "No phone is linked to this account",
+    "noDeviceBody": "Install the GameDashboard app and link it from Security › Mobile app to receive these notifications on your phone."
   },
   "activity": {
     "title": "Activity log",
@@ -1790,7 +1796,18 @@
     "problemTooLong": "The password cannot exceed {maximum} characters.",
     "problemContainsIdentity": "The password must not contain your name or your email address.",
     "problemPwned": "This password appears {occurrences, plural, one {# time} other {# times}} in known data breaches. Pick another one.",
-    "noOtherSession": "No other session"
+    "noOtherSession": "No other session",
+    "appSection": "Mobile app",
+    "appSectionHint": "Scan this code with the GameDashboard app to add this panel, then sign in in the browser that opens. Each linked phone appears here and can be removed in one click.",
+    "appQrAlt": "QR code of the panel address",
+    "appQrHint": "The code only contains the panel address:",
+    "appNoDevice": "No linked phone",
+    "appPlatform": {
+      "ios": "iPhone or iPad",
+      "android": "Android"
+    },
+    "appLinked": "linked",
+    "appRemove": "Remove"
   },
   "serverList": {
     "metaTitle": "Servers",
@@ -2304,7 +2321,9 @@
       "twoFactorDisabled": "Two-factor authentication turned off",
       "passkeyAdded": "Passkey added",
       "passkeyRemoved": "Passkey removed",
-      "emailChanged": "Email address changed"
+      "emailChanged": "Email address changed",
+      "appDeviceLinked": "Mobile app linked",
+      "appDeviceReplayed": "Mobile app removed for safety"
     },
     "credentialBody": {
       "passwordChanged": "The password of your account was just changed, and your other sessions were signed out.",
@@ -2313,7 +2332,9 @@
       "twoFactorDisabled": "Two-factor authentication with an app was just turned off for your account.",
       "passkeyAdded": "A new passkey was just registered on your account.",
       "passkeyRemoved": "A passkey was just removed from your account.",
-      "emailChanged": "The email address of your account was just replaced. This message goes to the former address; the next ones will go to the new one."
+      "emailChanged": "The email address of your account was just replaced. This message goes to the former address; the next ones will go to the new one.",
+      "appDeviceLinked": "A phone has just been linked to your account through the mobile app. You can find it, and remove it, in your account security.",
+      "appDeviceReplayed": "A mobile app secret was presented twice: it may have been copied. The phone concerned has been unlinked from your account; it will have to be linked again."
     },
     "credentialAdvice": "If this was not you, someone may have taken over your account: change your password, sign out your other sessions and check your two-factor authentication:",
     "credentialReassure": "If this was you, there is nothing to do.",
@@ -2703,6 +2724,354 @@
       "whitelist_remove": "Remove from whitelist",
       "op": "Make operator",
       "deop": "Remove operator"
+    }
+  },
+  "appLink": {
+    "title": "Allow the mobile app?",
+    "description": "“{device}” ({platform}) will be able to manage your servers as {email}, on {host}. You can remove it at any time from your account security.",
+    "platform": {
+      "ios": "iPhone or iPad",
+      "android": "Android"
+    },
+    "approve": "Allow this phone",
+    "refuse": "Refuse",
+    "notice": "Only accept if you have just started linking from the app, on this phone.",
+    "sentTitle": "Phone allowed",
+    "sentBody": "Go back to the app: it finishes linking on its own.",
+    "failedTitle": "Linking failed",
+    "failedBody": "The panel refused the link. Start again from the app.",
+    "expiredTitle": "No link in progress",
+    "expiredBody": "The request has expired or was already used. Start again from the app."
+  },
+  "mobile": {
+    "commun": {
+      "annuler": "Cancel",
+      "refuse": "Action refused"
+    },
+    "verrou": {
+      "raison": "Open the key that links this phone to the panel"
+    },
+    "presence": {
+      "restaurerSauvegarde": "Confirm restoring the backup",
+      "supprimerSauvegarde": "Confirm deleting the backup",
+      "supprimerFichiers": "Confirm deleting the files",
+      "restaurerInstantane": "Confirm restoring the snapshot",
+      "suspensionServeur": "Confirm suspending or unsuspending the server",
+      "suspensionCompte": "Confirm suspending or restoring the account",
+      "deconnecterPartout": "Confirm signing the account out everywhere",
+      "publierIncident": "Confirm publishing on the status page",
+      "miseAJourPanel": "Confirm updating the panel",
+      "geste": "Confirm this action on the server"
+    },
+    "instances": {
+      "titre": "My panels",
+      "ajouter": "Add a panel",
+      "etat": {
+        "liee": "Linked",
+        "a-confirmer": "Check needed",
+        "a-relier": "Link again"
+      },
+      "confidentialite": "Privacy policy"
+    },
+    "ajout": {
+      "titre": "Add a panel",
+      "intro": "Enter your panel's address, or scan the QR code shown in Account › Security › Mobile app.",
+      "adresse": {
+        "libelle": "Panel address",
+        "vide": "Enter the panel's address.",
+        "http": "Only https:// addresses are accepted: in clear text, the link code could be read on the network.",
+        "invalide": "This address is not valid."
+      },
+      "verdict": {
+        "injoignable": "This address does not respond. Check it, and your connection.",
+        "indisponible": "This panel is temporarily unavailable. Try again in a few minutes.",
+        "pas-un-panel": "This address does not respond like a GameDashboard panel.",
+        "panel-trop-ancien": "This panel is too old for the app. Its host needs to update it.",
+        "application-trop-ancienne": "This panel needs a newer version of the app. Update it from the store."
+      },
+      "verifier": "Continue",
+      "scanner": "Scan a QR code",
+      "ficheAide": "Check the domain: this is the site you are about to sign in to.",
+      "nomAppareil": "Name of this phone, as the panel will show it",
+      "seConnecter": "Sign in with the browser",
+      "autreAdresse": "Another address",
+      "raison": "Link this phone to the panel",
+      "liaison": {
+        "annulee": "Sign-in was interrupted before the end.",
+        "refusee": "You declined the link in the browser.",
+        "panel": "The panel could not complete the link. Try again.",
+        "etat": "This response does not match the link in progress: it was ignored.",
+        "invalide": "The browser's response could not be read. Try again.",
+        "echec": "Linking failed: expired code, lost connection or biometrics declined. Try again."
+      },
+      "demo": "Try without a panel"
+    },
+    "cadre": {
+      "retirer": "Remove this panel from the phone",
+      "verrouille": {
+        "titre": "Phone locked",
+        "corps": "Unlock with biometrics or your phone's passcode to open this panel.",
+        "action": "Unlock"
+      },
+      "hors-ligne": {
+        "titre": "Panel unreachable",
+        "corps": "The panel does not respond. Check your connection, or try again in a moment.",
+        "action": "Try again"
+      },
+      "introuvable": {
+        "titre": "Unknown panel",
+        "corps": "This panel is no longer linked to this phone.",
+        "action": "My panels"
+      },
+      "a-confirmer": {
+        "titre": "This panel has changed",
+        "corps": "The address responds, but it is no longer the same panel: it was reinstalled, or the domain changed hands. Nothing was sent. Only link it again if you know why.",
+        "action": "Link this new panel"
+      },
+      "a-relier": {
+        "titre": "Link ended",
+        "corps": "This phone was removed from the panel, or its link expired (30 days without use, 90 days at most). Sign in again with the browser to link it.",
+        "action": "Link again"
+      }
+    },
+    "serveurs": {
+      "joueurs": "{n, plural, =0 {no players} one {# player} other {# players}}",
+      "memoire": "Memory: {utilise} of {max}",
+      "cloche": "Notifications",
+      "clocheNonLues": "Notifications ({n})",
+      "compte": "Account",
+      "erreur": "List unavailable",
+      "vide": "No servers on this account."
+    },
+    "serveur": {
+      "console": "Console",
+      "joueurs": "Players",
+      "fichiers": "Files",
+      "sauvegardes": "Backups"
+    },
+    "sauvegardes": {
+      "quota": "{utilise} of {max} backups",
+      "quotaAtteint": "Quota reached: delete an unlocked backup to create another one.",
+      "nom": "Backup name",
+      "nomVide": "Enter a name.",
+      "restaurer": "Restore",
+      "viderPuisRestaurer": "Empty, then restore",
+      "viderAide": "\"Empty, then restore\" first deletes every file of the server: files missing from the archive are lost.",
+      "restaurationLancee": "Restore started",
+      "restaurationAide": "The daemon is rewriting the server's files. Wait for it to finish before starting the server: the console and the bell will tell you.",
+      "supprimer": "Delete"
+    },
+    "fichiers": {
+      "ouvrir": "Open",
+      "partager": "Download and share",
+      "supprimer": "Delete",
+      "dossier": "Folder",
+      "appuiLong": "Long-press an entry to rename, move, compress or delete it.",
+      "tropGros": "This file is larger than 1 MB: it does not open in the phone editor. Download it, or edit it from the browser.",
+      "binaire": "This file is not text: it downloads, it does not open here.",
+      "nomDossier": "Folder name",
+      "creer": "Create",
+      "valider": "Confirm",
+      "nom": {
+        "vide": "Enter a name.",
+        "reserve": "This name is reserved by the system.",
+        "barre": "A name cannot contain \"/\": create folders one at a time."
+      }
+    },
+    "editeur": {
+      "enregistrer": "Save",
+      "quitterTitre": "Leave without saving?",
+      "quitterCorps": "Your changes to this file will be lost.",
+      "quitter": "Leave"
+    },
+    "alimentation": {
+      "refuse": "Order refused",
+      "confirmer": {
+        "restart": "Restart the server?",
+        "stop": "Stop the server?",
+        "kill": "Kill the process?"
+      },
+      "confirmerCorps": "Connected players will be disconnected.",
+      "signal": {
+        "start": "Start",
+        "restart": "Restart",
+        "stop": "Stop",
+        "kill": "Kill"
+      }
+    },
+    "console": {
+      "interrompue": "The connection to the server stopped.",
+      "reconnecter": "Reconnect",
+      "releve": "CPU {cpu}% · memory {memoire}"
+    },
+    "cloche": {
+      "titre": "Notifications",
+      "vide": "No notifications.",
+      "toutLire": "Mark all as read"
+    },
+    "compte": {
+      "titre": "This phone",
+      "lieeLe": "Linked on {date}",
+      "expire": "New sign-in required by {date} at the latest",
+      "webAide": "Databases, scheduler, file permissions and account settings stay in the panel, in the browser.",
+      "ouvrirPanel": "Open the panel in the browser",
+      "panels": "My panels",
+      "delier": "Unlink this phone",
+      "delierTitre": "Unlink this phone?",
+      "delierCorps": "The panel removes this phone, and the key that linked it is erased. You will need to sign in again to link it."
+    },
+    "scanner": {
+      "titre": "Panel QR code",
+      "permission": "The app needs the camera to read the QR code shown by your panel. It reads nothing else.",
+      "autoriser": "Allow the camera"
+    },
+    "pousse": {
+      "nouvelle": "New notification",
+      "lire": "Open the app to read it.",
+      "canal": "Panel alerts"
+    },
+    "revendeur": {
+      "titre": "Reseller space",
+      "ouvrir": "Reseller",
+      "erreur": "Reseller space unavailable",
+      "enveloppe": "Allowance",
+      "dimension": {
+        "memoryMb": "Memory",
+        "diskMb": "Disk",
+        "servers": "Servers"
+      },
+      "sur": "{utilise} of {limite}",
+      "sansLimite": "{utilise}, no limit",
+      "reste": "{reste} left",
+      "depasse": "Over the allowance",
+      "estimee": "Figures overstated: {n, plural, one {# server could not be measured} other {# servers could not be measured}}.",
+      "clients": "Customers",
+      "aucunClient": "No customers yet.",
+      "nbServeurs": "{n, plural, =0 {no servers} one {# server} other {# servers}}",
+      "consommation": "Usage",
+      "webAide": "Branding, domains, keys and server limits are managed in the browser.",
+      "ouvrirPanel": "Open the panel's reseller space",
+      "aucunServeur": "No servers for this customer.",
+      "suspendu": "Suspended",
+      "occupe": "Installing or transferring",
+      "suspendre": "Suspend",
+      "retablir": "Unsuspend",
+      "suspendreTitre": "Suspend {nom}?",
+      "suspendreCorps": "The server stops and its owner can no longer use it until it is unsuspended.",
+      "retablirTitre": "Unsuspend {nom}?",
+      "retablirCorps": "The owner gets their server back.",
+      "sessionsOuvertes": "{n, plural, one {# SFTP session could not be closed} other {# SFTP sessions could not be closed}}: the daemon did not respond.",
+      "conso": {
+        "titre": "Usage",
+        "ceMois": "This month",
+        "moisDernier": "Last month",
+        "vide": "No readings for this period.",
+        "aide": "The panel's readings, day by day, in UTC.",
+        "jours": "{n, plural, one {# day} other {# days}}",
+        "disponibilite": "Availability: {pct}",
+        "processeur": "Average CPU: {pct}",
+        "memoire": "Peak memory: {taille}",
+        "reseau": "Network: {taille}",
+        "joueurs": "Peak players: {n}",
+        "incomplet": "Incomplete readings"
+      }
+    },
+    "administration": {
+      "ouvrir": "Administration",
+      "titre": "Administration",
+      "erreur": "Administration unavailable",
+      "calme": "All clear: every machine answers, no failed server, no open incident.",
+      "enEchec": "{proprietaire} · {machine}",
+      "webAide": "Eggs, machines and settings are managed in the browser.",
+      "ouvrirPanel": "Open the panel's administration",
+      "rubrique": {
+        "machines": "Machines",
+        "serveurs": "Servers",
+        "comptes": "Accounts",
+        "incidents": "Incidents",
+        "activite": "Activity log"
+      },
+      "miseAJour": {
+        "titre": "Look for a new version?",
+        "corps": "If a version is out, the panel tries it on the side, then switches over; it goes back to the previous one on its own if anything fails.",
+        "lancer": "Look and install",
+        "installer": "Install the new version"
+      },
+      "machines": {
+        "titre": "Machine",
+        "serveurs": "{n, plural, =0 {no server} one {# server} other {# servers}}",
+        "vue": "Last seen {quand}",
+        "jamaisVue": "Never seen: Wings has not called the panel yet",
+        "memoire": "Memory allocated: {accordee} of {total}",
+        "vide": "No machine.",
+        "maintenance": "Under maintenance: no server is created on it.",
+        "agent": "Node agent",
+        "agentEtat": {
+          "none": "No agent installed",
+          "online": "Online",
+          "silent": "Silent for more than two minutes"
+        }
+      },
+      "serveurs": {
+        "titre": "Servers",
+        "chercher": "Name, owner, machine or egg",
+        "aucun": "No matching server.",
+        "affiner": "{n, plural, one {# more server} other {# more servers}}: refine the search.",
+        "suspendre": "Suspend",
+        "retablir": "Restore"
+      },
+      "comptes": {
+        "titre": "Accounts",
+        "chercher": "Name or address",
+        "aucun": "No matching account.",
+        "affiner": "{n, plural, one {# more account} other {# more accounts}}: refine the search.",
+        "serveurs": "{n, plural, =0 {no server} one {# server} other {# servers}}",
+        "suspendu": "Account suspended",
+        "avec2fa": "Second factor on",
+        "sans2fa": "No second factor",
+        "adresseConfirmee": "address confirmed",
+        "adresseNonConfirmee": "address not confirmed",
+        "suspendre": "Suspend",
+        "retablir": "Restore",
+        "suspendreTitre": "Suspend {nom}?",
+        "suspendreCorps": "The account is signed out everywhere and can no longer sign in. The reason stays internal, read by staff only.",
+        "motif": "Reason",
+        "motifVide": "A reason is required.",
+        "motifLong": "500 characters at most.",
+        "confirmationAnnulee": "Confirmation cancelled: nothing was sent.",
+        "retablirTitre": "Restore this account?",
+        "retablirCorps": "The account can sign in again.",
+        "deconnecter": "Sign out everywhere",
+        "deconnecterTitre": "Sign this account out everywhere?",
+        "deconnecterCorps": "Its sessions close and its linked phones are removed: it will have to sign in again and relink the app."
+      },
+      "incidents": {
+        "titre": "Incidents",
+        "nouveau": "Open an incident",
+        "aucunOuvert": "No open incident.",
+        "clos": "Latest closed incidents",
+        "closFige": "Incident closed: it takes no more updates.",
+        "miseAJour": "New update",
+        "cloture": "“Resolved” closes the incident for good.",
+        "titreChamp": "Title",
+        "impactChamp": "Impact",
+        "messageChamp": "Public message",
+        "publier": "Publish",
+        "public": "Published at once on the status page, for everyone to see."
+      },
+      "activite": {
+        "titre": "Activity log",
+        "chercher": "Search the log",
+        "vide": "No entry.",
+        "plus": "Older entries"
+      }
+    },
+    "demo": {
+      "titre": "Demo",
+      "nom": "Demo panel",
+      "bandeau": "Demo: made-up data, nothing leaves the phone. Link your panel to act for real.",
+      "web": "The demo has no website: on a real panel, this button opens its pages in the browser.",
+      "fichiers": "Not available in the demo: on a real panel, the file goes straight between the phone and the server."
     }
   }
 }

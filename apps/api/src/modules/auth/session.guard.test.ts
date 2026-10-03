@@ -2,6 +2,7 @@ import type { ExecutionContext } from "@nestjs/common";
 import { ForbiddenException } from "@nestjs/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiKeyRepository } from "./api-key.repository";
+import type { AppDeviceRepository } from "./app-device.repository";
 import { SessionGuard, sessionCookie } from "./session.guard";
 import type { SessionRepository, SessionUser } from "./session.repository";
 
@@ -27,11 +28,13 @@ const principalDeCle = { user: utilisateur, scopes: ["power.start"] };
 function garde() {
   const sessions = { resolve: vi.fn(async () => utilisateur) };
   const keys = { resolve: vi.fn(async () => principalDeCle) };
+  const devices = { resolveAccess: vi.fn(async () => null) };
   const guard = new SessionGuard(
     sessions as unknown as SessionRepository,
     keys as unknown as ApiKeyRepository,
+    devices as unknown as AppDeviceRepository,
   );
-  return { guard, sessions, keys };
+  return { guard, sessions, keys, devices };
 }
 
 function contexte(requete: {

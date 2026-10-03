@@ -46,6 +46,8 @@ const NATIVES = new Set([
   "proxy_add_x_forwarded_for",
   "scheme",
   "http_upgrade",
+  // L'aiguillage du jeton d'appareil mobile (`$gd_mobile_upstream`, ADR 0010).
+  "http_authorization",
 ]);
 
 describe("infra/prod/panel.conf", () => {
@@ -70,6 +72,34 @@ describe("infra/prod/panel.conf", () => {
       expect(texte).not.toMatch(/\$(http_)?host\b/);
       expect(texte).not.toMatch(/proxy_set_header\s+Upgrade\s+\$http_upgrade/);
       expect(texte).toMatch(/~\*\^websocket\$\s+websocket;/);
+    }
+  });
+
+  /*
+   * Régression (Semgrep, dynamic-proxy-host, `--error` dans la CI) :
+   * l'aiguillage du jeton d'appareil passe par une destination variable.
+   * Elle ne vient que d'un map à adresses locales fixes, et chaque
+   * `proxy_pass` variable porte l'exception motivée de la règle.
+   */
+  it("n'envoie une destination variable que vers des adresses locales fixes", () => {
+    const local = readFileSync(join(RACINE, "infra", "local", "gamedashboard.local.conf"), "utf8");
+    for (const texte of [vhost, local]) {
+      const variables = [...texte.matchAll(/^.*proxy_pass http:\/\/\$(\w+);(.*)$/gm)];
+      // Espace client, espace revendeur, administration et profil, pour le
+      // jeton d'appareil.
+      expect(variables.length).toBe(4);
+      for (const [, nom, suite] of variables) {
+        expect(suite).toMatch(
+          /^ # nosemgrep: generic\.nginx\.security\.dynamic-proxy-host\.dynamic-proxy-host -- \S/,
+        );
+        const map = new RegExp(`^map \\$\\w+ \\$${nom} \\{\\n((?: {4}.*\\n)+)\\}`, "m").exec(
+          texte,
+        )?.[1];
+        expect(map, nom).toBeDefined();
+        for (const ligne of (map ?? "").trim().split("\n")) {
+          expect(ligne).toMatch(/\s127\.0\.0\.1:\d+;$/);
+        }
+      }
     }
   });
 
@@ -1306,5 +1336,127 @@ describe("archive autonome : dépôt des releases", () => {
       }
       expect(sortie).toContain("GITHUB_REPOSITORY doit nommer le dépôt des releases");
     }
+  });
+});
+
+/*
+ * L'application mobile (ADR 0010) se construit et se signe dans mobile.yml.
+ * Ses secrets de signature ouvrent les magasins sous le compte de l'éditeur :
+ * ils ne vivent que dans l'environnement `magasins` (approbation de
+ * Matheo), n'atteignent jamais un script par interpolation, et n'entrent
+ * dans le conteneur Linux que pour la commande qui en a besoin.
+ */
+describe("mobile.yml", () => {
+  const mobile = readFileSync(join(RACINE, ".github", "workflows", "mobile.yml"), "utf8");
+  const linux = readFileSync(join(RACINE, "infra", "ci", "linux.sh"), "utf8");
+  const blocs = Object.fromEntries(
+    [...mobile.slice(mobile.indexOf("\njobs:\n")).matchAll(/^ {2}(\w+):\n(?: {4}.*\n|\n)*/gm)].map(
+      ([bloc, nom]) => [nom as string, bloc],
+    ),
+  );
+
+  it("suit les règles des autres workflows", () => {
+    expect(mobile).toMatch(/^permissions:\n {2}contents: read\n\n/m);
+    expect(mobile).toMatch(/^defaults:\n {2}run:\n {4}shell: bash\n/m);
+    for (const [, action] of mobile.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)/gm)) {
+      if (action?.startsWith("./")) continue;
+      expect(action).toMatch(/^[\w.-]+\/[\w./-]+@[0-9a-f]{40}$/);
+    }
+    // Jamais déclenché par une PR : le dépôt est public.
+    expect(mobile).not.toMatch(/^ {2}pull_request(_target)?:/m);
+    expect(mobile).toMatch(/^ {4}tags: \["mobile-v\*"\]$/m);
+    expect(blocs.verifier).toMatch(
+      /uses: \.\/\.github\/workflows\/ci\.yml\n {4}with:\n {6}runner: \$\{\{ inputs\.runner \|\| 'CI_RUNNER' \}\}\n/,
+    );
+    expect(blocs.verifier).not.toContain("secrets");
+  });
+
+  it("construit Android dans le conteneur Linux, sur le runner habituel", () => {
+    const android = blocs.android ?? "";
+    expect(android).toContain(
+      `runs-on: \${{ fromJSON(inputs.runner && inputs.runner != 'CI_RUNNER' && toJSON(inputs.runner) || vars.CI_RUNNER || '"self-hosted"') }}`,
+    );
+    expect(android).toMatch(/- name: Bash de Git et Docker\n {8}if: runner\.os == 'Windows'\n/);
+    expect(android).toContain("run: bash infra/ci/linux.sh ouvrir\n");
+    expect(android).toMatch(
+      /- name: Rendre la machine du runner\n {8}if: always\(\)\n {8}run: bash infra\/ci\/linux\.sh fermer/,
+    );
+    expect(android).not.toContain("setup-java@");
+  });
+
+  it("ne donne les secrets qu'aux jobs de l'environnement magasins, et jamais dans un script", () => {
+    for (const [nom, bloc] of Object.entries(blocs)) {
+      if (!bloc.includes("secrets.")) continue;
+      expect(bloc, nom).toMatch(/^ {4}environment: magasins$/m);
+    }
+    expect(Object.keys(blocs).filter((nom) => blocs[nom]?.includes("secrets."))).toEqual([
+      "android",
+      "ios",
+    ]);
+    // Une valeur de secret interpolée dans un script en deviendrait le code.
+    const scripts = [...mobile.matchAll(/^( +)run: \|\n((?:\1 {2}.*\n|\n)*)/gm)].map((m) => m[2]);
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const script of scripts)
+      expect(script).not.toMatch(/\$\{\{\s*(secrets|github\.(ref|event))/);
+    expect(mobile).not.toMatch(/run: .*\$\{\{\s*secrets/);
+  });
+
+  it("ne fait entrer la clé d'envoi dans le conteneur que pour la commande qui signe", () => {
+    // Le conteneur entier ne reçoit aucun secret des magasins…
+    const transmises = /^TRANSMISES=\(([^)]*)\)/m.exec(linux)?.[1] ?? "";
+    expect(transmises).not.toMatch(/ANDROID|PLAY|APPLE/);
+    // … seulement la commande, par GD_LINUX_TRANSMETTRE, aux noms vérifiés.
+    expect(linux).toContain("for nom in $" + "{GD_LINUX_TRANSMETTRE:-}; do");
+    expect(linux).toContain('[[ "$nom" =~ ^[A-Z_][A-Z0-9_]*$ ]]');
+    expect(linux).toContain('docker exec "$' + '{options[@]}" -w /w "$NOM"');
+    const android = blocs.android ?? "";
+    const signature = android.slice(android.indexOf("- name: Construire et signer"));
+    expect(signature).toMatch(/GD_LINUX_TRANSMETTRE="[^"]*ANDROID_KEYSTORE_BASE64[^"]*"/);
+    expect(signature).toContain("bash apps/mobile/scripts/android.sh construire");
+  });
+
+  it("transmet à la commande les seules variables nommées et posées", () => {
+    // Un faux `docker` qui écrit ses arguments : linux.sh n'a pas besoin
+    // d'un vrai moteur pour montrer ce qu'il lui passerait.
+    const dossier = mkdtempSync(join(tmpdir(), "gd-transmettre-"));
+    try {
+      writeFileSync(join(dossier, "docker"), '#!/bin/sh\necho "$@"\n', { mode: 0o755 });
+      const lancer = (transmettre: string) =>
+        execFileSync("bash", [join(RACINE, "infra", "ci", "linux.sh"), "lancer", "true"], {
+          env: {
+            PATH: `${dossier}:${process.env.PATH}`,
+            GD_LINUX_TRANSMETTRE: transmettre,
+            POSEE: "secret",
+          },
+          encoding: "utf8",
+        });
+      const sortie = lancer("POSEE ABSENTE");
+      expect(sortie).toMatch(/^exec -e POSEE -w \/w gd-ci-\S+ bash -euo pipefail -c true$/m);
+      expect(sortie).not.toContain("ABSENTE");
+      expect(sortie).not.toContain("secret");
+      expect(lancer("")).toMatch(/^exec -w \/w /m);
+      expect(() => lancer("POSEE;id")).toThrow();
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+    }
+  });
+
+  it("signe iOS sur macOS dans un trousseau jetable, effacé même en échec", () => {
+    const ios = blocs.ios ?? "";
+    expect(ios).toContain("runs-on: macos-latest");
+    expect(ios).not.toContain("linux.sh");
+    expect(ios).toMatch(/- name: Effacer le trousseau et les clés\n {8}if: always\(\)\n/);
+    expect(ios).toContain('security delete-keychain "$RUNNER_TEMP/magasins.keychain-db"');
+    // Le profil doit viser l'application, pas une autre de la même équipe.
+    expect(ios).toContain('[ "$vise" = "$attendu" ]');
+  });
+
+  it("refuse de livrer un APK signé par la clé de débogage", () => {
+    const script = readFileSync(join(RACINE, "apps", "mobile", "scripts", "android.sh"), "utf8");
+    expect(script).toContain('grep -q "CN=Android Debug"');
+    expect(script).toMatch(/^OUTILS_SHA256=[0-9a-f]{64}$/m);
+    expect(script.indexOf("sha256sum -c")).toBeLessThan(script.indexOf("unzip -q"));
+    // La clé hors du dépôt copié, effacée en sortie.
+    expect(script).toContain("trap 'rm -rf \"$cle\"' EXIT");
   });
 });

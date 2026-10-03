@@ -1,9 +1,9 @@
 "use client";
 
+import { formatBytes } from "@gamedashboard/sdk/format";
 import { ChevronRight, File, FileArchive, FileCode, FileText, Folder, Home } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
-import { formatBytes } from "../lib/format";
 import { EmptyState } from "./empty-state";
 import { RelativeTime } from "./relative-time";
 import { Skeleton } from "./skeleton";

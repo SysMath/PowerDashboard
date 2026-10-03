@@ -2,3 +2,9 @@
 # le runner de la CI est sous Windows, et un CRLF casse les scripts bash, le
 # lint et la comparaison d'openapi.json.
 * text=auto eol=lf
+
+# L'application mobile ne part pas avec le panel : l'archive de release
+# (`git archive`, infra/release/assembler.sh) ne la porte pas, et le serveur
+# n'installe donc ni Expo ni React Native. pnpm tolère l'absence d'un projet
+# du lockfile, même figé.
+apps/mobile export-ignore

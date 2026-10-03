@@ -1,4 +1,12 @@
-import { authCookieAttributes, sessionCookieName } from "@gamedashboard/contracts";
+import {
+  APP_ACCESS_TOKEN_PREFIX,
+  APP_PRESENCE_HEADER,
+  APP_PRESENCE_REQUIRED,
+  appMayReach,
+  appNeedsPresence,
+  authCookieAttributes,
+  sessionCookieName,
+} from "@gamedashboard/contracts";
 import {
   type CanActivate,
   type ExecutionContext,
@@ -7,6 +15,7 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { ApiKeyRepository } from "./api-key.repository";
+import { AppDeviceRepository } from "./app-device.repository";
 import { crossSiteCookieWrite } from "./request-provenance";
 import { SessionRepository, type SessionUser } from "./session.repository";
 
@@ -48,6 +57,29 @@ export interface AuthenticatedRequest {
   user: SessionUser;
   scopes: string[] | null;
   sessionToken?: string;
+  /**
+   * Appareil mobile lié qui présente la requête (ADR 0010), absent sinon.
+   *
+   * Son jeton porte les droits du compte (`scopes` nul), mais ce n'est pas un
+   * navigateur : `isBrowserSession` le distingue, et les routes réservées au
+   * navigateur le refusent.
+   */
+  appDeviceId?: string;
+}
+
+/**
+ * La requête vient-elle d'une session ouverte dans un navigateur ?
+ *
+ * Ni une clé d'API (portées non nulles), ni un appareil mobile : les deux
+ * seuls appelants qui n'aient pas de cookie. Ce qui ne se fait que « connecté
+ * au panel » — gérer ses clés, créer un serveur, toucher à la sécurité du
+ * compte — se décide ici.
+ */
+export function isBrowserSession(request: {
+  scopes?: string[] | null;
+  appDeviceId?: string;
+}): boolean {
+  return request.scopes == null && request.appDeviceId === undefined;
 }
 
 /**
@@ -63,17 +95,21 @@ export class SessionGuard implements CanActivate {
   constructor(
     @Inject(SessionRepository) private readonly sessions: SessionRepository,
     @Inject(ApiKeyRepository) private readonly keys: ApiKeyRepository,
+    @Inject(AppDeviceRepository) private readonly devices: AppDeviceRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<{
       method?: string;
+      url?: string;
+      routeOptions?: { url?: string };
       cookies?: Record<string, string | undefined>;
       headers?: Record<string, string | string[] | undefined>;
       ip?: string;
       user?: SessionUser;
       scopes?: string[] | null;
       sessionToken?: string;
+      appDeviceId?: string;
     }>();
 
     const token = request.cookies?.[sessionCookie()];
@@ -103,11 +139,67 @@ export class SessionGuard implements CanActivate {
     const bearer = readBearer(request.headers?.authorization);
     if (!bearer) return false;
 
+    if (bearer.startsWith(APP_ACCESS_TOKEN_PREFIX)) return this.appDevice(request, bearer);
+
     const principal = await this.keys.resolve(bearer, request.ip);
     if (!principal) return false;
 
     request.user = principal.user;
     request.scopes = principal.scopes;
+    return true;
+  }
+
+  /**
+   * Jeton d'un appareil mobile lié (ADR 0010).
+   *
+   * Trois contrôles après le jeton lui-même : la route doit être de celles
+   * que l'application emploie (`appMayReach`, liste d'autorisation, sur le
+   * gabarit du routeur et jamais sur l'adresse reçue) ; un geste lourd exige
+   * la confirmation de présence, défi signé par la clé de l'appareil ; et la
+   * requête porte `appDeviceId`, qui la distingue d'une session de
+   * navigateur partout où cela compte.
+   */
+  private async appDevice(
+    request: {
+      method?: string;
+      url?: string;
+      routeOptions?: { url?: string };
+      headers?: Record<string, string | string[] | undefined>;
+      ip?: string;
+      user?: SessionUser;
+      scopes?: string[] | null;
+      appDeviceId?: string;
+    },
+    token: string,
+  ): Promise<boolean> {
+    const principal = await this.devices.resolveAccess(token, request.ip ?? null);
+    if (!principal) return false;
+
+    const method = request.method ?? "GET";
+    const route = request.routeOptions?.url ?? "";
+    if (!appMayReach(method, route)) {
+      throw new ForbiddenException(
+        "L'application mobile n'a pas accès à cette page du panel. Ouvrez-la dans un navigateur.",
+      );
+    }
+    if (appNeedsPresence(method, route)) {
+      const header = request.headers?.[APP_PRESENCE_HEADER];
+      const confirmed = await this.devices.consumePresence(
+        principal.deviceId,
+        (Array.isArray(header) ? header[0] : header) ?? null,
+        { method, path: (request.url ?? "").split("?")[0] ?? "" },
+      );
+      if (!confirmed) {
+        throw new ForbiddenException({
+          message: "Ce geste demande de confirmer votre présence sur le téléphone.",
+          code: APP_PRESENCE_REQUIRED,
+        });
+      }
+    }
+
+    request.user = principal.user;
+    request.scopes = null;
+    request.appDeviceId = principal.deviceId;
     return true;
   }
 }

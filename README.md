@@ -7,6 +7,7 @@ Panel de gestion de serveurs de jeu basé sur Docker. Voir [PLAN.md](./PLAN.md) 
 ```
 apps/web            Next.js 16 : espace client, revendeur, administration
 apps/api            NestJS : API client, applicative, contrat Wings, balayages de fond
+apps/mobile         Expo : application iOS et Android liée à n'importe quel panel (docs/application-mobile.md)
 packages/ui         Design system (@gamedashboard/ui)
 packages/contracts  Schémas Zod, règles métier partagées, catalogue d'API
 packages/db         Schéma Drizzle + migrations PostgreSQL (@gamedashboard/db)

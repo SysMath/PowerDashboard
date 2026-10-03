@@ -12,6 +12,7 @@ import {
 } from "../../test/throwaway-database";
 import type { DenialLogService } from "../activity/denial-log.service";
 import { ApiKeyRepository } from "../auth/api-key.repository";
+import { AppDeviceRepository } from "../auth/app-device.repository";
 import { IMPERSONATION_TTL_MS } from "../auth/impersonation";
 import { SessionGuard, sessionCookie } from "../auth/session.guard";
 import { SessionRepository } from "../auth/session.repository";
@@ -51,7 +52,10 @@ describe.skipIf(!HAS_DATABASE)("session empruntée d'un compte promu (intégrati
     sessions = new SessionRepository(db);
 
     const instances = new Map<unknown, CanActivate>([
-      [SessionGuard, new SessionGuard(sessions, new ApiKeyRepository(db))],
+      [
+        SessionGuard,
+        new SessionGuard(sessions, new ApiKeyRepository(db), new AppDeviceRepository(db)),
+      ],
       // Le journal des refus se tait : le sujet est la réponse du garde.
       [AdminGuard, new AdminGuard({ record: async () => {} } as unknown as DenialLogService)],
       [

@@ -1,6 +1,25 @@
 import {
+  type AdminActivityEntry,
+  type AdminIncident,
+  type AdminNode,
+  type AdminNodeAgentView,
+  type AdminServer,
+  type AdminUser,
+  BACKUP_RESTORE_TIMEOUT_MS,
+  type ClientBackupList,
+  type ClientBackupView,
+  type ClientFileEntryView,
+  type ClientNotificationView,
+  type ClientPlayersView,
+  type ClientServerView,
+  type ConsoleGrant,
+  type IncidentImpact,
+  type IncidentState,
   type PowerSignal,
+  type ResellerOverview,
   type ServerLimitsPatch,
+  type UpdateStatus,
+  type UploadGrant,
   withoutTrailingSlashes,
 } from "@gamedashboard/contracts";
 
@@ -32,8 +51,25 @@ import {
 export interface GameDashboardClientOptions {
   /** L'adresse du panel, sans barre finale : `https://panel.example`. */
   baseUrl: string;
-  /** Une clé personnelle ou une clé de plateforme, selon ce qu'on appelle. */
-  token: string;
+  /**
+   * Une clé personnelle ou une clé de plateforme, selon ce qu'on appelle. Ou
+   * une fonction qui rend le jeton du moment : celui d'un appareil mobile ne
+   * vaut que quinze minutes (ADR 0010), et se renouvelle entre deux appels.
+   */
+  token: string | (() => Promise<string>);
+  /**
+   * Appelée sur un 401. Si elle rend `true` (le jeton a pu être renouvelé),
+   * l'appel est rejoué **une fois** avec le jeton suivant ; sinon le 401
+   * remonte tel quel.
+   */
+  onUnauthorized?: () => Promise<boolean>;
+  /**
+   * Confirmation de présence d'un appareil mobile (ADR 0010). Appelée avant
+   * chaque geste que le panel protège ainsi (restaurer, supprimer), avec le
+   * verbe et le chemin exacts, sans la requête ; rend l'en-tête à joindre.
+   * Sans elle, ces gestes partent tels quels, ce qui convient à une clé.
+   */
+  presence?: (method: string, path: string) => Promise<Record<string, string>>;
   /** Au-delà, on cesse d'attendre. Dix secondes par défaut. */
   timeoutMs?: number;
   /** Pour les environnements sans `fetch` global, ou pour un client instrumenté. */
@@ -68,7 +104,9 @@ export interface ConsumptionRequest {
 
 export class GameDashboardClient {
   private readonly baseUrl: string;
-  private readonly token: string;
+  private readonly token: string | (() => Promise<string>);
+  private readonly onUnauthorized: (() => Promise<boolean>) | undefined;
+  private readonly presence: GameDashboardClientOptions["presence"];
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof globalThis.fetch;
 
@@ -78,17 +116,19 @@ export class GameDashboardClient {
     // réécrivent et d'autres refusent.
     this.baseUrl = withoutTrailingSlashes(options.baseUrl);
     this.token = options.token;
+    this.onUnauthorized = options.onUnauthorized;
+    this.presence = options.presence;
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.fetchImpl = options.fetch ?? globalThis.fetch;
   }
 
   /* --- Espace client, au nom du porteur de la clé -------------------------- */
 
-  servers(): Promise<unknown[]> {
-    return this.call<unknown[]>("GET", "/api/v1/client/servers");
+  servers(): Promise<ClientServerView[]> {
+    return this.call<ClientServerView[]>("GET", "/api/v1/client/servers");
   }
 
-  server(serverId: string): Promise<unknown> {
+  server(serverId: string): Promise<ClientServerView> {
     return this.call("GET", `/api/v1/client/servers/${encodeURIComponent(serverId)}`);
   }
 
@@ -110,7 +150,7 @@ export class GameDashboardClient {
    * transfert — et le jeton ne vaut que dix minutes, pour ce serveur et pour
    * les permissions du porteur de la clé.
    */
-  websocketGrant(serverId: string): Promise<unknown> {
+  websocketGrant(serverId: string): Promise<ConsoleGrant> {
     return this.call("POST", `/api/v1/client/servers/${encodeURIComponent(serverId)}/websocket`);
   }
 
@@ -126,7 +166,7 @@ export class GameDashboardClient {
   }
 
   /** Joueurs connectés, lus dans la dernière sonde de jeu, et actions proposées. */
-  players(serverId: string): Promise<unknown> {
+  players(serverId: string): Promise<ClientPlayersView> {
     return this.call("GET", `/api/v1/client/servers/${encodeURIComponent(serverId)}/players`);
   }
 
@@ -143,6 +183,154 @@ export class GameDashboardClient {
       `/api/v1/client/servers/${encodeURIComponent(serverId)}/players`,
       input,
     );
+  }
+
+  /**
+   * La cloche du compte : notifications, plus récentes d'abord, et le nombre
+   * de non lues. Le destinataire est le porteur du jeton, jamais un paramètre.
+   */
+  async notifications(): Promise<{ items: ClientNotificationView[]; unread: number }> {
+    const corps = await this.request("GET", "/api/v1/client/notifications");
+    const meta = corps?.meta as { unread?: unknown } | undefined;
+    return {
+      items: Array.isArray(corps?.data) ? (corps.data as ClientNotificationView[]) : [],
+      unread: typeof meta?.unread === "number" ? meta.unread : 0,
+    };
+  }
+
+  markNotificationsRead(): Promise<unknown> {
+    return this.call("POST", "/api/v1/client/notifications/read-all");
+  }
+
+  /* --- Sauvegardes ---------------------------------------------------------- */
+
+  /** Les sauvegardes du serveur, plus récentes d'abord, et son quota. */
+  async backups(serverId: string): Promise<ClientBackupList> {
+    const corps = await this.request("GET", this.serverPath(serverId, "backups"));
+    const meta = corps?.meta as { used?: unknown; limit?: unknown } | undefined;
+    return {
+      items: Array.isArray(corps?.data) ? (corps.data as ClientBackupView[]) : [],
+      used: typeof meta?.used === "number" ? meta.used : 0,
+      limit: typeof meta?.limit === "number" ? meta.limit : 0,
+    };
+  }
+
+  /** Lance une sauvegarde : le daemon archive en arrière-plan. */
+  createBackup(serverId: string, name: string): Promise<ClientBackupView> {
+    return this.call("POST", this.serverPath(serverId, "backups"), { name });
+  }
+
+  /** Verrouillée, la rotation de rétention ne l'efface pas. */
+  lockBackup(serverId: string, backupId: string, locked: boolean): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "backups", backupId, "lock"), { locked });
+  }
+
+  /**
+   * Restaure par-dessus les fichiers du serveur ; `truncate` les efface
+   * d'abord. Geste protégé : confirmation de présence pour un appareil.
+   */
+  restoreBackup(serverId: string, backupId: string, truncate = false): Promise<unknown> {
+    const chemin = this.serverPath(serverId, "backups", backupId, "restore");
+    // Le panel attend d'abord l'instantané de sûreté de l'agent, quand le
+    // node en a un : bien plus que le délai ordinaire.
+    return this.call(
+      "POST",
+      chemin,
+      { truncate },
+      {
+        protege: true,
+        delaiMs: BACKUP_RESTORE_TIMEOUT_MS,
+      },
+    );
+  }
+
+  deleteBackup(serverId: string, backupId: string): Promise<unknown> {
+    return this.call("DELETE", this.serverPath(serverId, "backups", backupId), undefined, {
+      protege: true,
+    });
+  }
+
+  /* --- Fichiers ------------------------------------------------------------- */
+
+  /** Le contenu d'un dossier, tel que Wings le rend (sans tri). */
+  async files(serverId: string, directory = "/"): Promise<ClientFileEntryView[]> {
+    const entrees = await this.call<unknown>(
+      "GET",
+      `${this.serverPath(serverId, "files")}?directory=${encodeURIComponent(directory)}`,
+    );
+    return Array.isArray(entrees) ? (entrees as ClientFileEntryView[]) : [];
+  }
+
+  async fileContents(serverId: string, file: string): Promise<string> {
+    const { content } = await this.call<{ content: string }>(
+      "GET",
+      `${this.serverPath(serverId, "files", "contents")}?file=${encodeURIComponent(file)}`,
+    );
+    return content;
+  }
+
+  writeFile(serverId: string, file: string, content: string): Promise<unknown> {
+    return this.call(
+      "POST",
+      `${this.serverPath(serverId, "files", "write")}?file=${encodeURIComponent(file)}`,
+      { content },
+    );
+  }
+
+  createDirectory(serverId: string, root: string, name: string): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "files", "create-directory"), {
+      root,
+      name,
+    });
+  }
+
+  /** `to` est relatif à `root`, comme `from` : un chemin avec « / » déplace. */
+  renameFile(serverId: string, root: string, from: string, to: string): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "files", "rename"), { root, from, to });
+  }
+
+  /** Suppression définitive. Geste protégé : confirmation de présence. */
+  deleteFiles(serverId: string, root: string, files: string[]): Promise<unknown> {
+    return this.call(
+      "POST",
+      this.serverPath(serverId, "files", "delete"),
+      { root, files },
+      { protege: true },
+    );
+  }
+
+  /** Rend le nom et la taille de l'archive, choisis par le daemon. */
+  compressFiles(
+    serverId: string,
+    root: string,
+    files: string[],
+  ): Promise<{ name: string; size: number }> {
+    return this.call("POST", this.serverPath(serverId, "files", "compress"), { root, files });
+  }
+
+  decompressFile(serverId: string, root: string, file: string): Promise<unknown> {
+    return this.call("POST", this.serverPath(serverId, "files", "decompress"), { root, file });
+  }
+
+  /** Adresse chez le daemon, valable une minute et une fois : à suivre aussitôt. */
+  async fileDownloadUrl(serverId: string, file: string): Promise<string> {
+    const { url } = await this.call<{ url: string }>(
+      "GET",
+      `${this.serverPath(serverId, "files", "download")}?file=${encodeURIComponent(file)}`,
+    );
+    return url;
+  }
+
+  /** Autorisation de déposer des fichiers directement chez le daemon. */
+  uploadGrant(serverId: string): Promise<UploadGrant> {
+    return this.call("POST", this.serverPath(serverId, "files", "upload-grant"));
+  }
+
+  private serverPath(serverId: string, ...segments: string[]): string {
+    return [
+      `/api/v1/client/servers/${encodeURIComponent(serverId)}`,
+      ...segments.map(encodeURIComponent),
+    ].join("/");
   }
 
   /**
@@ -172,12 +360,162 @@ export class GameDashboardClient {
    * sûreté est pris, puis le dossier est recopié. Il reste arrêté.
    */
   restoreSnapshot(serverId: string, name: string): Promise<unknown> {
-    return this.call("POST", this.snapshotPath(serverId, name, "restore"));
+    return this.call("POST", this.snapshotPath(serverId, name, "restore"), undefined, {
+      protege: true,
+    });
   }
 
   private snapshotPath(serverId: string, name?: string, action?: string): string {
     const base = `/api/v1/client/servers/${encodeURIComponent(serverId)}/snapshots`;
     return name ? `${base}/${encodeURIComponent(name)}/${action}` : base;
+  }
+
+  /** Le compte du porteur : son rôle dit quels espaces lui montrer. */
+  me(): Promise<{ user: { id: string; email: string; role: string } }> {
+    return this.call("GET", "/api/v1/auth/me");
+  }
+
+  /* --- Espace revendeur, au nom du revendeur (ADR 0010, lot 5) ------------ */
+
+  /** Ses machines, ses serveurs, ses clients, son enveloppe. */
+  resellerOverview(): Promise<ResellerOverview> {
+    return this.call("GET", "/api/v1/reseller/overview");
+  }
+
+  /** Suspend ou rétablit un serveur de son parc ; un geste qui demande la présence. */
+  setResellerServerSuspended(
+    serverId: string,
+    suspended: boolean,
+    reason?: string,
+  ): Promise<{ serverId: string; suspended: boolean; sessionsNotClosed: number }> {
+    return this.call(
+      "POST",
+      `/api/v1/reseller/servers/${encodeURIComponent(serverId)}/suspension`,
+      reason ? { suspended, reason } : { suspended },
+      { protege: true },
+    );
+  }
+
+  /**
+   * La consommation journalière de son parc, lue dans l'export JSONL : une
+   * journée par ligne, colonnes de `CONSUMPTION_COLUMNS`. Sans période, le
+   * mois en cours. Une ligne illisible est ignorée, pas l'export entier.
+   */
+  async resellerConsumption(
+    query: Omit<ConsumptionRequest, "page"> = {},
+  ): Promise<Record<string, unknown>[]> {
+    const search = new URLSearchParams({ format: "jsonl" });
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) search.set(key, String(value));
+    }
+    const texte = await this.texte("GET", `/api/v1/reseller/consumption/export?${search}`);
+    return texte.split("\n").flatMap((ligne) => {
+      const jour = lireJson(ligne);
+      return jour ? [jour] : [];
+    });
+  }
+
+  /* --- Administration simple (ADR 0010, lot 6) ---------------------------- */
+
+  adminNodes(): Promise<AdminNode[]> {
+    return this.call("GET", "/api/v1/admin/nodes");
+  }
+
+  adminNodeAgent(nodeId: string): Promise<AdminNodeAgentView> {
+    return this.call("GET", `/api/v1/admin/nodes/${encodeURIComponent(nodeId)}/agent`);
+  }
+
+  adminServers(): Promise<AdminServer[]> {
+    return this.call("GET", "/api/v1/admin/servers");
+  }
+
+  /** Suspend ou rétablit n'importe quel serveur ; un geste qui demande la présence. */
+  setAdminServerSuspended(
+    serverId: string,
+    suspended: boolean,
+    reason?: string,
+  ): Promise<{ serverId: string; suspended: boolean; sessionsNotClosed: number }> {
+    return this.call(
+      "POST",
+      `/api/v1/admin/servers/${encodeURIComponent(serverId)}/suspend`,
+      reason ? { suspended, reason } : { suspended },
+      { protege: true },
+    );
+  }
+
+  adminUsers(): Promise<AdminUser[]> {
+    return this.call("GET", "/api/v1/admin/users");
+  }
+
+  /** Suspend un compte (motif exigé) ou le rétablit ; présence demandée. */
+  setAdminUserSuspended(
+    userId: string,
+    input: { suspended: true; reason: string } | { suspended: false },
+  ): Promise<unknown> {
+    return this.call("POST", this.userPath(userId, "suspend"), input, { protege: true });
+  }
+
+  /** Déconnecte le compte partout, appareils liés compris ; présence demandée. */
+  revokeAdminUserSessions(userId: string): Promise<{ revoked: number }> {
+    return this.call("POST", this.userPath(userId, "revoke-sessions"), undefined, {
+      protege: true,
+    });
+  }
+
+  private userPath(userId: string, action: string): string {
+    return `/api/v1/admin/users/${encodeURIComponent(userId)}/${action}`;
+  }
+
+  adminIncidents(): Promise<AdminIncident[]> {
+    return this.call("GET", "/api/v1/admin/incidents");
+  }
+
+  /** Ouvre un incident, donc le publie sur /status ; présence demandée. */
+  openIncident(input: {
+    title: string;
+    impact: IncidentImpact;
+    body: string;
+    nodeIds?: string[];
+  }): Promise<AdminIncident> {
+    return this.call("POST", "/api/v1/admin/incidents", input, { protege: true });
+  }
+
+  /** Une mise à jour d'incident ; `resolved` le clôt. Présence demandée. */
+  postIncidentUpdate(
+    incidentId: string,
+    input: { state: IncidentState; body: string },
+  ): Promise<AdminIncident> {
+    return this.call(
+      "POST",
+      `/api/v1/admin/incidents/${encodeURIComponent(incidentId)}/updates`,
+      input,
+      { protege: true },
+    );
+  }
+
+  panelUpdate(): Promise<UpdateStatus> {
+    return this.call("GET", "/api/v1/admin/updates");
+  }
+
+  /** Cherche une nouvelle version et l'installe si elle paraît ; présence demandée. */
+  checkPanelUpdate(): Promise<UpdateStatus> {
+    return this.call("POST", "/api/v1/admin/updates/check", undefined, { protege: true });
+  }
+
+  /** Une page du journal de la plateforme, avec `hasMore` pour la suivante. */
+  async adminActivity(
+    query: { query?: string; page?: number } = {},
+  ): Promise<{ items: AdminActivityEntry[]; hasMore: boolean }> {
+    const search = new URLSearchParams();
+    if (query.query) search.set("query", query.query);
+    if (query.page) search.set("page", String(query.page));
+    const suffix = search.size > 0 ? `?${search}` : "";
+    const corps = await this.request("GET", `/api/v1/admin/activity${suffix}`);
+    const meta = corps?.meta as { hasMore?: unknown } | undefined;
+    return {
+      items: Array.isArray(corps?.data) ? (corps.data as AdminActivityEntry[]) : [],
+      hasMore: meta?.hasMore === true,
+    };
   }
 
   /* --- Espace applicatif, pour un système tiers ---------------------------- */
@@ -294,8 +632,24 @@ export class GameDashboardClient {
    * n'envoie rien. Ce refus ressemble à une demande invalide et coûte
    * longtemps à comprendre.
    */
-  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const corps = await this.request(method, path, body);
+  /**
+   * `protege` : geste qui exige une confirmation de présence. `delaiMs` :
+   * attente propre à ce geste, jamais plus courte que celle du client.
+   */
+  private async call<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options: { protege?: boolean; delaiMs?: number } = {},
+  ): Promise<T> {
+    // Le défi est demandé avant l'appel et signé pour ce chemin seul, sans
+    // la requête : c'est ce que le panel vérifie.
+    const entetes =
+      options.protege && this.presence
+        ? await this.presence(method, path.split("?")[0] ?? path)
+        : {};
+    const delai = Math.max(this.timeoutMs, options.delaiMs ?? 0);
+    const corps = await this.request(method, path, body, entetes, delai);
     // L'API enveloppe ses réponses dans `data`. Le client la déballe : c'est
     // une convention de transport, pas une information pour l'appelant.
     return (corps && "data" in corps ? corps.data : corps) as T;
@@ -306,15 +660,51 @@ export class GameDashboardClient {
     method: string,
     path: string,
     body?: unknown,
+    entetes: Record<string, string> = {},
+    delai = this.timeoutMs,
   ): Promise<Record<string, unknown> | null> {
+    return lireJson(await this.texte(method, path, body, entetes, delai));
+  }
+
+  /** Le corps en texte, pour un export qui n'est pas un seul objet JSON. */
+  private async texte(
+    method: string,
+    path: string,
+    body?: unknown,
+    entetes: Record<string, string> = {},
+    delai = this.timeoutMs,
+  ): Promise<string> {
+    try {
+      return await this.once(method, path, body, entetes, delai);
+    } catch (error) {
+      // Un seul nouvel essai, et seulement si le jeton a vraiment changé :
+      // rejouer en boucle un 401 ferait tourner un renouvellement refusé.
+      if (!(error instanceof ApiProblem) || error.status !== 401 || !this.onUnauthorized) {
+        throw error;
+      }
+      if (!(await this.onUnauthorized())) throw error;
+      // Le défi n'a pas été consommé : le panel refuse le jeton avant de le lire.
+      return this.once(method, path, body, entetes, delai);
+    }
+  }
+
+  private async once(
+    method: string,
+    path: string,
+    body: unknown,
+    entetes: Record<string, string>,
+    delai: number,
+  ): Promise<string> {
+    const token = typeof this.token === "string" ? this.token : await this.token();
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), delai);
 
     try {
       const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
         method,
         headers: {
-          Authorization: `Bearer ${this.token}`,
+          ...entetes,
+          Authorization: `Bearer ${token}`,
           Accept: "application/json",
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         },
@@ -332,10 +722,8 @@ export class GameDashboardClient {
        * perdant au passage le code HTTP, qui est la seule chose exploitable.
        */
       const brut = await response.text();
-      const corps = lireJson(brut);
-
-      if (!response.ok) throw probleme(response.status, corps);
-      return corps;
+      if (!response.ok) throw probleme(response.status, lireJson(brut));
+      return brut;
     } finally {
       clearTimeout(timer);
     }

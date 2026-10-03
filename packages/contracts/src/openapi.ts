@@ -94,7 +94,7 @@ export function buildOpenApiDocument(baseUrl = "https://panel.example"): OpenApi
         tags: [route.group],
         operationId: identifiant(famille, route),
         ...(parametres.length > 0 ? { parameters: parametres } : {}),
-        security: [{ [securite]: route.scope ? [route.scope] : [] }],
+        security: securiteDe(route, securite),
         ...(route.scope ? { "x-gd-scope": route.scope } : {}),
         responses: reponsesDe(route),
       };
@@ -136,6 +136,13 @@ export function buildOpenApiDocument(baseUrl = "https://panel.example"): OpenApi
             "Clé personnelle, créée depuis « Compte → Clés d'API ». Elle agit au nom de son " +
             "propriétaire et ne porte jamais plus que les portées qu'on lui a données.",
         },
+        appDevice: {
+          type: "http",
+          scheme: "bearer",
+          description:
+            "Jeton d'accès d'un appareil mobile lié (gd_mob_…), quinze minutes. Il porte les " +
+            "droits du compte sur l'espace client, jamais la gestion de sa sécurité.",
+        },
         applicationKey: {
           type: "http",
           scheme: "bearer",
@@ -163,6 +170,13 @@ export function buildOpenApiDocument(baseUrl = "https://panel.example"): OpenApi
       },
     },
   };
+}
+
+/** La sécurité d'une opération : celle de sa famille, sauf exception déclarée. */
+function securiteDe(route: ApiRoute, securite: string): Record<string, string[]>[] {
+  if (route.auth === "public") return [];
+  if (route.auth === "appareil") return [{ appDevice: [] }];
+  return [{ [securite]: route.scope ? [route.scope] : [] }];
 }
 
 /**
@@ -228,6 +242,7 @@ const PARAMETRES_CONNUS: Record<string, string> = {
   serverId: "Ne garder qu'un serveur.",
   ownerId: "Ne garder que les serveurs de ce compte (pour la consommation : titulaire du jour).",
   page: "Page demandée, à partir de 1.",
+  device: "Identifiant de l'appareil mobile lié.",
 };
 
 function descriptionParametre(nom: string): string {

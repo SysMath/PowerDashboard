@@ -1,5 +1,6 @@
 "use server";
 
+import type { ClientFileEntryView } from "@gamedashboard/contracts";
 import { revalidatePath } from "next/cache";
 import { ApiError, apiFetch, apiSend, apiSendFor } from "./client";
 
@@ -12,17 +13,8 @@ import { ApiError, apiFetch, apiSend, apiSendFor } from "./client";
  * cas s'il appelait Wings lui-même avec un jeton de portée large.
  */
 
-/** Forme réelle renvoyée par Wings, relevée sur le daemon en fonctionnement. */
-export interface FileEntryDto {
-  name: string;
-  mode: string;
-  size: number;
-  directory: boolean;
-  file: boolean;
-  symlink: boolean;
-  mime: string;
-  modified: string;
-}
+/** Forme réelle renvoyée par Wings, partagée avec l'application mobile. */
+export type FileEntryDto = ClientFileEntryView;
 
 export interface FileEntry {
   name: string;

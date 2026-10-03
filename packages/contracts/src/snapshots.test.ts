@@ -3,6 +3,8 @@ import { ServerLimitsPatch } from "./server";
 import {
   AgentSnapshotReport,
   agentSettingsFromPolicy,
+  BACKUP_RESTORE_TIMEOUT_MS,
+  BACKUP_SAFETY_WAIT_MS,
   DEFAULT_SNAPSHOT_POLICY,
   resolveSnapshotPolicy,
   SNAPSHOT_BOUNDS,
@@ -122,5 +124,13 @@ describe("limite d'instantanés d'un serveur", () => {
       ServerLimitsPatch.safeParse({ snapshots: SNAPSHOT_BOUNDS.pinLimitMax + 1 }).success,
     ).toBe(false);
     expect(ServerLimitsPatch.safeParse({ snapshots: -1 }).success).toBe(false);
+  });
+});
+
+describe("restauration d'une sauvegarde", () => {
+  it("laisse aux clients le temps de l'instantané de sûreté et de l'ordre à Wings", () => {
+    // Avec le délai ordinaire de dix secondes, le web et l'application
+    // disaient « délai dépassé » à une restauration qui partait pourtant.
+    expect(BACKUP_RESTORE_TIMEOUT_MS - BACKUP_SAFETY_WAIT_MS).toBeGreaterThanOrEqual(20_000);
   });
 });

@@ -14,6 +14,7 @@ import type { PlatformSettingsService } from "../admin/platform-settings.service
 import type { MailerService } from "../mail/mailer.service";
 import { NotificationPreferencesRepository } from "../notifications/notification-preferences.repository";
 import { NotificationsService } from "../notifications/notifications.service";
+import { PushOutboxService } from "../push/push-outbox.service";
 import type { BrandingService } from "../reseller/branding.service";
 import type { ClientWebhookEmitterService } from "../webhooks/client-webhook-emitter.service";
 import { AuthController } from "./auth.controller";
@@ -120,6 +121,7 @@ describe.skipIf(!HAS_DATABASE)("Alertes de sécurité (intégration)", () => {
       {
         forReseller: async () => ({ branding: { name: "Panel", replyTo: null }, domain: null }),
       } as unknown as BrandingService,
+      new PushOutboxService(db),
     );
     alerts = new SecurityAlertService(
       new SecurityAlertRepository(db),

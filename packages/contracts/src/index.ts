@@ -2,13 +2,16 @@
 import "./zod-runtime";
 
 export * from "./activity";
+export * from "./admin-space";
 export * from "./api-catalogue";
+export * from "./app-devices";
 export * from "./application-api";
 export * from "./audit";
 export * from "./auth-cookies";
 export * from "./billing";
 export * from "./branding";
 export * from "./browser-provenance";
+export * from "./client-views";
 export * from "./client-webhooks";
 export * from "./console-command";
 export * from "./consumption";
@@ -35,7 +38,9 @@ export * from "./platform-settings";
 export * from "./player-commands";
 export * from "./provisioning";
 export * from "./pterodactyl-egg";
+export * from "./push";
 export * from "./realtime";
+export * from "./reseller-space";
 export * from "./server";
 export * from "./server-reachability";
 export * from "./snapshots";

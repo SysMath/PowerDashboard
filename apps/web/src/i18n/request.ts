@@ -22,9 +22,13 @@ export default getRequestConfig(async () => {
     acceptLanguage: headerList.get("accept-language"),
   });
 
+  // Les textes de l'application mobile (ADR 0010) vivent dans le même
+  // catalogue, mais n'ont rien à faire dans chaque page du panel.
+  const { mobile: _mobile, ...messages } = messagesFor(locale);
+
   return {
     locale,
-    messages: messagesFor(locale),
+    messages,
     // Le fuseau vient du profil (§6.1). Tant que la session n'existe pas, une
     // valeur fixe vaut mieux que celle du serveur : une date rendue côté
     // serveur et côté client doit tomber sur le même texte.

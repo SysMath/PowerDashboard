@@ -15,6 +15,11 @@ const amont = vi.fn(async (..._args: unknown[]) =>
   Response.json({ ok: true }, { headers: { "content-encoding": "gzip", "set-cookie": "a=b" } }),
 );
 
+/** Un texte lu tel quel dans une expression régulière, antislash compris. */
+function echapper(texte: string): string {
+  return texte.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
+}
+
 function appel(chemin: string, init: RequestInit & { duplex?: "half" } = {}): Request {
   return new Request(`https://panel.example.fr${chemin}`, init);
 }
@@ -38,6 +43,7 @@ describe("relayablePath", () => {
     expect(relayablePath("/api/node-agent/heartbeat")).toBe(true);
     expect(relayablePath("/api/v1/openapi.json")).toBe(true);
     expect(relayablePath("/api/v1/status")).toBe(true);
+    expect(relayablePath("/api/v1/relais/envois")).toBe(true);
   });
 
   it("relaie le signal de release d'un hébergement autonome, avec sa signature", async () => {
@@ -82,6 +88,50 @@ describe("relayablePath", () => {
     expect(relayablePath("/api/v1/applications")).toBe(false);
   });
 
+  it("ouvre la liaison mobile à tous, l'espace client au seul jeton d'appareil (ADR 0010)", () => {
+    expect(relayablePath("/api/v1/auth/app/token")).toBe(true);
+    expect(relayablePath("/api/v1/auth/app/refresh")).toBe(true);
+    expect(relayablePath("/api/v1/client/servers", "Bearer gd_mob_jeton")).toBe(true);
+    expect(relayablePath("/api/v1/auth/me", "Bearer gd_mob_jeton")).toBe(true);
+    expect(relayablePath("/api/v1/reseller/overview", "Bearer gd_mob_jeton")).toBe(true);
+    expect(relayablePath("/api/v1/reseller/overview")).toBe(false);
+    // Une clé personnelle, ou rien : la porte reste fermée, comme dans nginx.
+    expect(relayablePath("/api/v1/client/servers", "Bearer gd_live_abc_secret")).toBe(false);
+    expect(relayablePath("/api/v1/auth/me")).toBe(false);
+    // Le jeton d'appareil n'ouvre rien d'autre.
+    expect(relayablePath("/api/v1/admin/users", "Bearer gd_mob_jeton")).toBe(true);
+    expect(relayablePath("/api/v1/admin/users", "Bearer gd_live_abc_secret")).toBe(false);
+    expect(relayablePath("/api/v1/auth/sessions", "Bearer gd_mob_jeton")).toBe(false);
+    expect(relayablePath("/api/v1/client/../admin/users", "Bearer gd_mob_jeton")).toBe(false);
+  });
+
+  it("échappe tout le chemin cité dans une expression régulière", () => {
+    for (const texte of ["= /api/v1/auth/me", "a\\b.c", "^(x)+[y]{1}|$?*"]) {
+      expect(new RegExp(`^${echapper(texte)}$`).test(texte), texte).toBe(true);
+    }
+    expect(new RegExp(echapper("a.c")).test("abc")).toBe(false);
+  });
+
+  it("relaie l'espace client nginx pour le jeton d'appareil, comme le vhost", () => {
+    const vhost = readFileSync(
+      fileURLToPath(new URL("../../../../infra/prod/panel.conf", import.meta.url)),
+      "utf8",
+    );
+    expect(vhost).toMatch(
+      /map \$http_authorization \$gd_mobile_upstream \{\s*"~\^Bearer gd_mob_"\s+127\.0\.0\.1:3211;/,
+    );
+    for (const chemin of [
+      "/api/v1/client/",
+      "/api/v1/reseller/",
+      "/api/v1/admin/",
+      "= /api/v1/auth/me",
+    ]) {
+      const bloc = new RegExp(`location ${echapper(chemin)} \\{([^}]*)\\}`).exec(vhost)?.[1];
+      expect(bloc, chemin).toMatch(/proxy_pass http:\/\/\$gd_mobile_upstream;/);
+      expect(bloc, chemin).toMatch(/proxy_set_header Cookie\s+"";/);
+    }
+  });
+
   it("refuse un chemin qui remonterait vers une autre route", () => {
     expect(relayablePath("/api/remote/../v1/admin/users")).toBe(false);
     expect(relayablePath("/api/remote/%2e%2e/v1/admin/users")).toBe(false);
@@ -96,6 +146,23 @@ describe("relayToApi", () => {
     const reponse = await relayToApi(appel("/api/remote/servers"));
     expect(reponse.status).toBe(404);
     expect(amont).not.toHaveBeenCalled();
+  });
+
+  it("relaie la confirmation de présence d'un appareil, jamais son cookie", async () => {
+    await relayToApi(
+      appel("/api/v1/client/servers/abc/backups/def/restore", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer gd_mob_jeton",
+          "x-gd-presence": "defi.signature",
+          cookie: "gd_session=volee",
+        },
+      }),
+    );
+    const [, init] = amont.mock.calls[0] as [string, RequestInit];
+    const transmis = init.headers as Headers;
+    expect(transmis.get("x-gd-presence")).toBe("defi.signature");
+    expect(transmis.get("cookie")).toBeNull();
   });
 
   it("refuse une route de l'API qui n'est pas publique", async () => {

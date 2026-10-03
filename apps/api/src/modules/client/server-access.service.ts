@@ -21,7 +21,7 @@ import {
 } from "@nestjs/common";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
-import type { RequestOrigin } from "../../common/request-origin";
+import { type RequestOrigin, requestOrigin } from "../../common/request-origin";
 import { DenialLogService } from "../activity/denial-log.service";
 
 /**
@@ -54,6 +54,26 @@ export interface AccessPrincipal {
    * Absente, le refus est consigné quand même, sans elles.
    */
   origin?: RequestOrigin;
+  /**
+   * Vrai pour l'application mobile (ADR 0010). Elle agit avec les droits du
+   * compte, mais jamais avec ceux du personnel sur les serveurs d'autrui :
+   * ce qui en est ouvert à l'application passe par `APP_STAFF_ROUTES`.
+   */
+  appDevice?: boolean;
+}
+
+/** Qui demande, tel que la garde l'a posé sur la requête. */
+export function accessPrincipal(request: {
+  user: { id: string };
+  scopes: string[] | null;
+  appDeviceId?: string;
+}): AccessPrincipal {
+  return {
+    id: request.user.id,
+    scopes: request.scopes,
+    origin: requestOrigin(request),
+    ...(request.appDeviceId !== undefined ? { appDevice: true } : {}),
+  };
 }
 
 /** Origine d'une demande dont l'appelant n'a rien dit. */
@@ -179,7 +199,10 @@ export class ServerAccessService {
        * l'écran de création n'annonce pas. Par clé, le personnel n'atteint que
        * ce qu'il possède ou ce à quoi il est invité, comme tout le monde.
        */
-      const staff = scopes === null ? await this.staffAccess(userId, serverId, permission) : null;
+      const staff =
+        scopes === null && !principal.appDevice
+          ? await this.staffAccess(userId, serverId, permission)
+          : null;
       if (staff) return staff;
       throw new NotFoundException("Serveur introuvable.");
     }

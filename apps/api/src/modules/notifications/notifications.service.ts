@@ -9,6 +9,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 import { MailerService } from "../mail/mailer.service";
+import { PushOutboxService } from "../push/push-outbox.service";
 import { BrandingService } from "../reseller/branding.service";
 import { ClientWebhookEmitterService } from "../webhooks/client-webhook-emitter.service";
 import { NotificationPreferencesRepository } from "./notification-preferences.repository";
@@ -61,6 +62,7 @@ export class NotificationsService {
     @Inject(ClientWebhookEmitterService)
     private readonly clientWebhooks: ClientWebhookEmitterService,
     @Inject(BrandingService) private readonly branding: BrandingService,
+    @Inject(PushOutboxService) private readonly push: PushOutboxService,
   ) {}
 
   async forUser(userId: string): Promise<{ items: ClientNotification[]; unread: number }> {
@@ -149,20 +151,25 @@ export class NotificationsService {
      */
     context?: Record<string, string>;
   }): Promise<void> {
+    let notificationId: string | null = null;
     try {
-      await this.db.insert(notifications).values({
-        userId: input.userId,
-        type: input.type,
-        title: input.title,
-        body: input.body,
-        channel: "inapp",
-        data: {
-          level: input.level,
-          ...(input.serverId ? { serverId: input.serverId } : {}),
-          ...(input.href ? { href: input.href } : {}),
-          ...(input.context ?? {}),
-        },
-      });
+      const [row] = await this.db
+        .insert(notifications)
+        .values({
+          userId: input.userId,
+          type: input.type,
+          title: input.title,
+          body: input.body,
+          channel: "inapp",
+          data: {
+            level: input.level,
+            ...(input.serverId ? { serverId: input.serverId } : {}),
+            ...(input.href ? { href: input.href } : {}),
+            ...(input.context ?? {}),
+          },
+        })
+        .returning({ id: notifications.id });
+      notificationId = row?.id ?? null;
     } catch (error) {
       this.logger.error(
         `Notification « ${input.type} » non déposée — ${
@@ -181,6 +188,46 @@ export class NotificationsService {
      * l'événement en ouvrant le panel.
      */
     void this.emailIfWanted(input);
+
+    // Le téléphone, comme le courriel : après la cloche, et seulement si elle
+    // existe, puisque c'est elle que l'application ouvre au toucher.
+    if (notificationId) void this.pushIfWanted({ ...input, notificationId });
+  }
+
+  /**
+   * Double la notification sur les téléphones liés au compte, si le compte
+   * le veut pour ce type (ADR 0010). Seuls le type et le nom du serveur
+   * partent ; le titre et le corps restent dans la cloche.
+   */
+  private async pushIfWanted(input: {
+    userId: string;
+    type: string;
+    serverId?: string;
+    notificationId: string;
+  }): Promise<void> {
+    try {
+      const channels = await this.preferences.channelsFor(input.userId, input.type);
+      if (!channels.includes("push")) return;
+      const [server] = input.serverId
+        ? await this.db
+            .select({ name: servers.name })
+            .from(servers)
+            .where(eq(servers.id, input.serverId))
+            .limit(1)
+        : [];
+      await this.push.enqueue({
+        userId: input.userId,
+        notificationId: input.notificationId,
+        type: input.type,
+        serverName: server?.name ?? null,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Notification « ${input.type} » non poussée — ${
+          error instanceof Error ? error.message : "erreur inconnue"
+        }`,
+      );
+    }
   }
 
   /**

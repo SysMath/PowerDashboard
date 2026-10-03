@@ -35,6 +35,7 @@ import { UserRepository } from "../auth/user.repository";
 import type { MailerService } from "../mail/mailer.service";
 import { NotificationPreferencesRepository } from "../notifications/notification-preferences.repository";
 import { NotificationsService } from "../notifications/notifications.service";
+import { PushOutboxService } from "../push/push-outbox.service";
 import { SftpAuthService } from "../remote/sftp-auth.service";
 import type { BrandingService } from "../reseller/branding.service";
 import type { S3Service } from "../storage/s3.service";
@@ -94,6 +95,7 @@ describe.skipIf(!HAS_DATABASE)("suspension et modification d'un compte (intégra
         {
           forReseller: async () => ({ branding: { name: "Panel", replyTo: null }, domain: null }),
         } as unknown as BrandingService,
+        new PushOutboxService(db),
       ),
       mailer as unknown as MailerService,
       new ActivityService(db),

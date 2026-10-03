@@ -21,6 +21,12 @@ export interface ApiRoute {
   /** Portée requise sur la clé. `null` quand aucune portée particulière n'est exigée. */
   scope: string | null;
   group: string;
+  /**
+   * Authentification, quand ce n'est pas celle de la famille : `public` pour
+   * une route qui s'authentifie par ce qu'elle porte (l'échange d'un code de
+   * liaison), `appareil` pour le jeton d'un appareil mobile lié (ADR 0010).
+   */
+  auth?: "public" | "appareil";
 }
 
 /** Routes accessibles avec une clé personnelle, au nom de l'utilisateur. */
@@ -159,6 +165,13 @@ export const CLIENT_ROUTES: ApiRoute[] = [
   },
   {
     method: "POST",
+    path: "/servers/{server}/files/create-directory",
+    summary: "Créer un dossier : `{ root, name }`, `name` relatif à `root`.",
+    scope: "files.write",
+    group: "Fichiers",
+  },
+  {
+    method: "POST",
     path: "/servers/{server}/files/rename",
     summary: "Renommer ou déplacer un fichier ou un dossier.",
     scope: "files.write",
@@ -191,6 +204,14 @@ export const CLIENT_ROUTES: ApiRoute[] = [
     path: "/servers/{server}/backups",
     summary: "Déclencher une sauvegarde. Accepte un en-tête d'idempotence.",
     scope: "backups.create",
+    group: "Sauvegardes",
+  },
+  {
+    method: "POST",
+    path: "/servers/{server}/backups/{backup}/lock",
+    summary:
+      "Verrouiller ou déverrouiller une sauvegarde (`{ locked }`) : verrouillée, la rotation de rétention ne l'efface pas. Exige le droit de supprimer.",
+    scope: "backups.delete",
     group: "Sauvegardes",
   },
   {
@@ -313,6 +334,21 @@ export const CLIENT_ROUTES: ApiRoute[] = [
     summary: "Journal d'audit du serveur, paginé par curseur.",
     scope: "activity.read",
     group: "Audit",
+  },
+  {
+    method: "GET",
+    path: "/notifications",
+    summary:
+      "Notifications du compte, les plus récentes d'abord, avec le nombre de non lues (meta.unread).",
+    scope: null,
+    group: "Notifications",
+  },
+  {
+    method: "POST",
+    path: "/notifications/read-all",
+    summary: "Marquer toutes les notifications du compte comme lues.",
+    scope: null,
+    group: "Notifications",
   },
 ];
 
@@ -510,6 +546,204 @@ export const SESSION_ROUTES: ApiRoute[] = [
     summary: "Supprime une clé d'accès. Mot de passe exigé.",
     scope: null,
     group: "Clés d'accès",
+  },
+  {
+    method: "POST",
+    path: "/auth/app/authorize",
+    summary:
+      "Accepte la liaison de l'application mobile depuis le navigateur du téléphone et rend un code de soixante secondes, à usage unique. Refusée à une prise en main.",
+    scope: null,
+    group: "Application mobile",
+  },
+  {
+    method: "POST",
+    path: "/auth/app/token",
+    summary:
+      "Échange le code de liaison, le vérificateur PKCE et la clé publique de l'appareil (signature P-256 à l'appui) contre un jeton d'accès de quinze minutes et un secret d'appareil.",
+    scope: null,
+    group: "Application mobile",
+    auth: "public",
+  },
+  {
+    method: "POST",
+    path: "/auth/app/refresh",
+    summary:
+      "Renouvelle le jeton d'accès contre le secret d'appareil, signé par la clé de l'appareil. Le secret est remplacé ; présenter l'ancien retire l'appareil.",
+    scope: null,
+    group: "Application mobile",
+    auth: "public",
+  },
+  {
+    method: "POST",
+    path: "/auth/app/challenge",
+    summary:
+      "Défi de deux minutes à signer par la clé de l'appareil (en-tête x-gd-presence) avant un geste lourd : restauration, suppression, réinstallation.",
+    scope: null,
+    group: "Application mobile",
+    auth: "appareil",
+  },
+  {
+    method: "DELETE",
+    path: "/auth/app/device",
+    summary: "L'application se délie elle-même du panel.",
+    scope: null,
+    group: "Application mobile",
+    auth: "appareil",
+  },
+  {
+    method: "PUT",
+    path: "/auth/app/push",
+    summary:
+      "Dépose de quoi joindre l'appareil : son jeton Expo en mode direct, sa poignée du relais en mode relais. Refusé (409) quand le mode diffère de celui que sert le panel, que publie /.well-known/gamedashboard.",
+    scope: null,
+    group: "Application mobile",
+    auth: "appareil",
+  },
+  {
+    method: "DELETE",
+    path: "/auth/app/push",
+    summary: "L'appareil ne reçoit plus de notifications poussées.",
+    scope: null,
+    group: "Application mobile",
+    auth: "appareil",
+  },
+  {
+    method: "GET",
+    path: "/auth/devices",
+    summary: "Appareils mobiles liés au compte, le plus récemment vu en tête.",
+    scope: null,
+    group: "Application mobile",
+  },
+  {
+    method: "DELETE",
+    path: "/auth/devices/{device}",
+    summary: "Retire un appareil mobile : ses jetons cessent de valoir sur-le-champ.",
+    scope: null,
+    group: "Application mobile",
+  },
+  {
+    method: "GET",
+    path: "/reseller/overview",
+    summary:
+      "Espace revendeur : ses machines, ses serveurs et ses clients, son enveloppe et ce qu'il en consomme. Ouverte à l'application mobile.",
+    scope: null,
+    group: "Espace revendeur",
+  },
+  {
+    method: "POST",
+    path: "/reseller/servers/{server}/suspension",
+    summary:
+      "Suspend (`suspended: true`, motif facultatif) ou rétablit un serveur de son parc. Depuis l'application, confirmation de présence exigée.",
+    scope: null,
+    group: "Espace revendeur",
+  },
+  {
+    method: "GET",
+    path: "/reseller/consumption/export?from={jour}&to={jour}&format={format}",
+    summary:
+      "Consommation journalière de son parc, en CSV ou JSONL ; sans période, le mois en cours. Consignée au journal.",
+    scope: null,
+    group: "Espace revendeur",
+  },
+  {
+    method: "GET",
+    path: "/admin/nodes",
+    summary:
+      "Machines du parc : capacité, allocation, relevés et dernier signal du daemon. Personnel (support compris).",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/nodes/{node}/agent",
+    summary:
+      "Agent de la machine : état, version, fonctions annoncées et capacités qui en découlent.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/servers",
+    summary: "Tous les serveurs : titulaire, machine, egg, état de gestion et état du conteneur.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/servers/{server}/suspend",
+    summary:
+      "Suspend (`suspended: true`, motif facultatif) ou rétablit un serveur. Administration seulement ; depuis l'application, confirmation de présence exigée.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/users",
+    summary: "Tous les comptes : rôle, second facteur, suspension, dernière connexion, serveurs.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/users/{user}/suspend",
+    summary:
+      "Suspend un compte (`suspended: true`, motif exigé, sessions coupées) ou le rétablit. Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/users/{user}/revoke-sessions",
+    summary:
+      "Déconnecte un compte partout : ses sessions et ses appareils mobiles liés. Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/incidents",
+    summary: "Incidents de la page /status, ouverts et clos, avec leurs mises à jour.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/incidents",
+    summary:
+      "Ouvre et publie un incident (`title`, `impact`, `body`, `nodeIds`). Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/incidents/{incident}/updates",
+    summary:
+      "Ajoute une mise à jour (`state`, `body`) ; l'état `resolved` clôt l'incident. Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/updates",
+    summary:
+      "État de la mise à jour autonome du panel (hébergement cPanel) ; `actif: false` ailleurs.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "POST",
+    path: "/admin/updates/check",
+    summary:
+      "Lance la recherche d'une nouvelle version, et son installation si elle paraît. Administration seulement ; présence exigée depuis l'application.",
+    scope: null,
+    group: "Administration",
+  },
+  {
+    method: "GET",
+    path: "/admin/activity?query={recherche}&page={page}",
+    summary: "Journal de la plateforme, le plus récent d'abord, par pages.",
+    scope: null,
+    group: "Administration",
   },
 ];
 

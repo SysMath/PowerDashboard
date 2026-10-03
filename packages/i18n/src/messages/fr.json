@@ -123,7 +123,13 @@
     "noSmtpTitle": "Aucun courriel ne partira",
     "noSmtpBody": "La plateforme n'a pas de serveur d'envoi configuré. Vos choix sont enregistrés et s'appliqueront dès qu'elle en aura un.",
     "unverifiedTitle": "Votre adresse n'est pas confirmée",
-    "unverifiedBody": "Rien ne sera écrit à une adresse que personne n'a confirmée. Confirmez-la depuis le bandeau du panel pour recevoir ces messages."
+    "unverifiedBody": "Rien ne sera écrit à une adresse que personne n'a confirmée. Confirmez-la depuis le bandeau du panel pour recevoir ces messages.",
+    "channelEmail": "Courriel",
+    "channelPush": "Téléphone",
+    "noPushTitle": "Aucune notification n'ira sur un téléphone",
+    "noPushBody": "Ce panel n'envoie pas de notifications à l'application mobile. Vos choix sont enregistrés et s'appliqueront dès qu'il le fera ; la cloche de l'application reste à jour.",
+    "noDeviceTitle": "Aucun téléphone n'est relié à ce compte",
+    "noDeviceBody": "Installez l'application GameDashboard et reliez-la depuis Sécurité › Application mobile pour recevoir ces notifications sur votre téléphone."
   },
   "activity": {
     "title": "Journal d'activité",
@@ -1790,7 +1796,18 @@
     "problemTooLong": "Le mot de passe ne peut pas dépasser {maximum} caractères.",
     "problemContainsIdentity": "Le mot de passe ne doit pas contenir votre nom ni votre adresse e-mail.",
     "problemPwned": "Ce mot de passe apparaît {occurrences, plural, one {# fois} other {# fois}} dans des fuites de données connues. Choisissez-en un autre.",
-    "noOtherSession": "Aucune autre session"
+    "noOtherSession": "Aucune autre session",
+    "appSection": "Application mobile",
+    "appSectionHint": "Scannez ce code avec l'application GameDashboard pour y ajouter ce panel, puis connectez-vous dans le navigateur qui s'ouvre. Chaque téléphone lié apparaît ici et se retire d'un geste.",
+    "appQrAlt": "Code QR de l'adresse du panel",
+    "appQrHint": "Le code ne contient que l'adresse du panel :",
+    "appNoDevice": "Aucun téléphone lié",
+    "appPlatform": {
+      "ios": "iPhone ou iPad",
+      "android": "Android"
+    },
+    "appLinked": "lié",
+    "appRemove": "Retirer"
   },
   "serverList": {
     "metaTitle": "Serveurs",
@@ -2304,7 +2321,9 @@
       "twoFactorDisabled": "Double authentification désactivée",
       "passkeyAdded": "Clé d'accès ajoutée",
       "passkeyRemoved": "Clé d'accès supprimée",
-      "emailChanged": "Adresse e-mail modifiée"
+      "emailChanged": "Adresse e-mail modifiée",
+      "appDeviceLinked": "Application mobile liée",
+      "appDeviceReplayed": "Application mobile retirée par sécurité"
     },
     "credentialBody": {
       "passwordChanged": "Le mot de passe de votre compte vient d'être changé, et les autres sessions ont été fermées.",
@@ -2313,7 +2332,9 @@
       "twoFactorDisabled": "La double authentification par application vient d'être désactivée sur votre compte.",
       "passkeyAdded": "Une nouvelle clé d'accès vient d'être enregistrée sur votre compte.",
       "passkeyRemoved": "Une clé d'accès vient d'être retirée de votre compte.",
-      "emailChanged": "L'adresse e-mail de votre compte vient d'être remplacée. Ce message part vers l'ancienne adresse ; les suivants iront à la nouvelle."
+      "emailChanged": "L'adresse e-mail de votre compte vient d'être remplacée. Ce message part vers l'ancienne adresse ; les suivants iront à la nouvelle.",
+      "appDeviceLinked": "Un téléphone vient d'être lié à votre compte par l'application mobile. Vous le retrouvez, et pouvez le retirer, dans la sécurité du compte.",
+      "appDeviceReplayed": "Un secret de l'application mobile a été présenté une seconde fois : il a pu être copié. Le téléphone concerné a été délié de votre compte ; il faudra le lier de nouveau."
     },
     "credentialAdvice": "Si ce n'était pas vous, quelqu'un a peut-être pris la main sur votre compte : changez votre mot de passe, fermez les autres sessions et vérifiez votre double authentification :",
     "credentialReassure": "Si c'était vous, il n'y a rien à faire.",
@@ -2703,6 +2724,354 @@
       "whitelist_remove": "Retirer de la liste blanche",
       "op": "Nommer opérateur",
       "deop": "Retirer opérateur"
+    }
+  },
+  "appLink": {
+    "title": "Autoriser l'application mobile ?",
+    "description": "« {device} » ({platform}) pourra gérer vos serveurs au nom de {email}, sur {host}. Vous pourrez le retirer à tout moment dans la sécurité du compte.",
+    "platform": {
+      "ios": "iPhone ou iPad",
+      "android": "Android"
+    },
+    "approve": "Autoriser ce téléphone",
+    "refuse": "Refuser",
+    "notice": "N'acceptez que si vous venez de lancer la liaison depuis l'application, sur ce téléphone.",
+    "sentTitle": "Téléphone autorisé",
+    "sentBody": "Revenez dans l'application : elle termine la liaison d'elle-même.",
+    "failedTitle": "Liaison impossible",
+    "failedBody": "Le panel a refusé la liaison. Recommencez depuis l'application.",
+    "expiredTitle": "Aucune liaison en cours",
+    "expiredBody": "La demande a expiré ou a déjà servi. Recommencez depuis l'application."
+  },
+  "mobile": {
+    "commun": {
+      "annuler": "Annuler",
+      "refuse": "Geste refusé"
+    },
+    "verrou": {
+      "raison": "Ouvrir la clé qui relie ce téléphone au panel"
+    },
+    "presence": {
+      "restaurerSauvegarde": "Confirmer la restauration de la sauvegarde",
+      "supprimerSauvegarde": "Confirmer la suppression de la sauvegarde",
+      "supprimerFichiers": "Confirmer la suppression des fichiers",
+      "restaurerInstantane": "Confirmer la restauration de l'instantané",
+      "suspensionServeur": "Confirmer la suspension ou le rétablissement du serveur",
+      "suspensionCompte": "Confirmer la suspension ou le rétablissement du compte",
+      "deconnecterPartout": "Confirmer la déconnexion du compte partout",
+      "publierIncident": "Confirmer la publication sur la page d'état",
+      "miseAJourPanel": "Confirmer la mise à jour du panel",
+      "geste": "Confirmer cette action sur le serveur"
+    },
+    "instances": {
+      "titre": "Mes panels",
+      "ajouter": "Ajouter un panel",
+      "etat": {
+        "liee": "Lié",
+        "a-confirmer": "À vérifier",
+        "a-relier": "À relier"
+      },
+      "confidentialite": "Politique de confidentialité"
+    },
+    "ajout": {
+      "titre": "Ajouter un panel",
+      "intro": "Saisissez l'adresse de votre panel, ou scannez le code QR affiché dans Compte › Sécurité › Application mobile.",
+      "adresse": {
+        "libelle": "Adresse du panel",
+        "vide": "Saisissez l'adresse du panel.",
+        "http": "Seules les adresses en https:// sont acceptées : en clair, le code de liaison pourrait être lu sur le réseau.",
+        "invalide": "Cette adresse n'est pas valide."
+      },
+      "verdict": {
+        "injoignable": "Cette adresse ne répond pas. Vérifiez-la, ainsi que votre connexion.",
+        "indisponible": "Ce panel est momentanément indisponible. Réessayez dans quelques minutes.",
+        "pas-un-panel": "Cette adresse ne répond pas comme un panel GameDashboard.",
+        "panel-trop-ancien": "Ce panel est trop ancien pour l'application. Son hébergeur doit le mettre à jour.",
+        "application-trop-ancienne": "Ce panel demande une version plus récente de l'application. Mettez-la à jour depuis le magasin."
+      },
+      "verifier": "Continuer",
+      "scanner": "Scanner un code QR",
+      "ficheAide": "Vérifiez le domaine : c'est sur ce site que vous allez vous connecter.",
+      "nomAppareil": "Nom de ce téléphone, tel que le panel l'affichera",
+      "seConnecter": "Se connecter dans le navigateur",
+      "autreAdresse": "Autre adresse",
+      "raison": "Lier ce téléphone au panel",
+      "liaison": {
+        "annulee": "La connexion a été interrompue avant la fin.",
+        "refusee": "Vous avez refusé la liaison dans le navigateur.",
+        "panel": "Le panel n'a pas pu terminer la liaison. Réessayez.",
+        "etat": "Ce retour ne correspond pas à la liaison ouverte : il a été ignoré.",
+        "invalide": "Le retour du navigateur est illisible. Réessayez.",
+        "echec": "La liaison a échoué : code expiré, connexion perdue ou biométrie refusée. Réessayez."
+      },
+      "demo": "Essayer sans panel"
+    },
+    "cadre": {
+      "retirer": "Retirer ce panel du téléphone",
+      "verrouille": {
+        "titre": "Téléphone verrouillé",
+        "corps": "Déverrouillez avec la biométrie ou le code du téléphone pour ouvrir ce panel.",
+        "action": "Déverrouiller"
+      },
+      "hors-ligne": {
+        "titre": "Panel injoignable",
+        "corps": "Le panel ne répond pas. Vérifiez votre connexion, ou réessayez dans un instant.",
+        "action": "Réessayer"
+      },
+      "introuvable": {
+        "titre": "Panel inconnu",
+        "corps": "Ce panel n'est plus lié à ce téléphone.",
+        "action": "Mes panels"
+      },
+      "a-confirmer": {
+        "titre": "Ce panel a changé",
+        "corps": "L'adresse répond, mais ce n'est plus le même panel : il a été réinstallé, ou le domaine a changé de mains. Rien n'a été envoyé. Ne le reliez que si vous savez pourquoi.",
+        "action": "Relier ce nouveau panel"
+      },
+      "a-relier": {
+        "titre": "Liaison terminée",
+        "corps": "Ce téléphone a été retiré du panel, ou sa liaison a expiré (30 jours sans usage, 90 jours au plus). Reconnectez-vous dans le navigateur pour le relier.",
+        "action": "Relier de nouveau"
+      }
+    },
+    "serveurs": {
+      "joueurs": "{n, plural, =0 {aucun joueur} one {# joueur} other {# joueurs}}",
+      "memoire": "Mémoire : {utilise} sur {max}",
+      "cloche": "Notifications",
+      "clocheNonLues": "Notifications ({n})",
+      "compte": "Compte",
+      "erreur": "Liste indisponible",
+      "vide": "Aucun serveur sur ce compte."
+    },
+    "serveur": {
+      "console": "Console",
+      "joueurs": "Joueurs",
+      "fichiers": "Fichiers",
+      "sauvegardes": "Sauvegardes"
+    },
+    "sauvegardes": {
+      "quota": "{utilise} sur {max} sauvegardes",
+      "quotaAtteint": "Quota atteint : supprimez une sauvegarde déverrouillée pour en créer une autre.",
+      "nom": "Nom de la sauvegarde",
+      "nomVide": "Indiquez un nom.",
+      "restaurer": "Restaurer",
+      "viderPuisRestaurer": "Vider, puis restaurer",
+      "viderAide": "« Vider, puis restaurer » supprime d'abord tous les fichiers du serveur : ceux que l'archive ne contient pas disparaissent.",
+      "restaurationLancee": "Restauration lancée",
+      "restaurationAide": "Le daemon réécrit les fichiers du serveur. Attendez la fin avant de le démarrer : la console et la cloche le signaleront.",
+      "supprimer": "Supprimer"
+    },
+    "fichiers": {
+      "ouvrir": "Ouvrir",
+      "partager": "Télécharger et partager",
+      "supprimer": "Supprimer",
+      "dossier": "Dossier",
+      "appuiLong": "Appui long sur une entrée pour la renommer, la déplacer, la compresser ou la supprimer.",
+      "tropGros": "Ce fichier dépasse 1 Mo : il ne s'ouvre pas dans l'éditeur du téléphone. Téléchargez-le, ou modifiez-le depuis le navigateur.",
+      "binaire": "Ce fichier n'est pas du texte : il se télécharge, il ne s'ouvre pas ici.",
+      "nomDossier": "Nom du dossier",
+      "creer": "Créer",
+      "valider": "Valider",
+      "nom": {
+        "vide": "Indiquez un nom.",
+        "reserve": "Ce nom est réservé par le système.",
+        "barre": "Un nom ne contient pas de « / » : créez les dossiers un par un."
+      }
+    },
+    "editeur": {
+      "enregistrer": "Enregistrer",
+      "quitterTitre": "Quitter sans enregistrer ?",
+      "quitterCorps": "Vos modifications de ce fichier seront perdues.",
+      "quitter": "Quitter"
+    },
+    "alimentation": {
+      "refuse": "Ordre refusé",
+      "confirmer": {
+        "restart": "Redémarrer le serveur ?",
+        "stop": "Arrêter le serveur ?",
+        "kill": "Tuer le processus ?"
+      },
+      "confirmerCorps": "Les joueurs connectés seront déconnectés.",
+      "signal": {
+        "start": "Démarrer",
+        "restart": "Redémarrer",
+        "stop": "Arrêter",
+        "kill": "Tuer"
+      }
+    },
+    "console": {
+      "interrompue": "La connexion au serveur s'est arrêtée.",
+      "reconnecter": "Reconnecter",
+      "releve": "Processeur {cpu} % · mémoire {memoire}"
+    },
+    "cloche": {
+      "titre": "Notifications",
+      "vide": "Aucune notification.",
+      "toutLire": "Tout marquer comme lu"
+    },
+    "compte": {
+      "titre": "Ce téléphone",
+      "lieeLe": "Lié le {date}",
+      "expire": "Nouvelle connexion nécessaire au plus tard le {date}",
+      "webAide": "Bases de données, planificateur, permissions des fichiers et réglages du compte restent dans le panel, depuis le navigateur.",
+      "ouvrirPanel": "Ouvrir le panel dans le navigateur",
+      "panels": "Mes panels",
+      "delier": "Délier ce téléphone",
+      "delierTitre": "Délier ce téléphone ?",
+      "delierCorps": "Le panel retire ce téléphone, et la clé qui l'y reliait est effacée. Il faudra se reconnecter pour le relier de nouveau."
+    },
+    "scanner": {
+      "titre": "Code QR du panel",
+      "permission": "L'application a besoin de la caméra pour lire le code QR affiché par votre panel. Elle ne lit rien d'autre.",
+      "autoriser": "Autoriser la caméra"
+    },
+    "pousse": {
+      "nouvelle": "Nouvelle notification",
+      "lire": "Ouvrez l'application pour la lire.",
+      "canal": "Alertes des panels"
+    },
+    "revendeur": {
+      "titre": "Espace revendeur",
+      "ouvrir": "Revendeur",
+      "erreur": "Espace revendeur indisponible",
+      "enveloppe": "Enveloppe",
+      "dimension": {
+        "memoryMb": "Mémoire",
+        "diskMb": "Disque",
+        "servers": "Serveurs"
+      },
+      "sur": "{utilise} sur {limite}",
+      "sansLimite": "{utilise}, sans limite",
+      "reste": "reste {reste}",
+      "depasse": "Au-delà de l'enveloppe",
+      "estimee": "Chiffres majorés : {n, plural, one {# serveur n'a pas pu être relevé} other {# serveurs n'ont pas pu être relevés}}.",
+      "clients": "Clients",
+      "aucunClient": "Aucun client pour l'instant.",
+      "nbServeurs": "{n, plural, =0 {aucun serveur} one {# serveur} other {# serveurs}}",
+      "consommation": "Consommation",
+      "webAide": "Marque, domaines, clés et limites des serveurs se règlent dans le navigateur.",
+      "ouvrirPanel": "Ouvrir l'espace revendeur du panel",
+      "aucunServeur": "Aucun serveur pour ce client.",
+      "suspendu": "Suspendu",
+      "occupe": "Installation ou transfert en cours",
+      "suspendre": "Suspendre",
+      "retablir": "Rétablir",
+      "suspendreTitre": "Suspendre {nom} ?",
+      "suspendreCorps": "Le serveur s'arrête et son titulaire ne peut plus y agir jusqu'au rétablissement.",
+      "retablirTitre": "Rétablir {nom} ?",
+      "retablirCorps": "Le titulaire retrouve son serveur.",
+      "sessionsOuvertes": "{n, plural, one {# session SFTP n'a pas pu être coupée} other {# sessions SFTP n'ont pas pu être coupées}} : le daemon ne répondait pas.",
+      "conso": {
+        "titre": "Consommation",
+        "ceMois": "Ce mois-ci",
+        "moisDernier": "Mois dernier",
+        "vide": "Aucun relevé sur cette période.",
+        "aide": "Les relevés du panel, jour par jour, en temps universel.",
+        "jours": "{n, plural, one {# jour} other {# jours}}",
+        "disponibilite": "Disponibilité : {pct}",
+        "processeur": "Processeur moyen : {pct}",
+        "memoire": "Mémoire au plus haut : {taille}",
+        "reseau": "Réseau : {taille}",
+        "joueurs": "Joueurs au plus : {n}",
+        "incomplet": "Relevés incomplets"
+      }
+    },
+    "administration": {
+      "ouvrir": "Administration",
+      "titre": "Administration",
+      "erreur": "Administration indisponible",
+      "calme": "Rien à signaler : toutes les machines répondent, aucun serveur en échec, aucun incident ouvert.",
+      "enEchec": "{proprietaire} · {machine}",
+      "webAide": "Eggs, machines et réglages se règlent dans le navigateur.",
+      "ouvrirPanel": "Ouvrir l'administration du panel",
+      "rubrique": {
+        "machines": "Machines",
+        "serveurs": "Serveurs",
+        "comptes": "Comptes",
+        "incidents": "Incidents",
+        "activite": "Journal"
+      },
+      "miseAJour": {
+        "titre": "Chercher une nouvelle version ?",
+        "corps": "Si une version est parue, le panel l'essaie à part puis bascule dessus ; il revient seul à la précédente en cas d'échec.",
+        "lancer": "Chercher et installer",
+        "installer": "Installer la nouvelle version"
+      },
+      "machines": {
+        "titre": "Machine",
+        "serveurs": "{n, plural, =0 {aucun serveur} one {# serveur} other {# serveurs}}",
+        "vue": "Dernier signe {quand}",
+        "jamaisVue": "Jamais vue : Wings n'a pas encore appelé le panel",
+        "memoire": "Mémoire accordée : {accordee} sur {total}",
+        "vide": "Aucune machine.",
+        "maintenance": "En maintenance : aucun serveur n'y est créé.",
+        "agent": "Agent de node",
+        "agentEtat": {
+          "none": "Aucun agent installé",
+          "online": "En ligne",
+          "silent": "Silencieux depuis plus de deux minutes"
+        }
+      },
+      "serveurs": {
+        "titre": "Serveurs",
+        "chercher": "Nom, titulaire, machine ou egg",
+        "aucun": "Aucun serveur ne correspond.",
+        "affiner": "{n, plural, one {# autre serveur} other {# autres serveurs}} : affinez la recherche.",
+        "suspendre": "Suspendre",
+        "retablir": "Rétablir"
+      },
+      "comptes": {
+        "titre": "Comptes",
+        "chercher": "Nom ou adresse",
+        "aucun": "Aucun compte ne correspond.",
+        "affiner": "{n, plural, one {# autre compte} other {# autres comptes}} : affinez la recherche.",
+        "serveurs": "{n, plural, =0 {aucun serveur} one {# serveur} other {# serveurs}}",
+        "suspendu": "Compte suspendu",
+        "avec2fa": "Second facteur actif",
+        "sans2fa": "Sans second facteur",
+        "adresseConfirmee": "adresse confirmée",
+        "adresseNonConfirmee": "adresse non confirmée",
+        "suspendre": "Suspendre",
+        "retablir": "Rétablir",
+        "suspendreTitre": "Suspendre {nom} ?",
+        "suspendreCorps": "Le compte est déconnecté partout et ne peut plus se connecter. Le motif reste interne, lu par le personnel seulement.",
+        "motif": "Motif",
+        "motifVide": "Le motif est exigé.",
+        "motifLong": "500 caractères au plus.",
+        "confirmationAnnulee": "Confirmation annulée : rien n'est parti.",
+        "retablirTitre": "Rétablir ce compte ?",
+        "retablirCorps": "Le compte peut de nouveau se connecter.",
+        "deconnecter": "Déconnecter partout",
+        "deconnecterTitre": "Déconnecter ce compte partout ?",
+        "deconnecterCorps": "Ses sessions se ferment et ses téléphones liés sont retirés : il devra se reconnecter et relier l'application."
+      },
+      "incidents": {
+        "titre": "Incidents",
+        "nouveau": "Ouvrir un incident",
+        "aucunOuvert": "Aucun incident ouvert.",
+        "clos": "Derniers incidents clos",
+        "closFige": "Incident clos : il ne reçoit plus de mise à jour.",
+        "miseAJour": "Nouvelle mise à jour",
+        "cloture": "« Résolu » clôt l'incident, définitivement.",
+        "titreChamp": "Titre",
+        "impactChamp": "Impact",
+        "messageChamp": "Message public",
+        "publier": "Publier",
+        "public": "Publié aussitôt sur la page d'état, à la vue de tous."
+      },
+      "activite": {
+        "titre": "Journal",
+        "chercher": "Rechercher dans le journal",
+        "vide": "Aucune entrée.",
+        "plus": "Entrées plus anciennes"
+      }
+    },
+    "demo": {
+      "titre": "Démonstration",
+      "nom": "Panel de démonstration",
+      "bandeau": "Démonstration : des données fictives, rien ne quitte le téléphone. Reliez votre panel pour agir pour de vrai.",
+      "web": "La démonstration n'a pas de site : sur un vrai panel, ce bouton ouvre ses pages dans le navigateur.",
+      "fichiers": "Indisponible en démonstration : sur un vrai panel, le fichier passe directement entre le téléphone et le serveur."
     }
   }
 }

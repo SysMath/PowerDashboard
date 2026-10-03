@@ -13,18 +13,17 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { z } from "zod";
-import { requestOrigin } from "../../common/request-origin";
 import { PlatformSettingsService } from "../admin/platform-settings.service";
 import { ImpersonationReadOnlyGuard } from "../auth/impersonation.guard";
 import type { AuthenticatedRequest } from "../auth/session.guard";
-import { SessionGuard } from "../auth/session.guard";
+import { isBrowserSession, SessionGuard } from "../auth/session.guard";
 import { BillingService } from "../billing/billing.service";
 import { NodeCapabilitiesService } from "../node-agent/node-capabilities.service";
 import { ResellerQuotaService } from "../reseller/reseller-quota.service";
 import { CatalogueService } from "./catalogue.service";
 import { ClientNodesService } from "./client-nodes.service";
 import { type ClientServer, ClientServersService } from "./client-servers.service";
-import { ServerAccessService } from "./server-access.service";
+import { accessPrincipal, ServerAccessService } from "./server-access.service";
 import { ServerProvisioningService } from "./server-provisioning.service";
 import { SubusersService } from "./subusers.service";
 
@@ -197,6 +196,10 @@ export class ClientController {
         "Les clés d'API ne peuvent pas créer de serveur. Connectez-vous au panel.",
       );
     }
+    // Ni l'application mobile : le formulaire de création reste sur le web.
+    if (!isBrowserSession(request)) {
+      throw new ForbiddenException("Un serveur se crée dans le panel, depuis un navigateur.");
+    }
 
     /*
      * Le libre-service peut être fermé, et le drapeau le dit vraiment.
@@ -258,11 +261,7 @@ export class ClientController {
   ): Promise<{ data: ClientServer & { snapshots: boolean } }> {
     // Lève 404 pour un inconnu — même réponse que « n'existe pas », pour qu'on
     // ne puisse pas énumérer les serveurs des autres.
-    await this.access.require(
-      { id: request.user.id, scopes: request.scopes, origin: requestOrigin(request) },
-      id,
-      "console.read",
-    );
+    await this.access.require(accessPrincipal(request), id, "console.read");
 
     const server = await this.servers.byId(id, request.user.id);
     if (!server) throw new NotFoundException("Serveur introuvable.");
@@ -286,11 +285,7 @@ export class ClientController {
     @Req() request: ClientRequest,
     @Param("id") id: string,
   ): Promise<{ data: { commands: string[] } }> {
-    await this.access.require(
-      { id: request.user.id, scopes: request.scopes, origin: requestOrigin(request) },
-      id,
-      "console.read",
-    );
+    await this.access.require(accessPrincipal(request), id, "console.read");
     return { data: { commands: await this.servers.consoleCommands(id) } };
   }
 }

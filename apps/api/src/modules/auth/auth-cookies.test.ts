@@ -3,6 +3,7 @@ import { join, relative } from "node:path";
 import type { ExecutionContext } from "@nestjs/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiKeyRepository } from "./api-key.repository";
+import type { AppDeviceRepository } from "./app-device.repository";
 import type { SecurityAlertService } from "./security-alert.service";
 import { SessionGuard } from "./session.guard";
 import type { SessionRepository, SessionUser } from "./session.repository";
@@ -90,6 +91,7 @@ describe("cookies d'authentification de l'API", () => {
     const guard = new SessionGuard(
       { resolve } as unknown as SessionRepository,
       { resolve: async () => null } as unknown as ApiKeyRepository,
+      {} as AppDeviceRepository,
     );
     const request = { cookies: { "__Host-gd_session": "jeton-de-session" }, headers: {} };
     const context = {

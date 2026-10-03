@@ -8,6 +8,7 @@
 | [Décisions d'architecture](./adr/README.md) | Pourquoi le projet est construit ainsi, une décision par fichier |
 | [Runbooks](./runbooks/README.md) | Procédures d'exploitation : jetons de node, machine injoignable, clé maître des secrets, déplacement de serveur, restauration de la base, incident de sécurité |
 | [Runner auto-hébergé](./runner-auto-heberge.md) | Faire tourner la CI et les releases sur notre propre machine |
+| [Application mobile](./application-mobile.md) | Développer l'application iOS et Android, et la publier sur les pistes de test des magasins |
 | [Sous-domaines des serveurs](./sous-domaines.md) | Régler la zone Cloudflare où le panel publie les adresses des serveurs, et ce qu'il y écrit |
 | [Reprise Pterodactyl](./reprise-pterodactyl.md) | Basculer un panel Pterodactyl existant, Wings compris |
 | [Audit ASVS niveau 2](./securite/audit-asvs-l2.md) | Consigne de l'audit de sécurité de la V1, à confier à une session Claude |

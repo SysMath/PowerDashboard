@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { type ReactNode, useCallback, useMemo, useState, useTransition } from "react";
 import { PasswordForm } from "@/components/password-form";
 import { SshKeyList } from "@/components/ssh-key-list";
 import { TwoFactorSection } from "@/components/two-factor-section";
@@ -62,12 +62,15 @@ export function SecurityWorkspace({
   twoFactor,
   passkeys,
   sshKeys,
+  mobile,
   provisionalPassword = false,
 }: {
   initial: AccountSession[];
   twoFactor: TwoFactorStatus;
   passkeys: Passkey[];
   sshKeys: SshKey[];
+  /** Application mobile : code QR et téléphones liés (ADR 0010). */
+  mobile?: ReactNode;
   /** Arrivé ici depuis la connexion, avec un mot de passe provisoire. */
   provisionalPassword?: boolean;
 }) {
@@ -233,6 +236,8 @@ export function SecurityWorkspace({
       <SettingsSection title={t("sshSection")} description={t("sshSectionHint")}>
         <SshKeyList initial={sshKeys} localPassword={twoFactor.localPassword} />
       </SettingsSection>
+
+      {mobile}
 
       <SettingsSection
         title={t("sessions")}

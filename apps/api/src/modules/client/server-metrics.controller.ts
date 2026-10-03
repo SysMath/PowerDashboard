@@ -9,11 +9,10 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { requestOrigin } from "../../common/request-origin";
 import { ImpersonationReadOnlyGuard } from "../auth/impersonation.guard";
 import type { AuthenticatedRequest } from "../auth/session.guard";
 import { SessionGuard } from "../auth/session.guard";
-import { ServerAccessService } from "./server-access.service";
+import { accessPrincipal, ServerAccessService } from "./server-access.service";
 import { ServerMetricsService } from "./server-metrics.service";
 
 /**
@@ -58,11 +57,7 @@ export class ServerMetricsController {
       );
     }
 
-    await this.access.require(
-      { id: request.user.id, scopes: request.scopes, origin: requestOrigin(request) },
-      id,
-      "console.read",
-    );
+    await this.access.require(accessPrincipal(request), id, "console.read");
 
     // La réponse repasse par son schéma : c'est le contrat promis à l'écran et
     // au SDK, et une colonne rendue en chaîne par le pilote doit casser ici,

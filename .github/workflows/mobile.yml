@@ -1,0 +1,376 @@
+name: Application mobile
+
+# Construit, signe et envoie l'application mobile (ADR 0010) sur les pistes
+# de test des magasins : piste interne de Google Play et TestFlight. La
+# publication au public reste un geste des consoles des magasins.
+#
+# Se déclenche en poussant une étiquette :
+#
+#   git tag mobile-v1.2.0 && git push origin mobile-v1.2.0
+#
+# Les secrets de signature vivent dans l'environnement GitHub `magasins`,
+# dont chaque déploiement attend l'approbation de Matheo, et ne sont jamais
+# donnés à une exécution venue d'une PR : ce workflow n'en a pas
+# (docs/application-mobile.md, « Publier »).
+
+on:
+  push:
+    tags: ["mobile-v*"]
+  # Republier une étiquette existante, après une panne par exemple.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Étiquette existante à publier (ex. mobile-v1.2.0)"
+        required: true
+      runner:
+        description: "Runner : celui de la variable CI_RUNNER, ceux de GitHub, ou l'auto-hébergé"
+        type: choice
+        options: [CI_RUNNER, ubuntu-latest, self-hosted]
+        default: CI_RUNNER
+
+# Une seule publication à la fois par version, jamais annulée en cours de
+# route : un envoi coupé laisserait une session ouverte chez un magasin.
+concurrency:
+  group: mobile-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI: "true"
+  TURBO_TELEMETRY_DISABLED: 1
+  # Le numéro de construction des deux magasins : il ne fait que croître.
+  # Une relance garde le sien, et un magasin refuse alors un doublon.
+  GAMEDASHBOARD_MOBILE_BUILD: ${{ github.run_number }}
+
+jobs:
+  verifier:
+    name: Vérifications
+    uses: ./.github/workflows/ci.yml
+    with:
+      runner: ${{ inputs.runner || 'CI_RUNNER' }}
+
+  android:
+    name: Android (APK, AAB, Google Play)
+    needs: verifier
+    # Même runner que la CI, même conteneur Linux (infra/ci/linux.sh).
+    runs-on: ${{ fromJSON(inputs.runner && inputs.runner != 'CI_RUNNER' && toJSON(inputs.runner) || vars.CI_RUNNER || '"self-hosted"') }}
+    environment: magasins
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      # Attestations de provenance et d'inventaire des binaires.
+      id-token: write
+      attestations: write
+    env:
+      ETIQUETTE: ${{ inputs.version || github.ref_name }}
+
+    steps:
+      # Voir release.yml : bash de Git et docker.exe dans le PATH du service.
+      - name: Bash de Git et Docker
+        if: runner.os == 'Windows'
+        shell: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
+        run: |
+          $git = @("$env:ProgramFiles\Git\bin", "${env:ProgramFiles(x86)}\Git\bin", "$env:LOCALAPPDATA\Programs\Git\bin") |
+            Where-Object { Test-Path "$_\bash.exe" } | Select-Object -First 1
+          if (-not $git) { Write-Output "::error::Git for Windows introuvable sur le runner (docs/runner-auto-heberge.md)."; exit 1 }
+          Add-Content -Path $env:GITHUB_PATH -Value $git
+          if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+            $docker = "$env:ProgramFiles\Docker\Docker\resources\bin"
+            if (-not (Test-Path "$docker\docker.exe")) { Write-Output "::error::docker.exe introuvable sur le runner (docs/runner-auto-heberge.md)."; exit 1 }
+            Add-Content -Path $env:GITHUB_PATH -Value $docker
+          }
+
+      - name: Fins de ligne du dépôt
+        run: git config --global core.autocrlf false
+
+      # Sans jeton dans .git/config : le dépôt est copié dans le conteneur, où
+      # tourne le code des dépendances.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.version || github.ref }}
+          persist-credentials: false
+
+      - name: Contrôler l'étiquette
+        run: |
+          [[ "$ETIQUETTE" =~ ^mobile-v([0-9]+\.[0-9]+\.[0-9]+)$ ]] \
+            || { echo "::error::Étiquette invalide : $ETIQUETTE (attendu : mobile-v1.2.3)"; exit 1; }
+          git rev-parse -q --verify "refs/tags/$ETIQUETTE" >/dev/null \
+            || { echo "::error::L'étiquette $ETIQUETTE n'existe pas."; exit 1; }
+          echo "GAMEDASHBOARD_MOBILE_VERSION=${BASH_REMATCH[1]}" >>"$GITHUB_ENV"
+
+      # Avant toute construction : une clé absente donnerait un binaire signé
+      # par la clé de débogage, que android.sh refuse de toute façon.
+      - name: Secrets de Google Play
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          GD_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_MOT_DE_PASSE }}
+          GD_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_CLE_ALIAS }}
+          GD_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_CLE_MOT_DE_PASSE }}
+          PLAY_COMPTE_SERVICE: ${{ secrets.PLAY_COMPTE_SERVICE }}
+        run: |
+          manque=0
+          for nom in ANDROID_KEYSTORE_BASE64 GD_ANDROID_KEYSTORE_PASSWORD GD_ANDROID_KEY_ALIAS GD_ANDROID_KEY_PASSWORD PLAY_COMPTE_SERVICE; do
+            [ -n "${!nom}" ] || { echo "::error::Secret absent de l'environnement magasins : $nom"; manque=1; }
+          done
+          exit "$manque"
+
+      - name: Conteneur Linux
+        run: bash infra/ci/linux.sh ouvrir
+
+      - name: Installer les dépendances
+        run: bash infra/ci/linux.sh lancer 'pnpm install --frozen-lockfile'
+
+      - name: JDK et SDK Android
+        run: bash infra/ci/linux.sh lancer 'bash apps/mobile/scripts/android.sh outils'
+
+      # La clé d'envoi n'est donnée qu'à cette commande (GD_LINUX_TRANSMETTRE),
+      # pas au conteneur : elle n'existait pas pendant l'installation.
+      # Notifications poussées (ADR 0010, lot 4) : facultatives, une
+      # construction sans projet Expo relève la cloche de chaque panel.
+      - name: Construire et signer
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          GD_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_MOT_DE_PASSE }}
+          GD_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_CLE_ALIAS }}
+          GD_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_CLE_MOT_DE_PASSE }}
+          EXPO_PROJECT_ID: ${{ vars.EXPO_PROJET }}
+          GAMEDASHBOARD_PUSH_RELAYS: ${{ vars.RELAIS_NOTIFICATIONS }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          [ -n "$EXPO_PROJECT_ID" ] && [ -n "$GOOGLE_SERVICES_JSON" ] \
+            || echo "::warning::EXPO_PROJET ou GOOGLE_SERVICES_JSON absent : application sans notifications poussées."
+          GD_LINUX_TRANSMETTRE="GAMEDASHBOARD_MOBILE_VERSION GAMEDASHBOARD_MOBILE_BUILD ANDROID_KEYSTORE_BASE64 GD_ANDROID_KEYSTORE_PASSWORD GD_ANDROID_KEY_ALIAS GD_ANDROID_KEY_PASSWORD EXPO_PROJECT_ID GAMEDASHBOARD_PUSH_RELAYS GOOGLE_SERVICES_JSON" \
+            bash infra/ci/linux.sh lancer 'bash apps/mobile/scripts/android.sh construire'
+
+      # Inventaire des dépendances livrées dans l'application (CycloneDX),
+      # par pnpm lui-même : celui de Trivy décrirait tout le dépôt.
+      - name: Inventaire des dépendances (SBOM)
+        run: |
+          GD_LINUX_TRANSMETTRE=GAMEDASHBOARD_MOBILE_VERSION bash infra/ci/linux.sh lancer '
+            pnpm sbom --sbom-format cyclonedx --sbom-spec-version 1.6 --prod \
+              --filter @gamedashboard/mobile \
+              --out "dist-mobile/gamedashboard-mobile-$GAMEDASHBOARD_MOBILE_VERSION-android.cdx.json"'
+
+      - name: Rapatrier les binaires
+        run: bash infra/ci/linux.sh rapatrier dist-mobile
+
+      - name: Attester la provenance
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: |
+            dist-mobile/gamedashboard-mobile-*.apk
+            dist-mobile/gamedashboard-mobile-*.aab
+
+      - name: Attester l'inventaire
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist-mobile/gamedashboard-mobile-*.aab
+          sbom-path: dist-mobile/gamedashboard-mobile-${{ env.GAMEDASHBOARD_MOBILE_VERSION }}-android.cdx.json
+
+      # Avant l'envoi : le tout premier AAB d'une application se dépose à la
+      # main dans la console de Google Play, qui refuse l'API jusque-là.
+      - name: Conserver les binaires
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gamedashboard-mobile-android-${{ env.GAMEDASHBOARD_MOBILE_VERSION }}
+          path: dist-mobile/
+          retention-days: 30
+
+      # PLAY_STATUT : `draft` tant que la fiche n'a jamais été publiée.
+      - name: Envoyer sur la piste de test de Google Play
+        env:
+          PLAY_COMPTE_SERVICE: ${{ secrets.PLAY_COMPTE_SERVICE }}
+          PLAY_STATUT: ${{ vars.PLAY_STATUT }}
+        run: |
+          GD_LINUX_TRANSMETTRE="GAMEDASHBOARD_MOBILE_VERSION PLAY_COMPTE_SERVICE PLAY_STATUT" bash infra/ci/linux.sh lancer '
+            node apps/mobile/scripts/google-play.mts \
+              "dist-mobile/gamedashboard-mobile-$GAMEDASHBOARD_MOBILE_VERSION.aab" "$GAMEDASHBOARD_MOBILE_VERSION"'
+
+      - name: Rendre la machine du runner
+        if: always()
+        run: bash infra/ci/linux.sh fermer
+
+  ios:
+    name: iOS (IPA, TestFlight)
+    needs: verifier
+    # La seule exception à la règle du conteneur Linux (ADR 0010) : un
+    # binaire iOS exige macOS et Xcode, que ni le runner Windows ni un
+    # conteneur n'ont. Runner macOS de GitHub, gratuit pour un dépôt public.
+    runs-on: macos-latest
+    environment: magasins
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      ETIQUETTE: ${{ inputs.version || github.ref_name }}
+      # Lus par app.config.ts au projet Xcode puis à l'archive (expo-constants).
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJET }}
+      GAMEDASHBOARD_PUSH_RELAYS: ${{ vars.RELAIS_NOTIFICATIONS }}
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.version || github.ref }}
+          persist-credentials: false
+
+      - name: Contrôler l'étiquette
+        run: |
+          [[ "$ETIQUETTE" =~ ^mobile-v([0-9]+\.[0-9]+\.[0-9]+)$ ]] \
+            || { echo "::error::Étiquette invalide : $ETIQUETTE (attendu : mobile-v1.2.3)"; exit 1; }
+          git rev-parse -q --verify "refs/tags/$ETIQUETTE" >/dev/null \
+            || { echo "::error::L'étiquette $ETIQUETTE n'existe pas."; exit 1; }
+          echo "GAMEDASHBOARD_MOBILE_VERSION=${BASH_REMATCH[1]}" >>"$GITHUB_ENV"
+
+      # L'équipe (identifiant à dix caractères du compte de développeur) n'est
+      # pas un secret : une variable de l'environnement magasins.
+      - name: Secrets d'Apple
+        env:
+          GD_IOS_EQUIPE: ${{ vars.APPLE_EQUIPE }}
+          APPLE_CERTIFICAT_P12: ${{ secrets.APPLE_CERTIFICAT_P12 }}
+          APPLE_CERTIFICAT_MOT_DE_PASSE: ${{ secrets.APPLE_CERTIFICAT_MOT_DE_PASSE }}
+          APPLE_PROFIL: ${{ secrets.APPLE_PROFIL }}
+          APPLE_CLE_API: ${{ secrets.APPLE_CLE_API }}
+          APPLE_CLE_API_ID: ${{ secrets.APPLE_CLE_API_ID }}
+          APPLE_EMETTEUR_API: ${{ secrets.APPLE_EMETTEUR_API }}
+        run: |
+          manque=0
+          for nom in GD_IOS_EQUIPE APPLE_CERTIFICAT_P12 APPLE_CERTIFICAT_MOT_DE_PASSE APPLE_PROFIL APPLE_CLE_API APPLE_CLE_API_ID APPLE_EMETTEUR_API; do
+            [ -n "${!nom}" ] || { echo "::error::Absent de l'environnement magasins : $nom"; manque=1; }
+          done
+          [ "$manque" = 0 ] || exit 1
+          [[ "$GD_IOS_EQUIPE" =~ ^[A-Z0-9]{10}$ ]] || { echo "::error::APPLE_EQUIPE invalide : $GD_IOS_EQUIPE"; exit 1; }
+          echo "GD_IOS_EQUIPE=$GD_IOS_EQUIPE" >>"$GITHUB_ENV"
+
+      # Node à la version du dépôt, pnpm à celle de `packageManager`.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Installer les dépendances
+        run: |
+          npm install -g --no-fund --no-audit --loglevel=error "$(node -p 'require("./package.json").packageManager')"
+          pnpm install --frozen-lockfile --filter "@gamedashboard/mobile..."
+          xcodebuild -version
+
+      # Trousseau jetable, détruit en fin de job ; le profil s'installe sous
+      # son UUID, et son nom va au projet (plugins/signature.ts).
+      - name: Certificat et profil de distribution
+        env:
+          APPLE_CERTIFICAT_P12: ${{ secrets.APPLE_CERTIFICAT_P12 }}
+          APPLE_CERTIFICAT_MOT_DE_PASSE: ${{ secrets.APPLE_CERTIFICAT_MOT_DE_PASSE }}
+          APPLE_PROFIL: ${{ secrets.APPLE_PROFIL }}
+        run: |
+          trousseau=$RUNNER_TEMP/magasins.keychain-db
+          mot=$(openssl rand -hex 24)
+          security create-keychain -p "$mot" "$trousseau"
+          security set-keychain-settings -lut 3600 "$trousseau"
+          security unlock-keychain -p "$mot" "$trousseau"
+          (umask 077; printf '%s' "$APPLE_CERTIFICAT_P12" | base64 --decode >"$RUNNER_TEMP/distribution.p12")
+          security import "$RUNNER_TEMP/distribution.p12" -k "$trousseau" -P "$APPLE_CERTIFICAT_MOT_DE_PASSE" \
+            -T /usr/bin/codesign -T /usr/bin/security >/dev/null
+          rm -f "$RUNNER_TEMP/distribution.p12"
+          security set-key-partition-list -S apple-tool:,apple: -k "$mot" "$trousseau" >/dev/null
+          security list-keychains -d user -s "$trousseau" $(security list-keychains -d user | tr -d '"')
+
+          profil=$RUNNER_TEMP/magasins.mobileprovision
+          printf '%s' "$APPLE_PROFIL" | base64 --decode >"$profil"
+          security cms -D -i "$profil" >"$RUNNER_TEMP/profil.plist"
+          identifiant=$(sed -n 's/^export const IDENTIFIANT = "\(.*\)";$/\1/p' apps/mobile/identifiant.ts)
+          attendu="$GD_IOS_EQUIPE.$identifiant"
+          vise=$(plutil -extract Entitlements.application-identifier raw "$RUNNER_TEMP/profil.plist")
+          [ "$vise" = "$attendu" ] || { echo "::error::Le profil vise $vise, pas $attendu."; exit 1; }
+          uuid=$(plutil -extract UUID raw "$RUNNER_TEMP/profil.plist")
+          for dossier in "$HOME/Library/MobileDevice/Provisioning Profiles" \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$dossier"
+            cp "$profil" "$dossier/$uuid.mobileprovision"
+          done
+          {
+            echo "GD_IOS_PROFIL=$(plutil -extract Name raw "$RUNNER_TEMP/profil.plist")"
+            echo "GD_IOS_IDENTIFIANT=$identifiant"
+          } >>"$GITHUB_ENV"
+
+      - name: Projet Xcode
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Archiver
+        working-directory: apps/mobile/ios
+        run: |
+          xcodebuild -workspace GameDashboard.xcworkspace -scheme GameDashboard \
+            -configuration Release -destination generic/platform=iOS \
+            -archivePath "$RUNNER_TEMP/GameDashboard.xcarchive" archive
+
+      - name: Exporter l'IPA
+        run: |
+          options=$RUNNER_TEMP/ExportOptions.plist
+          plutil -create xml1 "$options"
+          plutil -insert method -string app-store-connect "$options"
+          plutil -insert destination -string export "$options"
+          plutil -insert teamID -string "$GD_IOS_EQUIPE" "$options"
+          plutil -insert signingStyle -string manual "$options"
+          plutil -insert provisioningProfiles -dictionary "$options"
+          plutil -insert "provisioningProfiles.$GD_IOS_IDENTIFIANT" -string "$GD_IOS_PROFIL" "$options"
+          plutil -insert manageAppVersionAndBuildNumber -bool false "$options"
+          plutil -insert uploadSymbols -bool true "$options"
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/GameDashboard.xcarchive" \
+            -exportOptionsPlist "$options" -exportPath "$RUNNER_TEMP/export"
+          mkdir -p dist-mobile
+          mv "$RUNNER_TEMP"/export/*.ipa "dist-mobile/gamedashboard-mobile-$GAMEDASHBOARD_MOBILE_VERSION.ipa"
+
+      - name: Inventaire des dépendances (SBOM)
+        run: |
+          pnpm sbom --sbom-format cyclonedx --sbom-spec-version 1.6 --prod \
+            --filter @gamedashboard/mobile \
+            --out "dist-mobile/gamedashboard-mobile-$GAMEDASHBOARD_MOBILE_VERSION-ios.cdx.json"
+
+      - name: Attester la provenance
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: dist-mobile/gamedashboard-mobile-*.ipa
+
+      - name: Attester l'inventaire
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist-mobile/gamedashboard-mobile-*.ipa
+          sbom-path: dist-mobile/gamedashboard-mobile-${{ env.GAMEDASHBOARD_MOBILE_VERSION }}-ios.cdx.json
+
+      - name: Conserver les binaires
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gamedashboard-mobile-ios-${{ env.GAMEDASHBOARD_MOBILE_VERSION }}
+          path: dist-mobile/
+          retention-days: 30
+
+      # Clé de l'API App Store Connect, rôle « Développeur » : elle dépose des
+      # versions, elle ne publie rien.
+      - name: Envoyer sur TestFlight
+        env:
+          APPLE_CLE_API: ${{ secrets.APPLE_CLE_API }}
+          APPLE_CLE_API_ID: ${{ secrets.APPLE_CLE_API_ID }}
+          APPLE_EMETTEUR_API: ${{ secrets.APPLE_EMETTEUR_API }}
+        run: |
+          export API_PRIVATE_KEYS_DIR=$RUNNER_TEMP/cles-api
+          mkdir -p "$API_PRIVATE_KEYS_DIR"
+          (umask 077; printf '%s' "$APPLE_CLE_API" >"$API_PRIVATE_KEYS_DIR/AuthKey_$APPLE_CLE_API_ID.p8")
+          xcrun altool --upload-app --type ios \
+            --file "dist-mobile/gamedashboard-mobile-$GAMEDASHBOARD_MOBILE_VERSION.ipa" \
+            --apiKey "$APPLE_CLE_API_ID" --apiIssuer "$APPLE_EMETTEUR_API"
+
+      - name: Effacer le trousseau et les clés
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/magasins.keychain-db" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/cles-api" "$RUNNER_TEMP/magasins.mobileprovision" "$RUNNER_TEMP/profil.plist"
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision \
+            "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.mobileprovision

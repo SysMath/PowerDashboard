@@ -1,12 +1,12 @@
 import {
   channelsFor,
-  NOTIFICATION_CHANNELS,
   NOTIFICATION_EVENTS,
   type NotificationChannel,
+  storedChannels,
 } from "@gamedashboard/contracts";
-import { type Database, notificationPreferences } from "@gamedashboard/db";
+import { appDevices, type Database, notificationPreferences } from "@gamedashboard/db";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database.provider";
 
 /** Un événement, tel que l'écran du compte le présente. */
@@ -69,6 +69,9 @@ export class NotificationPreferencesRepository {
    * écran, elle peut porter un canal retiré depuis, et faire échouer
    * l'enregistrement entier pour cela ferait perdre les choix valides.
    *
+   * Le téléphone y est toujours dit, coupé ou non (`storedChannels`) : un
+   * choix enregistré ne retombe plus sur le défaut.
+   *
    * Un événement obligatoire est **ignoré** en silence côté écriture — l'écran
    * ne le propose pas, et une requête forgée ne doit pas pouvoir couper une
    * annonce de suspension.
@@ -77,9 +80,8 @@ export class NotificationPreferencesRepository {
     const event = NOTIFICATION_EVENTS.find((candidate) => candidate.type === type);
     if (!event || event.mandatory) return;
 
-    const clean = NOTIFICATION_CHANNELS.filter((channel) => channels.includes(channel));
     const values = {
-      channels: [...clean],
+      channels: storedChannels(channels),
       updatedAt: new Date().toISOString(),
     };
 
@@ -90,6 +92,27 @@ export class NotificationPreferencesRepository {
         target: [notificationPreferences.userId, notificationPreferences.event],
         set: values,
       });
+  }
+
+  /**
+   * Téléphones de ce compte qui recevront ses notifications poussées : liés,
+   * valables, et inscrits dans le mode que sert le panel. L'écran le dit
+   * quand il n'y en a aucun, plutôt que de laisser croire qu'ils sonneront.
+   */
+  async pushDevices(userId: string, mode: string): Promise<number> {
+    const [row] = await this.db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(appDevices)
+      .where(
+        and(
+          eq(appDevices.userId, userId),
+          eq(appDevices.pushMode, mode),
+          isNotNull(appDevices.pushHandle),
+          isNull(appDevices.revokedAt),
+          gt(appDevices.expiresAt, sql`now()`),
+        ),
+      );
+    return row?.n ?? 0;
   }
 
   private async storedFor(userId: string): Promise<Map<string, string[]>> {

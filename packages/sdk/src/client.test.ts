@@ -1,6 +1,10 @@
 import {
+  APP_PRESENCE_HEADER,
+  APP_PRESENCE_ROUTES,
   APPLICATION_ROUTES,
   type ApiRoute,
+  BACKUP_RESTORE_TIMEOUT_MS,
+  BACKUP_SAFETY_WAIT_MS,
   CLIENT_ROUTES,
   SESSION_ROUTES,
 } from "@gamedashboard/contracts";
@@ -139,6 +143,71 @@ describe("GameDashboardClient", () => {
     expect(entetes(appel, 0).Authorization).toBe("Bearer gd_live_essai");
   });
 
+  it("demande le jeton du moment à chaque appel quand on lui donne une fonction", async () => {
+    // Le jeton d'un appareil mobile change toutes les quinze minutes : le
+    // client ne doit jamais garder celui de sa construction.
+    const jetons = ["gd_mob_un", "gd_mob_deux"];
+    const appel = espion(() => fausseReponse({ data: [] }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: async () => jetons.shift() ?? "",
+      fetch: appel,
+    });
+    await c.servers();
+    await c.servers();
+    expect(entetes(appel, 0).Authorization).toBe("Bearer gd_mob_un");
+    expect(entetes(appel, 1).Authorization).toBe("Bearer gd_mob_deux");
+  });
+
+  it("rejoue un 401 une seule fois, après un renouvellement réussi", async () => {
+    let jeton = "gd_mob_perime";
+    const appel = espion((_url, init) =>
+      (init?.headers as Record<string, string> | undefined)?.Authorization === "Bearer gd_mob_frais"
+        ? fausseReponse({ data: [] })
+        : fausseReponse({ title: "Session expirée" }, 401),
+    );
+    const renouveler = vi.fn(async () => {
+      jeton = "gd_mob_frais";
+      return true;
+    });
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: async () => jeton,
+      onUnauthorized: renouveler,
+      fetch: appel,
+    });
+
+    await expect(c.servers()).resolves.toEqual([]);
+    expect(renouveler).toHaveBeenCalledTimes(1);
+    expect(appel).toHaveBeenCalledTimes(2);
+  });
+
+  it("laisse remonter le 401 quand le renouvellement échoue, sans boucler", async () => {
+    const appel = espion(() => fausseReponse({ title: "Session expirée" }, 401));
+    const renouveler = vi.fn(async () => false);
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: async () => "gd_mob_perime",
+      onUnauthorized: renouveler,
+      fetch: appel,
+    });
+
+    const echec = await c.servers().catch((error: unknown) => error);
+    expect((echec as ApiProblem).status).toBe(401);
+    expect(renouveler).toHaveBeenCalledTimes(1);
+    expect(appel).toHaveBeenCalledTimes(1);
+  });
+
+  it("lit la cloche avec son nombre de non lues", async () => {
+    const appel = espion(() =>
+      fausseReponse({ data: [{ id: "n1", title: "Survie : hors ligne" }], meta: { unread: 3 } }),
+    );
+    await expect(client(appel).notifications()).resolves.toEqual({
+      items: [{ id: "n1", title: "Survie : hors ligne" }],
+      unread: 3,
+    });
+  });
+
   /*
    * Non-régression : `suspendServer` et `unsuspendServer` appelaient
    * `…/suspend` et `…/unsuspend`, deux routes que l'API applicative n'a jamais
@@ -170,6 +239,8 @@ describe("GameDashboardClient", () => {
     await c.websocketGrant(id);
     await c.command(id, "say bonjour");
     await c.players(id);
+    await c.notifications();
+    await c.markNotificationsRead();
     await c.playerAction(id, { action: "kick", player: "Steve" });
     const nom = "gd-20260930T120000.000Z";
     await c.snapshots(id);
@@ -177,6 +248,22 @@ describe("GameDashboardClient", () => {
     await c.pinSnapshot(id, nom, "avant la mise à jour");
     await c.unpinSnapshot(id, nom);
     await c.restoreSnapshot(id, nom);
+    const sauvegarde = "7f3a9c2e";
+    await c.backups(id);
+    await c.createBackup(id, "avant-mise-a-jour");
+    await c.lockBackup(id, sauvegarde, true);
+    await c.restoreBackup(id, sauvegarde, true);
+    await c.deleteBackup(id, sauvegarde);
+    await c.files(id, "/plugins");
+    await c.fileContents(id, "/server.properties");
+    await c.writeFile(id, "/server.properties", "motd=Bonjour");
+    await c.createDirectory(id, "/", "mondes");
+    await c.renameFile(id, "/", "a.txt", "b.txt");
+    await c.deleteFiles(id, "/", ["b.txt"]);
+    await c.compressFiles(id, "/", ["world"]);
+    await c.decompressFile(id, "/", "world.tar.gz");
+    await c.fileDownloadUrl(id, "/latest.log");
+    await c.uploadGrant(id);
     await c.createServer({});
     await c.suspendServer(id, "impayé");
     await c.unsuspendServer(id);
@@ -185,13 +272,223 @@ describe("GameDashboardClient", () => {
     await c.terminateServer(id);
     await c.ssoLink({ externalId: "client-42" });
     await c.consumption({ from: "2026-09-01", to: "2026-09-30" });
+    await c.me();
+    await c.adminNodes();
+    await c.adminNodeAgent(id);
+    await c.adminServers();
+    await c.setAdminServerSuspended(id, true, "abus");
+    await c.adminUsers();
+    await c.setAdminUserSuspended(id, { suspended: true, reason: "fraude" });
+    await c.revokeAdminUserSessions(id);
+    await c.adminIncidents();
+    await c.openIncident({ title: "Panne", impact: "major", body: "On regarde." });
+    await c.postIncidentUpdate(id, { state: "resolved", body: "Rétabli." });
+    await c.panelUpdate();
+    await c.checkPanelUpdate();
+    await c.adminActivity({ query: "server.", page: 2 });
+    await c.resellerOverview();
+    await c.setResellerServerSuspended(id, true, "impayé");
+    await c.resellerConsumption({ from: "2026-09-01" });
     await c.openapi();
 
     const visees = appel.mock.calls.map(
       ([url, init]) =>
-        `${init?.method ?? "GET"} ${forme(new URL(String(url)).pathname.replace(id, "{x}").replace(nom, "{x}"))}`,
+        `${init?.method ?? "GET"} ${forme(new URL(String(url)).pathname.replace(id, "{x}").replace(nom, "{x}").replace("7f3a9c2e", "{x}"))}`,
     );
     expect(visees.filter((route) => !connues.has(route))).toEqual([]);
+  });
+
+  /*
+   * Un appareil mobile ne restaure ni ne supprime sans confirmer sa présence
+   * (ADR 0010) : le SDK demande l'en-tête pour exactement les routes que le
+   * panel protège, avec le chemin sans la requête, et pour aucune autre.
+   */
+  it("joint la confirmation de présence aux seuls gestes que le panel protège", async () => {
+    const appel = espion(() => fausseReponse({ data: { content: "", url: "u" } }));
+    const presence = vi.fn(async (method: string, path: string) => ({
+      [APP_PRESENCE_HEADER]: `defi.${method} ${path}`,
+    }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: "gd_mob_essai",
+      fetch: appel,
+      presence,
+    });
+    const [id, sauvegarde, nom] = ["31201e0c", "7f3a9c2e", "gd-20260930T120000.000Z"];
+    await c.backups(id);
+    await c.restoreBackup(id, sauvegarde, true);
+    await c.deleteBackup(id, sauvegarde);
+    await c.lockBackup(id, sauvegarde, false);
+    await c.files(id, "/");
+    await c.deleteFiles(id, "/", ["a"]);
+    await c.renameFile(id, "/", "a", "b");
+    await c.restoreSnapshot(id, nom);
+
+    const protegees = new Set(
+      APP_PRESENCE_ROUTES.map((r) => `${r.method} ${r.path.replace(/:\w+/g, ":x")}`),
+    );
+    appel.mock.calls.forEach(([url, init], n) => {
+      const chemin = new URL(String(url)).pathname;
+      const gabarit = `${init?.method ?? "GET"} ${chemin.replace(id, ":x").replace(sauvegarde, ":x").replace(nom, ":x")}`;
+      const entete = entetes(appel, n)[APP_PRESENCE_HEADER];
+      if (protegees.has(gabarit)) expect(entete, gabarit).toBe(`defi.${init?.method} ${chemin}`);
+      else expect(entete, gabarit).toBeUndefined();
+    });
+    expect(presence).toHaveBeenCalledTimes(4);
+  });
+
+  it("suspend un serveur du revendeur en présence, et lit son parc sans", async () => {
+    const appel = espion(() => fausseReponse({ data: {} }));
+    const presence = vi.fn(async (method: string, path: string) => ({
+      [APP_PRESENCE_HEADER]: `defi.${method} ${path}`,
+    }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: "gd_mob_essai",
+      fetch: appel,
+      presence,
+    });
+    await c.resellerOverview();
+    await c.setResellerServerSuspended("31201e0c", false);
+    expect(entetes(appel, 0)[APP_PRESENCE_HEADER]).toBeUndefined();
+    expect(entetes(appel, 1)[APP_PRESENCE_HEADER]).toBe(
+      "defi.POST /api/v1/reseller/servers/31201e0c/suspension",
+    );
+    expect(JSON.parse(String(initDe(appel, 1).body))).toEqual({ suspended: false });
+  });
+
+  it("demande la présence pour chaque geste d'administration, jamais pour une lecture", async () => {
+    const appel = espion(() => fausseReponse({ data: [] }));
+    const presence = vi.fn(async (method: string, path: string) => ({
+      [APP_PRESENCE_HEADER]: `defi.${method} ${path}`,
+    }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: "gd_mob_essai",
+      fetch: appel,
+      presence,
+    });
+    const id = "31201e0c";
+    await c.adminServers();
+    await c.adminUsers();
+    await c.adminIncidents();
+    await c.panelUpdate();
+    await c.adminActivity();
+    expect(presence).not.toHaveBeenCalled();
+    await c.setAdminServerSuspended(id, false);
+    await c.setAdminUserSuspended(id, { suspended: false });
+    await c.revokeAdminUserSessions(id);
+    await c.openIncident({ title: "Panne", impact: "minor", body: "On regarde." });
+    await c.postIncidentUpdate(id, { state: "monitoring", body: "Ça revient." });
+    await c.checkPanelUpdate();
+    expect(presence.mock.calls.map(([method, path]) => `${method} ${path}`)).toEqual([
+      `POST /api/v1/admin/servers/${id}/suspend`,
+      `POST /api/v1/admin/users/${id}/suspend`,
+      `POST /api/v1/admin/users/${id}/revoke-sessions`,
+      "POST /api/v1/admin/incidents",
+      `POST /api/v1/admin/incidents/${id}/updates`,
+      "POST /api/v1/admin/updates/check",
+    ]);
+  });
+
+  it("lit le journal de la plateforme par pages", async () => {
+    const appel = espion(() =>
+      fausseReponse({
+        data: [{ id: "a1", event: "server.created" }],
+        meta: { page: 2, hasMore: true },
+      }),
+    );
+    await expect(client(appel).adminActivity({ query: "server.", page: 2 })).resolves.toEqual({
+      items: [{ id: "a1", event: "server.created" }],
+      hasMore: true,
+    });
+    const url = new URL(String(appel.mock.calls[0]?.[0]));
+    expect(url.pathname).toBe("/api/v1/admin/activity");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ query: "server.", page: "2" });
+  });
+
+  it("lit la consommation du revendeur ligne à ligne, sans échouer sur une ligne", async () => {
+    const jsonl = `${JSON.stringify({ day: "2026-09-01", serverId: "s1" })}\nnon json\n${JSON.stringify({ day: "2026-09-02", serverId: "s1" })}\n`;
+    const appel = espion(
+      () => new Response(jsonl, { headers: { "content-type": "application/x-ndjson" } }),
+    );
+    const jours = await client(appel).resellerConsumption({ from: "2026-09-01", to: "2026-09-30" });
+    expect(jours).toEqual([
+      { day: "2026-09-01", serverId: "s1" },
+      { day: "2026-09-02", serverId: "s1" },
+    ]);
+    const url = new URL(String(appel.mock.calls[0]?.[0]));
+    expect(url.pathname).toBe("/api/v1/reseller/consumption/export");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      format: "jsonl",
+      from: "2026-09-01",
+      to: "2026-09-30",
+    });
+  });
+
+  /*
+   * Le panel résout le jeton avant de consommer le défi : la reprise après
+   * un 401 renvoie le même en-tête, sans redemander la biométrie.
+   */
+  it("garde la même confirmation de présence pour la reprise après un 401", async () => {
+    let jeton = "gd_mob_perime";
+    const appel = espion((_url, init) =>
+      (init?.headers as Record<string, string> | undefined)?.Authorization === "Bearer gd_mob_frais"
+        ? fausseReponse({ data: {} })
+        : fausseReponse({ title: "Session expirée" }, 401),
+    );
+    const presence = vi.fn(async () => ({ [APP_PRESENCE_HEADER]: "defi.signature" }));
+    const c = new GameDashboardClient({
+      baseUrl: "https://panel.example",
+      token: async () => jeton,
+      onUnauthorized: async () => {
+        jeton = "gd_mob_frais";
+        return true;
+      },
+      fetch: appel,
+      presence,
+    });
+
+    await c.deleteBackup("31201e0c", "7f3a9c2e");
+    expect(appel).toHaveBeenCalledTimes(2);
+    expect(presence).toHaveBeenCalledTimes(1);
+    expect(entetes(appel, 1)[APP_PRESENCE_HEADER]).toBe("defi.signature");
+  });
+
+  /*
+   * Le panel attend l'instantané de sûreté de l'agent avant de restaurer.
+   * Avec le délai ordinaire, le client abandonnait et disait « délai
+   * dépassé » à une restauration qui partait pourtant.
+   */
+  it("attend une restauration au-delà du délai ordinaire, et elle seule", async () => {
+    vi.useFakeTimers();
+    try {
+      const lente = (_url: string, init?: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          const fin = setTimeout(() => resolve(fausseReponse({ data: {} })), BACKUP_SAFETY_WAIT_MS);
+          init?.signal?.addEventListener("abort", () => {
+            clearTimeout(fin);
+            reject(new DOMException("interrompu", "AbortError"));
+          });
+        });
+      const c = new GameDashboardClient({
+        baseUrl: "https://panel.example",
+        token: "gd_mob_essai",
+        fetch: vi.fn(lente) as unknown as typeof fetch,
+      });
+
+      const restauration = c.restoreBackup("31201e0c", "7f3a9c2e");
+      const suppression = c.deleteBackup("31201e0c", "7f3a9c2e");
+      const issues = Promise.allSettled([restauration, suppression]);
+      await vi.advanceTimersByTimeAsync(BACKUP_SAFETY_WAIT_MS);
+      const [restauree, supprimee] = await issues;
+
+      expect(restauree.status).toBe("fulfilled");
+      expect(supprimee.status).toBe("rejected");
+      expect(BACKUP_RESTORE_TIMEOUT_MS).toBeGreaterThan(BACKUP_SAFETY_WAIT_MS);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("suspend et rétablit par la même route, avec un booléen", async () => {

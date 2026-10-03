@@ -1,4 +1,4 @@
-import { formatRelative } from "../lib/format";
+import { formatRelative } from "@gamedashboard/sdk/format";
 
 export interface RelativeTimeProps {
   /**

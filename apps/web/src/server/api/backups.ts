@@ -1,27 +1,16 @@
 "use server";
 
+import {
+  BACKUP_RESTORE_TIMEOUT_MS,
+  type ClientBackupList,
+  type ClientBackupView,
+} from "@gamedashboard/contracts";
 import { revalidatePath } from "next/cache";
 import { apiFetch, apiSend } from "./client";
 
-export interface Backup {
-  id: string;
-  name: string;
-  bytes: number;
-  checksum: string | null;
-  /** `null` = en cours. Ni réussie, ni ratée : on ne sait pas encore. */
-  isSuccessful: boolean | null;
-  isLocked: boolean;
-  createdAt: string;
-  completedAt: string | null;
-  /** `snapshot` : archivée par l'agent depuis un instantané, donc cohérente. */
-  source?: "wings" | "snapshot";
-}
-
-export interface BackupList {
-  items: Backup[];
-  used: number;
-  limit: number;
-}
+/** Définies avec l'application mobile, qui lit la même route (ADR 0010). */
+export type Backup = ClientBackupView;
+export type BackupList = ClientBackupList;
 
 export async function listBackups(serverId: string): Promise<BackupList> {
   const { data, meta } = await apiFetch<{
@@ -55,7 +44,13 @@ export async function restoreBackup(
   truncate: boolean,
 ): Promise<{ error: string | null }> {
   return act(serverId, () =>
-    apiSend(`/api/v1/client/servers/${serverId}/backups/${backupId}/restore`, { truncate }),
+    // L'API attend d'abord l'instantané de sûreté de l'agent, s'il y en a un.
+    apiSend(
+      `/api/v1/client/servers/${serverId}/backups/${backupId}/restore`,
+      { truncate },
+      "POST",
+      { delaiMs: BACKUP_RESTORE_TIMEOUT_MS },
+    ),
   );
 }
 

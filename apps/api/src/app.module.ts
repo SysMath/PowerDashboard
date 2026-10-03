@@ -6,6 +6,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { ClientModule } from "./modules/client/client.module";
 import { HealthModule } from "./modules/health/health.module";
 import { NodeAgentModule } from "./modules/node-agent/node-agent.module";
+import { PushModule } from "./modules/push/push.module";
 import { RemoteModule } from "./modules/remote/remote.module";
 import { ResellerModule } from "./modules/reseller/reseller.module";
 import { SchedulerModule } from "./modules/scheduler/scheduler.module";
@@ -32,6 +33,7 @@ import { UpdatesModule } from "./modules/updates/updates.module";
     NodeAgentModule,
     // Instantanés de volumes, première fonction de l'agent (ADR 0009).
     SnapshotsModule,
+    PushModule,
     SchedulerModule,
     // Page de statut : lecture publique sans compte, rédaction réservée.
     StatusModule,

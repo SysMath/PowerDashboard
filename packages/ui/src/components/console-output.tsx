@@ -1,9 +1,9 @@
 "use client";
 
+import type { AnsiColor, AnsiSegment } from "@gamedashboard/sdk/ansi";
+import { linkify, splitMatches } from "@gamedashboard/sdk/console-text";
 import { memo } from "react";
-import type { AnsiColor, AnsiSegment } from "../lib/ansi";
 import { cn } from "../lib/cn";
-import { linkify, splitMatches } from "../lib/console-text";
 import type { ConsoleLine } from "./console";
 
 /**

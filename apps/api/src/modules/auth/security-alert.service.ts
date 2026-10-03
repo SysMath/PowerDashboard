@@ -39,6 +39,7 @@ const WEAKENING_CHANGES: ReadonlySet<CredentialChange> = new Set([
   "twoFactorDisabled",
   "passkeyRemoved",
   "emailChanged",
+  "appDeviceReplayed",
 ]);
 
 /**
