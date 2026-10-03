@@ -83,3 +83,11 @@ auditConfig:
     # piégé en pâtirait, et un lien de l'application n'est lu que s'il porte
     # le schéma `gamedashboard://`.
     - GHSA-vcc3-ghjq-m6fr
+    # braces <= 3.0.3 : déni de service par motifs d'accolades imbriqués
+    # (sévérité haute). Aucune version corrigée publiée. Amené par l'outillage
+    # de build de apps/mobile seul : expo > @expo/cli > metro-file-map >
+    # micromatch > braces 3.0.3, qui lit les motifs de fichiers du dépôt à la
+    # compilation, sur la machine de build. Jamais embarqué dans l'application
+    # ni dans le panel, et aucun motif venu d'un tiers ne lui est donné.
+    # Décision de Matheol : avis ignoré.
+    - GHSA-vfj7-8cjw-p6xm
