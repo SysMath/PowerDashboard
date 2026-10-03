@@ -20,6 +20,7 @@ import {
   type ServerLimitsPatch,
   type UpdateStatus,
   type UploadGrant,
+  withoutTrailingSlashes,
 } from "@gamedashboard/contracts";
 
 /**
@@ -101,18 +102,6 @@ export interface ConsumptionRequest {
   page?: number;
 }
 
-/**
- * L'adresse sans ses barres obliques finales, en temps linéaire.
- *
- * Une boucle et non `replace(/\/+$/, "")`, que CodeQL signale comme
- * quadratique : sur « ////…x », la regex repart de chaque barre.
- */
-function sansBarresFinales(adresse: string): string {
-  let fin = adresse.length;
-  while (fin > 0 && adresse[fin - 1] === "/") fin--;
-  return adresse.slice(0, fin);
-}
-
 export class GameDashboardClient {
   private readonly baseUrl: string;
   private readonly token: string | (() => Promise<string>);
@@ -125,7 +114,7 @@ export class GameDashboardClient {
     // La barre finale est retirée ici une fois pour toutes : `${base}/servers`
     // avec une base qui finit par `/` donne `//servers`, que certains proxys
     // réécrivent et d'autres refusent.
-    this.baseUrl = sansBarresFinales(options.baseUrl);
+    this.baseUrl = withoutTrailingSlashes(options.baseUrl);
     this.token = options.token;
     this.onUnauthorized = options.onUnauthorized;
     this.presence = options.presence;
